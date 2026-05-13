@@ -128,8 +128,6 @@ const reviewModal = document.getElementById("review-modal");
 
 const cartBtn = document.getElementById("cart-btn");
 const cartFooter = document.querySelector(".cart-footer");
-const bottomCartFooter = document.getElementById("bottom-cart-footer");
-const bottomCartBtn = document.getElementById("bottom-cart-btn");
 
 const closeModalBtn = document.getElementById("close-modal-btn");
 const goToAddressBtn = document.getElementById("go-to-address-btn");
@@ -141,7 +139,6 @@ const finishOrderBtn = document.getElementById("finish-order-btn");
 const cartItemsContainer = document.getElementById("cart-items");
 const cartTotal = document.getElementById("cart-total");
 const cartCount = document.getElementById("cart-count");
-const bottomCartCount = document.getElementById("bottom-cart-count");
 
 const cepInput = document.getElementById("cep");
 const streetInput = document.getElementById("street");
@@ -342,36 +339,24 @@ function resetAddressForm() {
 }
 
 function showFloatingCart() {
-  if (cartFooter) {
-    cartFooter.classList.remove("cart-footer-hidden");
-    cartFooter.classList.add("cart-footer-visible");
-  }
+  if (!cartFooter) return;
 
-  if (bottomCartFooter) {
-    bottomCartFooter.classList.remove("bottom-cart-visible");
-  }
+  cartFooter.classList.remove("cart-footer-hidden", "cart-footer-bottom");
+  cartFooter.classList.add("cart-footer-visible");
 }
 
 function showBottomCart() {
-  if (cartFooter) {
-    cartFooter.classList.remove("cart-footer-visible");
-    cartFooter.classList.add("cart-footer-hidden");
-  }
+  if (!cartFooter) return;
 
-  if (bottomCartFooter) {
-    bottomCartFooter.classList.add("bottom-cart-visible");
-  }
+  cartFooter.classList.remove("cart-footer-hidden");
+  cartFooter.classList.add("cart-footer-visible", "cart-footer-bottom");
 }
 
-function hideAllCarts() {
-  if (cartFooter) {
-    cartFooter.classList.remove("cart-footer-visible");
-    cartFooter.classList.add("cart-footer-hidden");
-  }
+function hideCartFooter() {
+  if (!cartFooter) return;
 
-  if (bottomCartFooter) {
-    bottomCartFooter.classList.remove("bottom-cart-visible");
-  }
+  cartFooter.classList.remove("cart-footer-visible", "cart-footer-bottom");
+  cartFooter.classList.add("cart-footer-hidden");
 }
 
 function setupCartVisibility() {
@@ -386,7 +371,7 @@ function setupCartVisibility() {
     const hasReachedPageBottom = window.scrollY >= pageBottomThreshold;
 
     if (!hasReachedMenu) {
-      hideAllCarts();
+      hideCartFooter();
       return;
     }
 
@@ -591,10 +576,6 @@ function updateCart() {
   cartTotal.textContent = formatPrice(getCartSubtotal());
   cartCount.textContent = count;
 
-  if (bottomCartCount) {
-    bottomCartCount.textContent = count;
-  }
-
   const cartItemCountLabel = document.getElementById("cart-item-count-label");
   if (cartItemCountLabel) {
     cartItemCountLabel.textContent = count === 1 ? "1 item" : `${count} itens`;
@@ -644,7 +625,6 @@ if (cartItemsContainer) {
 
 // ===== MODAIS =====
 if (cartBtn) cartBtn.onclick = () => openModal(cartModal);
-if (bottomCartBtn) bottomCartBtn.onclick = () => openModal(cartModal);
 if (closeModalBtn) closeModalBtn.onclick = () => closeAllModals();
 
 if (goToAddressBtn) {
@@ -941,7 +921,7 @@ function updateStoreStatus() {
 // ===== INIT =====
 document.addEventListener("DOMContentLoaded", () => {
   renderMenu();
-  hideAllCarts();
+  hideCartFooter();
   bindAddToCartButtons();
   updateCart();
   updateStoreStatus();

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-br">
   <head>
     <meta charset="UTF-8" />
@@ -24,208 +24,6 @@
     <link rel="stylesheet" href="output.css" />
     <link rel="shortcut icon" href="assets/icon.ico" type="image/x-icon" />
     <title>The Burger House - Hamburgueria Artesanal</title>
-
-    <style>
-      #cart-items::-webkit-scrollbar {
-        width: 6px;
-      }
-      #cart-items::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 10px;
-      }
-      #cart-items::-webkit-scrollbar-thumb {
-        background: #fbbf24;
-        border-radius: 10px;
-      }
-      #cart-items::-webkit-scrollbar-thumb:hover {
-        background: #f59e0b;
-      }
-
-      .products-list-container {
-        display: flex;
-        flex-direction: column;
-        gap: 1.25rem;
-        width: 100%;
-      }
-
-      .product-item-card {
-        display: flex;
-        align-items: center;
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 1rem;
-        padding: 1rem;
-        gap: 1.5rem;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-      }
-
-      .product-item-card:hover {
-        border-color: #fbbf24;
-        box-shadow: 0 10px 25px rgba(251, 191, 36, 0.1);
-        transform: translateY(-3px);
-      }
-
-      .product-item-img-wrapper {
-        flex-shrink: 0;
-        width: 110px;
-        height: 110px;
-        border-radius: 0.75rem;
-        overflow: hidden;
-        background: #f9fafb;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-      }
-
-      .product-item-img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-        transition: transform 0.5s ease;
-      }
-
-      .product-item-card:hover .product-item-img {
-        transform: scale(1.1);
-      }
-
-      .product-item-info {
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-      }
-
-      .product-item-name-row {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-      }
-
-      .product-item-name {
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #111827;
-        margin: 0;
-      }
-
-      .product-item-tag {
-        font-size: 0.65rem;
-        font-weight: 700;
-        padding: 0.25rem 0.6rem;
-        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-        color: #000;
-        border-radius: 99px;
-        text-transform: uppercase;
-        letter-spacing: 0.025em;
-      }
-
-      .product-item-desc {
-        font-size: 0.875rem;
-        color: #6b7280;
-        line-height: 1.4;
-        margin: 0;
-        max-width: 500px;
-      }
-
-      .product-item-footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-top: 0.5rem;
-      }
-
-      .product-item-price {
-        font-size: 1.15rem;
-        font-weight: 800;
-        color: #f59e0b;
-      }
-
-      .btn-add-item {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 42px;
-        height: 42px;
-        background: #111827;
-        color: #fbbf24;
-        border-radius: 0.75rem;
-        transition: all 0.2s ease;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-      }
-
-      .btn-add-item:hover {
-        background: #fbbf24;
-        color: #111827;
-        transform: scale(1.05);
-      }
-
-      .btn-add-item:active {
-        transform: scale(0.95);
-      }
-
-      @media (max-width: 640px) {
-        .product-item-card {
-          padding: 0.875rem;
-          gap: 1rem;
-        }
-
-        .product-item-img-wrapper {
-          width: 85px;
-          height: 85px;
-        }
-
-        .product-item-name {
-          font-size: 0.95rem;
-        }
-
-        .product-item-desc {
-          font-size: 0.8rem;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-
-        .product-item-price {
-          font-size: 1.05rem;
-        }
-
-        .btn-add-item {
-          width: 38px;
-          height: 38px;
-        }
-      }
-
-      @media (max-width: 400px) {
-        .product-item-card {
-          gap: 0.75rem;
-        }
-
-        .product-item-img-wrapper {
-          width: 75px;
-          height: 75px;
-        }
-      }
-
-      .section-header {
-        margin-bottom: 2.5rem;
-      }
-
-      .section-title {
-        font-size: 1.75rem;
-        font-weight: 800;
-        color: #111827;
-        display: flex;
-        align-items: center;
-      }
-
-      .section-subtitle {
-        color: #6b7280;
-        margin-top: 0.25rem;
-      }
-    </style>
   </head>
 
   <body>
@@ -262,7 +60,11 @@
             <p class="text-base font-medium">Seg à Dom • 18h às 23h</p>
           </div>
 
-          <div id="date-span" class="badge-status badge-open" aria-live="polite">
+          <div
+            id="date-span"
+            class="badge-status badge-open"
+            aria-live="polite"
+          >
             <span class="status-dot"></span>
             <span id="status-text">Aberto agora</span>
           </div>
@@ -292,32 +94,45 @@
       </section>
     </main>
 
-    <div class="bg-black/60 w-full h-full fixed top-0 left-0 z-[99] flex items-center justify-center hidden" id="cart-modal" role="dialog" aria-modal="true" aria-labelledby="cart-modal-title">
-      <div class="cart-modal-content relative w-[90%] max-w-lg max-h-[90vh] flex flex-col">
-
-        <!-- Cabeçalho do modal -->
+    <div
+      class="bg-black/60 w-full h-full fixed top-0 left-0 z-[99] flex items-center justify-center hidden"
+      id="cart-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="cart-modal-title"
+    >
+      <div
+        class="cart-modal-content relative w-[90%] max-w-lg max-h-[90vh] flex flex-col"
+      >
         <div class="cart-modal-header">
           <div class="cart-modal-header-left">
             <div class="cart-modal-icon-wrap">
               <i class="fa fa-shopping-cart" aria-hidden="true"></i>
             </div>
             <div>
-              <h2 id="cart-modal-title" class="cart-modal-title">Meu Carrinho</h2>
-              <p class="cart-modal-subtitle"><span id="cart-item-count-label">0 itens</span> selecionados</p>
+              <h2 id="cart-modal-title" class="cart-modal-title">
+                Meu Carrinho
+              </h2>
+              <p class="cart-modal-subtitle">
+                <span id="cart-item-count-label">0 itens</span> selecionados
+              </p>
             </div>
           </div>
-          <button type="button" class="close-modal-x cart-modal-close" aria-label="Fechar">
+          <button
+            type="button"
+            class="close-modal-x cart-modal-close"
+            aria-label="Fechar"
+          >
             <i class="fa fa-times" aria-hidden="true"></i>
           </button>
         </div>
 
-        <!-- Lista de itens -->
-        <div id="cart-items" class="cart-modal-items flex-grow overflow-y-auto pr-1 min-h-[100px]"></div>
+        <div
+          id="cart-items"
+          class="cart-modal-items flex-grow overflow-y-auto pr-1 min-h-[100px]"
+        ></div>
 
-        <!-- Rodapé do modal -->
         <div class="cart-modal-footer">
-
-          <!-- Subtotal -->
           <div class="cart-subtotal-row">
             <div class="cart-subtotal-info">
               <span class="cart-subtotal-label">Subtotal dos itens</span>
@@ -329,85 +144,176 @@
             <span id="cart-total" class="cart-subtotal-value">R$ 0,00</span>
           </div>
 
-          <!-- Ações -->
           <div class="cart-modal-actions">
-            <button type="button" id="close-modal-btn" class="cart-btn-secondary">
+            <button
+              type="button"
+              id="close-modal-btn"
+              class="cart-btn-secondary"
+            >
               <i class="fa fa-arrow-left" aria-hidden="true"></i>
               Voltar
             </button>
-            <button type="button" id="go-to-address-btn" class="cart-btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+            <button
+              type="button"
+              id="go-to-address-btn"
+              class="cart-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <span>Continuar</span>
               <i class="fa fa-arrow-right" aria-hidden="true"></i>
             </button>
           </div>
         </div>
-
       </div>
     </div>
 
-    <div class="bg-black/60 w-full h-full fixed top-0 left-0 z-[100] flex items-center justify-center hidden" id="address-modal" role="dialog" aria-modal="true" aria-labelledby="address-modal-title">
+    <div
+      class="bg-black/60 w-full h-full fixed top-0 left-0 z-[100] flex items-center justify-center hidden"
+      id="address-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="address-modal-title"
+    >
       <div class="cart-modal-content relative">
-
-        <!-- Cabeçalho do modal -->
         <div class="cart-modal-header">
           <div class="cart-modal-header-left">
             <div class="cart-modal-icon-wrap">
               <i class="fa fa-map-marker-alt" aria-hidden="true"></i>
             </div>
             <div>
-              <h2 id="address-modal-title" class="cart-modal-title">Endereço de Entrega</h2>
+              <h2 id="address-modal-title" class="cart-modal-title">
+                Endereço de Entrega
+              </h2>
               <p class="cart-modal-subtitle">Informe o local de entrega</p>
             </div>
           </div>
-          <button type="button" class="close-modal-x cart-modal-close" aria-label="Fechar">
+          <button
+            type="button"
+            class="close-modal-x cart-modal-close"
+            aria-label="Fechar"
+          >
             <i class="fa fa-times" aria-hidden="true"></i>
           </button>
         </div>
 
-        <!-- Conteúdo do formulário -->
         <div class="cart-modal-items overflow-y-auto flex-grow">
           <div class="space-y-3">
             <div>
-              <label class="block text-sm font-bold text-zinc-700 mb-1" for="cep">CEP*</label>
-              <input type="text" id="cep" placeholder="00000-000" maxlength="9" class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none transition-colors" />
-              <p id="cep-loading" class="text-xs text-amber-600 mt-1 hidden">Buscando CEP...</p>
+              <label
+                class="block text-sm font-bold text-zinc-700 mb-1"
+                for="cep"
+              >
+                CEP*
+              </label>
+              <input
+                type="text"
+                id="cep"
+                placeholder="00000-000"
+                maxlength="9"
+                class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none transition-colors"
+              />
+              <p id="cep-loading" class="text-xs text-amber-600 mt-1 hidden">
+                Buscando CEP...
+              </p>
             </div>
+
             <div class="grid grid-cols-3 gap-2">
               <div class="col-span-2">
-                <label class="block text-sm font-bold text-zinc-700 mb-1" for="street">Rua*</label>
-                <input type="text" id="street" readonly class="w-full border-2 p-2 rounded bg-zinc-50 text-zinc-500" />
+                <label
+                  class="block text-sm font-bold text-zinc-700 mb-1"
+                  for="street"
+                >
+                  Rua*
+                </label>
+                <input
+                  type="text"
+                  id="street"
+                  readonly
+                  class="w-full border-2 p-2 rounded bg-zinc-50 text-zinc-500"
+                />
               </div>
               <div>
-                <label class="block text-sm font-bold text-zinc-700 mb-1" for="house-number">Número*</label>
-                <input type="text" id="house-number" placeholder="Ex: 123" class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none" />
+                <label
+                  class="block text-sm font-bold text-zinc-700 mb-1"
+                  for="house-number"
+                >
+                  Número*
+                </label>
+                <input
+                  type="text"
+                  id="house-number"
+                  placeholder="Ex: 123"
+                  class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none"
+                />
               </div>
             </div>
+
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="block text-sm font-bold text-zinc-700 mb-1" for="neighborhood">Bairro*</label>
-                <input type="text" id="neighborhood" readonly class="w-full border-2 p-2 rounded bg-zinc-50 text-zinc-500" />
+                <label
+                  class="block text-sm font-bold text-zinc-700 mb-1"
+                  for="neighborhood"
+                >
+                  Bairro*
+                </label>
+                <input
+                  type="text"
+                  id="neighborhood"
+                  readonly
+                  class="w-full border-2 p-2 rounded bg-zinc-50 text-zinc-500"
+                />
               </div>
               <div>
-                <label class="block text-sm font-bold text-zinc-700 mb-1" for="city">Cidade*</label>
-                <input type="text" id="city" readonly class="w-full border-2 p-2 rounded bg-zinc-50 text-zinc-500" />
+                <label
+                  class="block text-sm font-bold text-zinc-700 mb-1"
+                  for="city"
+                >
+                  Cidade*
+                </label>
+                <input
+                  type="text"
+                  id="city"
+                  readonly
+                  class="w-full border-2 p-2 rounded bg-zinc-50 text-zinc-500"
+                />
               </div>
             </div>
+
             <div>
-              <label class="block text-sm font-bold text-zinc-700 mb-1" for="complement">Complemento (Opcional)</label>
-              <input type="text" id="complement" placeholder="Apto, Bloco, etc." class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none" />
+              <label
+                class="block text-sm font-bold text-zinc-700 mb-1"
+                for="complement"
+              >
+                Complemento (Opcional)
+              </label>
+              <input
+                type="text"
+                id="complement"
+                placeholder="Apto, Bloco, etc."
+                class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none"
+              />
             </div>
           </div>
-          <p class="text-red-500 text-sm mt-3 hidden" id="address-warn">Preencha os campos obrigatórios (*)</p>
+
+          <p class="text-red-500 text-sm mt-3 hidden" id="address-warn">
+            Preencha os campos obrigatórios (*)
+          </p>
         </div>
 
-        <!-- Rodapé do modal -->
         <div class="cart-modal-footer">
           <div class="cart-modal-actions">
-            <button type="button" id="back-to-cart-btn" class="cart-btn-secondary">
+            <button
+              type="button"
+              id="back-to-cart-btn"
+              class="cart-btn-secondary"
+            >
               <i class="fa fa-arrow-left" aria-hidden="true"></i>
               Voltar
             </button>
-            <button type="button" id="go-to-review-btn" class="cart-btn-primary">
+            <button
+              type="button"
+              id="go-to-review-btn"
+              class="cart-btn-primary"
+            >
               <span>Continuar</span>
               <i class="fa fa-arrow-right" aria-hidden="true"></i>
             </button>
@@ -416,56 +322,93 @@
       </div>
     </div>
 
-
-    <div class="bg-black/60 w-full h-full fixed top-0 left-0 z-[101] flex items-center justify-center hidden" id="review-modal" role="dialog" aria-modal="true" aria-labelledby="review-modal-title">
+    <div
+      class="bg-black/60 w-full h-full fixed top-0 left-0 z-[101] flex items-center justify-center hidden"
+      id="review-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="review-modal-title"
+    >
       <div class="cart-modal-content relative">
-
-        <!-- Cabeçalho do modal -->
         <div class="cart-modal-header">
           <div class="cart-modal-header-left">
             <div class="cart-modal-icon-wrap">
               <i class="fa fa-check-circle" aria-hidden="true"></i>
             </div>
             <div>
-              <h2 id="review-modal-title" class="cart-modal-title">Revisão do Pedido</h2>
-              <p class="cart-modal-subtitle">Confirme os dados antes de finalizar</p>
+              <h2 id="review-modal-title" class="cart-modal-title">
+                Revisão do Pedido
+              </h2>
+              <p class="cart-modal-subtitle">
+                Confirme os dados antes de finalizar
+              </p>
             </div>
           </div>
-          <button type="button" class="close-modal-x cart-modal-close" aria-label="Fechar">
+          <button
+            type="button"
+            class="close-modal-x cart-modal-close"
+            aria-label="Fechar"
+          >
             <i class="fa fa-times" aria-hidden="true"></i>
           </button>
         </div>
 
-        <!-- Conteúdo da revisão -->
         <div class="cart-modal-items overflow-y-auto flex-grow">
           <div class="space-y-4">
             <div>
               <h3 class="font-bold text-zinc-700 mb-2 flex items-center gap-2">
-                <i class="fa fa-shopping-basket text-amber-600" aria-hidden="true"></i> Itens do Pedido
+                <i
+                  class="fa fa-shopping-basket text-amber-600"
+                  aria-hidden="true"
+                ></i>
+                Itens do Pedido
               </h3>
-              <div id="review-items" class="bg-zinc-50 p-3 rounded-lg space-y-2 text-sm"></div>
+              <div
+                id="review-items"
+                class="bg-zinc-50 p-3 rounded-lg space-y-2 text-sm"
+              ></div>
             </div>
+
             <div>
               <h3 class="font-bold text-zinc-700 mb-2 flex items-center gap-2">
-                <i class="fa fa-map-marker-alt text-amber-600" aria-hidden="true"></i> Endereço de Entrega
+                <i
+                  class="fa fa-map-marker-alt text-amber-600"
+                  aria-hidden="true"
+                ></i>
+                Endereço de Entrega
               </h3>
-              <div id="review-address" class="bg-zinc-50 p-3 rounded-lg text-sm text-zinc-600 italic"></div>
+              <div
+                id="review-address"
+                class="bg-zinc-50 p-3 rounded-lg text-sm text-zinc-600 italic"
+              ></div>
             </div>
+
             <div class="flex justify-between items-center border-t pt-3 mt-3">
-              <span class="text-base font-bold text-zinc-700">Total Final:</span>
-              <span id="review-total" class="text-xl font-bold text-amber-600">R$ 0,00</span>
+              <span class="text-base font-bold text-zinc-700"
+                >Total Final:</span
+              >
+              <span id="review-total" class="text-xl font-bold text-amber-600">
+                R$ 0,00
+              </span>
             </div>
           </div>
         </div>
 
-        <!-- Rodapé do modal -->
         <div class="cart-modal-footer">
           <div class="cart-modal-actions">
-            <button type="button" id="back-to-address-btn" class="cart-btn-secondary">
+            <button
+              type="button"
+              id="back-to-address-btn"
+              class="cart-btn-secondary"
+            >
               <i class="fa fa-arrow-left" aria-hidden="true"></i>
               Voltar
             </button>
-            <button type="button" id="finish-order-btn" class="cart-btn-primary" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">
+            <button
+              type="button"
+              id="finish-order-btn"
+              class="cart-btn-primary cart-btn-success"
+            >
               <i class="fab fa-whatsapp" aria-hidden="true"></i>
               <span>Finalizar</span>
             </button>
@@ -474,31 +417,25 @@
       </div>
     </div>
 
-
-  <footer class="cart-footer cart-footer-hidden w-full py-4 fixed bottom-0 z-40 flex items-center justify-center">
-  <button type="button" class="cart-button" id="cart-btn" aria-label="Abrir carrinho">
-    <i class="fa fa-shopping-cart text-2xl" aria-hidden="true"></i>
-    <span class="cart-count">(<span id="cart-count">0</span>)</span>
-    <span>Meu Carrinho</span>
-  </button>
-</footer>
-
-<footer id="bottom-cart-footer" class="bottom-cart-footer">
-  <div class="bottom-cart-container">
-    <button
-      type="button"
-      class="cart-button"
-      id="bottom-cart-btn"
-      aria-label="Abrir carrinho no rodapé"
+    <footer
+      class="cart-footer cart-footer-hidden w-full py-4 fixed bottom-0 z-40 flex items-center justify-center"
     >
-      <i class="fa fa-shopping-cart text-2xl" aria-hidden="true"></i>
-      <span class="cart-count">(<span id="bottom-cart-count">0</span>)</span>
-      <span>Meu Carrinho</span>
-    </button>
-  </div>
-</footer>
+      <button
+        type="button"
+        class="cart-button"
+        id="cart-btn"
+        aria-label="Abrir carrinho"
+      >
+        <i class="fa fa-shopping-cart text-2xl" aria-hidden="true"></i>
+        <span class="cart-count">(<span id="cart-count">0</span>)</span>
+        <span>Meu Carrinho</span>
+      </button>
+    </footer>
 
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script
+      type="text/javascript"
+      src="https://cdn.jsdelivr.net/npm/toastify-js"
+    ></script>
     <script src="./script.js"></script>
   </body>
 </html>
