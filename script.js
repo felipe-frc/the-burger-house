@@ -1,7 +1,6 @@
 // ===== CONFIG =====
 const DELIVERY_FEE = 5;
 
-
 const MENU_CATEGORIES = [
   {
     title: "Nossos Hambúrgueres",
@@ -101,14 +100,16 @@ const MENU_CATEGORIES = [
       {
         id: "drink-coca-lata",
         name: "Coca-Cola Lata",
-        description: "Refrigerante gelado e refrescante para complementar sua refeição.",
+        description:
+          "Refrigerante gelado e refrescante para complementar sua refeição.",
         price: 5.9,
         image: "./assets/refri-1.webp",
       },
       {
         id: "drink-guarana-antarctica",
         name: "Guaraná Antarctica",
-        description: "Refrigerante com sabor único e refrescante para sua satisfação.",
+        description:
+          "Refrigerante com sabor único e refrescante para sua satisfação.",
         price: 5.9,
         image: "./assets/refri-2.webp",
       },
@@ -185,6 +186,7 @@ function getCartTotalWithDelivery() {
 function isStoreOpenNow() {
   const now = new Date();
   const hour = now.getHours();
+
   return hour >= 18 && hour < 23;
 }
 
@@ -195,6 +197,7 @@ function revealOnScroll() {
 
   reveals.forEach((el) => {
     const elementTop = el.getBoundingClientRect().top;
+
     if (elementTop < windowHeight - 100) {
       el.classList.add("active");
     }
@@ -208,7 +211,9 @@ function saveCart() {
 
 function openModal(modal) {
   closeAllModals();
+
   if (!modal) return;
+
   modal.classList.remove("hidden");
   document.body.style.overflow = "hidden";
 }
@@ -217,17 +222,20 @@ function closeAllModals() {
   if (cartModal) cartModal.classList.add("hidden");
   if (addressModal) addressModal.classList.add("hidden");
   if (reviewModal) reviewModal.classList.add("hidden");
+
   document.body.style.overflow = "";
 }
 
 function showAddressWarning(message) {
   if (!addressWarn) return;
+
   addressWarn.textContent = message;
   addressWarn.classList.remove("hidden");
 }
 
 function hideAddressWarning() {
   if (!addressWarn) return;
+
   addressWarn.classList.add("hidden");
 }
 
@@ -251,6 +259,7 @@ function getAddressText() {
 
 function updateProceedButtonState() {
   if (!goToAddressBtn) return;
+
   goToAddressBtn.disabled = cart.length === 0;
 }
 
@@ -259,6 +268,7 @@ function showToast(message, background = "#ef4444") {
     console.error("Toastify não carregado:", message);
     return;
   }
+
   Toastify({
     text: message,
     duration: 3000,
@@ -334,6 +344,7 @@ function resetAddressForm() {
   if (cityInput) cityInput.value = "";
   if (houseNumberInput) houseNumberInput.value = "";
   if (complementInput) complementInput.value = "";
+
   hideAddressWarning();
   lastFetchedCep = "";
 }
@@ -384,6 +395,7 @@ function setupCartVisibility() {
   }
 
   updateCartVisibility();
+
   window.addEventListener("scroll", updateCartVisibility);
   window.addEventListener("resize", updateCartVisibility);
 }
@@ -413,14 +425,18 @@ function renderProductCard(product) {
           loading="lazy"
         />
       </div>
+
       <div class="product-item-info">
         <div class="product-item-name-row">
           <h3 class="product-item-name">${escapeHTML(product.name)}</h3>
           ${tagHTML}
         </div>
+
         <p class="product-item-desc">${escapeHTML(product.description)}</p>
+
         <div class="product-item-footer">
           <span class="product-item-price">${formatPrice(product.price)}</span>
+
           <button
             type="button"
             class="btn-add-item add-to-cart-btn"
@@ -443,6 +459,7 @@ function renderMenuCategory(category) {
           <i class="${escapeHTML(category.icon)} text-amber-500" aria-hidden="true"></i>
           <span class="section-title-text">${escapeHTML(category.title)}</span>
         </h2>
+
         <p class="section-subtitle">${escapeHTML(category.subtitle)}</p>
       </div>
 
@@ -455,6 +472,7 @@ function renderMenuCategory(category) {
 
 function renderMenu() {
   const menuCategoriesContainer = document.getElementById("menu-categories");
+
   if (!menuCategoriesContainer) return;
 
   menuCategoriesContainer.innerHTML = MENU_CATEGORIES.map(renderMenuCategory).join("");
@@ -494,6 +512,7 @@ function addItemToCart(button) {
 function bindAddToCartButtons() {
   document.addEventListener("click", (e) => {
     const button = e.target.closest(".add-to-cart-btn");
+
     if (!button) return;
 
     e.preventDefault();
@@ -530,15 +549,15 @@ function updateCart() {
 
       div.innerHTML = `
         <div class="flex-1 min-w-0">
-          <p class="font-bold text-zinc-800 break-words">${item.name}</p>
+          <p class="font-bold text-zinc-800 break-words">${escapeHTML(item.name)}</p>
           <p class="text-sm text-zinc-500">${formatPrice(item.price)} cada</p>
-          
+
           <div class="flex items-center gap-2 mt-3">
             <button
               type="button"
               class="minus-btn w-8 h-8 rounded-md border border-zinc-300 hover:bg-zinc-100 transition"
-              data-id="${item.id}"
-              aria-label="Diminuir quantidade de ${item.name}"
+              data-id="${escapeHTML(item.id)}"
+              aria-label="Diminuir quantidade de ${escapeHTML(item.name)}"
             >
               -
             </button>
@@ -548,8 +567,8 @@ function updateCart() {
             <button
               type="button"
               class="plus-btn w-8 h-8 rounded-md border border-zinc-300 hover:bg-zinc-100 transition"
-              data-id="${item.id}"
-              aria-label="Aumentar quantidade de ${item.name}"
+              data-id="${escapeHTML(item.id)}"
+              aria-label="Aumentar quantidade de ${escapeHTML(item.name)}"
             >
               +
             </button>
@@ -557,12 +576,13 @@ function updateCart() {
         </div>
 
         <div class="flex flex-col items-end gap-2">
-           <span class="font-bold text-amber-600">${formatPrice(itemSubtotal)}</span>
-           <button
+          <span class="font-bold text-amber-600">${formatPrice(itemSubtotal)}</span>
+
+          <button
             type="button"
             class="remove-btn text-red-500 text-sm font-medium hover:text-red-700 transition whitespace-nowrap"
-            data-id="${item.id}"
-            aria-label="Remover ${item.name} do carrinho"
+            data-id="${escapeHTML(item.id)}"
+            aria-label="Remover ${escapeHTML(item.name)} do carrinho"
           >
             Remover
           </button>
@@ -577,6 +597,7 @@ function updateCart() {
   cartCount.textContent = count;
 
   const cartItemCountLabel = document.getElementById("cart-item-count-label");
+
   if (cartItemCountLabel) {
     cartItemCountLabel.textContent = count === 1 ? "1 item" : `${count} itens`;
   }
@@ -601,22 +622,27 @@ if (cartItemsContainer) {
 
     if (plusBtn) {
       const id = plusBtn.dataset.id;
-      const item = cart.find((i) => i.id === id);
+      const item = cart.find((cartItem) => cartItem.id === id);
+
       if (item) {
         item.quantity += 1;
         updateCart();
       }
+
       return;
     }
 
     if (minusBtn) {
       const id = minusBtn.dataset.id;
-      const item = cart.find((i) => i.id === id);
+      const item = cart.find((cartItem) => cartItem.id === id);
+
       if (item) {
         item.quantity -= 1;
+
         if (item.quantity <= 0) {
-          cart = cart.filter((i) => i.id !== id);
+          cart = cart.filter((cartItem) => cartItem.id !== id);
         }
+
         updateCart();
       }
     }
@@ -624,8 +650,13 @@ if (cartItemsContainer) {
 }
 
 // ===== MODAIS =====
-if (cartBtn) cartBtn.onclick = () => openModal(cartModal);
-if (closeModalBtn) closeModalBtn.onclick = () => closeAllModals();
+if (cartBtn) {
+  cartBtn.onclick = () => openModal(cartModal);
+}
+
+if (closeModalBtn) {
+  closeModalBtn.onclick = () => closeAllModals();
+}
 
 if (goToAddressBtn) {
   goToAddressBtn.onclick = () => {
@@ -643,7 +674,9 @@ if (goToAddressBtn) {
   };
 }
 
-if (backToCartBtn) backToCartBtn.onclick = () => openModal(cartModal);
+if (backToCartBtn) {
+  backToCartBtn.onclick = () => openModal(cartModal);
+}
 
 if (goToReviewBtn) {
   goToReviewBtn.onclick = () => {
@@ -664,25 +697,34 @@ if (goToReviewBtn) {
   };
 }
 
-if (backToAddressBtn) backToAddressBtn.onclick = () => openModal(addressModal);
+if (backToAddressBtn) {
+  backToAddressBtn.onclick = () => openModal(addressModal);
+}
 
 document.querySelectorAll(".close-modal-x").forEach((button) => {
   button.addEventListener("click", closeAllModals);
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeAllModals();
+  if (e.key === "Escape") {
+    closeAllModals();
+  }
 });
 
 [cartModal, addressModal, reviewModal].forEach((modal) => {
   if (!modal) return;
+
   modal.addEventListener("click", (e) => {
-    if (e.target === modal) closeAllModals();
+    if (e.target === modal) {
+      closeAllModals();
+    }
   });
 });
 
 // ===== ENDEREÇO =====
 async function fetchAddressByCep() {
+  if (!cepInput) return;
+
   const cep = cepInput.value.replace(/\D/g, "");
 
   if (cep.length !== 8) {
@@ -698,11 +740,17 @@ async function fetchAddressByCep() {
     isFetchingCep = true;
     lastFetchedCep = cep;
 
-    if (cepLoading) cepLoading.classList.remove("hidden");
+    if (cepLoading) {
+      cepLoading.classList.remove("hidden");
+    }
+
     hideAddressWarning();
 
     const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
-    if (!response.ok) throw new Error("Falha ao consultar o CEP.");
+
+    if (!response.ok) {
+      throw new Error("Falha ao consultar o CEP.");
+    }
 
     const data = await response.json();
 
@@ -712,11 +760,15 @@ async function fetchAddressByCep() {
       return;
     }
 
-    streetInput.value = data.logradouro || "";
-    neighborhoodInput.value = data.bairro || "";
-    cityInput.value = data.localidade || "";
+    if (streetInput) streetInput.value = data.logradouro || "";
+    if (neighborhoodInput) neighborhoodInput.value = data.bairro || "";
+    if (cityInput) cityInput.value = data.localidade || "";
 
-    if (!streetInput.value || !neighborhoodInput.value || !cityInput.value) {
+    if (
+      !streetInput?.value ||
+      !neighborhoodInput?.value ||
+      !cityInput?.value
+    ) {
       showAddressWarning("Não foi possível preencher o endereço completo com esse CEP.");
       return;
     }
@@ -728,7 +780,10 @@ async function fetchAddressByCep() {
     lastFetchedCep = "";
   } finally {
     isFetchingCep = false;
-    if (cepLoading) cepLoading.classList.add("hidden");
+
+    if (cepLoading) {
+      cepLoading.classList.add("hidden");
+    }
   }
 }
 
@@ -745,24 +800,35 @@ if (cepInput) {
       clearAddressFields();
       hideAddressWarning();
       lastFetchedCep = "";
-      if (cepLoading) cepLoading.classList.add("hidden");
+
+      if (cepLoading) {
+        cepLoading.classList.add("hidden");
+      }
+
       return;
     }
 
-    if (cep.length === 8) fetchAddressByCep();
+    if (cep.length === 8) {
+      fetchAddressByCep();
+    }
   });
 }
 
-if (houseNumberInput) houseNumberInput.addEventListener("input", hideAddressWarning);
-if (complementInput) complementInput.addEventListener("input", hideAddressWarning);
+if (houseNumberInput) {
+  houseNumberInput.addEventListener("input", hideAddressWarning);
+}
+
+if (complementInput) {
+  complementInput.addEventListener("input", hideAddressWarning);
+}
 
 // ===== VALIDAÇÃO =====
 function validateAddressFields() {
-  const cep = cepInput.value.replace(/\D/g, "");
-  const number = houseNumberInput.value.trim();
-  const street = streetInput.value.trim();
-  const neighborhood = neighborhoodInput.value.trim();
-  const city = cityInput.value.trim();
+  const cep = cepInput ? cepInput.value.replace(/\D/g, "") : "";
+  const number = houseNumberInput ? houseNumberInput.value.trim() : "";
+  const street = streetInput ? streetInput.value.trim() : "";
+  const neighborhood = neighborhoodInput ? neighborhoodInput.value.trim() : "";
+  const city = cityInput ? cityInput.value.trim() : "";
 
   if (isFetchingCep) {
     showAddressWarning("Aguarde a busca do CEP terminar.");
@@ -806,16 +872,21 @@ function loadReview() {
 
   cart.forEach((item) => {
     const itemSubtotal = item.price * item.quantity;
-
     const itemRow = document.createElement("div");
+
     itemRow.className =
       "flex items-center justify-between gap-3 border-b border-zinc-200 pb-2";
 
     itemRow.innerHTML = `
       <div class="min-w-0">
-        <p class="font-medium text-zinc-800 break-words">${item.quantity}x ${item.name}</p>
+        <p class="font-medium text-zinc-800 break-words">
+          ${item.quantity}x ${escapeHTML(item.name)}
+        </p>
       </div>
-      <span class="font-semibold text-amber-600 whitespace-nowrap">${formatPrice(itemSubtotal)}</span>
+
+      <span class="font-semibold text-amber-600 whitespace-nowrap">
+        ${formatPrice(itemSubtotal)}
+      </span>
     `;
 
     reviewItems.appendChild(itemRow);
@@ -878,7 +949,7 @@ if (finishOrderBtn) {
       message += `- ${item.quantity}x ${item.name} (${formatPrice(itemSubtotal)})\n`;
     });
 
-    message += `\n*Resumo:*\n`;
+    message += "\n*Resumo:*\n";
     message += `Subtotal: ${formatPrice(subtotal)}\n`;
     message += `Taxa de entrega: ${formatPrice(deliveryFee)}\n`;
     message += `Total: ${formatPrice(totalWithDelivery)}\n`;
