@@ -242,6 +242,10 @@
                   type="text"
                   id="house-number"
                   placeholder="Ex: 123"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  maxlength="6"
+                  autocomplete="off"
                   class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none"
                 />
               </div>
@@ -384,9 +388,9 @@
             </div>
 
             <div class="flex justify-between items-center border-t pt-3 mt-3">
-              <span class="text-base font-bold text-zinc-700"
-                >Total Final:</span
-              >
+              <span class="text-base font-bold text-zinc-700">
+                Total Final:
+              </span>
               <span id="review-total" class="text-xl font-bold text-amber-600">
                 R$ 0,00
               </span>
