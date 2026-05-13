@@ -245,6 +245,10 @@ function clearAddressFields() {
   if (cityInput) cityInput.value = "";
 }
 
+function isValidHouseNumber(value) {
+  return /^[0-9]+$/.test(value.trim());
+}
+
 function getAddressText() {
   const street = streetInput ? streetInput.value.trim() : "";
   const houseNumber = houseNumberInput ? houseNumberInput.value.trim() : "";
@@ -815,7 +819,10 @@ if (cepInput) {
 }
 
 if (houseNumberInput) {
-  houseNumberInput.addEventListener("input", hideAddressWarning);
+  houseNumberInput.addEventListener("input", () => {
+    houseNumberInput.value = houseNumberInput.value.replace(/\D/g, "");
+    hideAddressWarning();
+  });
 }
 
 if (complementInput) {
@@ -835,17 +842,15 @@ function validateAddressFields() {
     return false;
   }
 
-  const isValid =
-    cep.length === 8 &&
-    number !== "" &&
-    street !== "" &&
-    neighborhood !== "" &&
-    city !== "";
-
-  if (!isValid) {
+  if (cep.length !== 8 || street === "" || neighborhood === "" || city === "") {
     showAddressWarning(
       "Preencha os campos obrigatórios e informe um CEP válido para carregar o endereço."
     );
+    return false;
+  }
+
+  if (!isValidHouseNumber(number)) {
+    showAddressWarning("Informe um número válido usando apenas dígitos.");
     return false;
   }
 
