@@ -724,6 +724,41 @@
     border-color: #a1a1aa;
     box-shadow: 0 0 0 3px rgba(161, 161, 170, 0.2);
   }
+
+  .order-notes-field {
+    width: 100%;
+    min-height: 96px;
+    resize: vertical;
+    border: 2px solid #e4e4e7;
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+    background: #ffffff;
+    color: #3f3f46;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    outline: none;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      background 0.2s ease;
+  }
+
+  .order-notes-field::placeholder {
+    color: #a1a1aa;
+  }
+
+  .order-notes-field:focus {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
+    background: #fffaf0;
+  }
+
+  .order-notes-hint {
+    margin-top: 0.35rem;
+    color: #71717a;
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
 }
 
 @layer utilities {

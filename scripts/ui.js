@@ -40,6 +40,7 @@ export const elements = {
   reviewItems: document.getElementById("review-items"),
   reviewAddress: document.getElementById("review-address"),
   reviewTotal: document.getElementById("review-total"),
+  orderNotesInput: document.getElementById("order-notes"),
 
   dateSpan: document.getElementById("date-span"),
   statusText: document.getElementById("status-text"),

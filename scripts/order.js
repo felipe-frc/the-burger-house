@@ -23,6 +23,18 @@ import {
   showToast,
 } from "./ui.js";
 
+function getOrderNotes() {
+  if (!elements.orderNotesInput) return "";
+
+  return elements.orderNotesInput.value.trim();
+}
+
+function clearOrderNotes() {
+  if (!elements.orderNotesInput) return;
+
+  elements.orderNotesInput.value = "";
+}
+
 export function loadReview() {
   if (!elements.reviewItems || !elements.reviewAddress || !elements.reviewTotal) {
     return;
@@ -107,6 +119,7 @@ function finishOrder() {
   setFinishButtonLoading(true);
 
   const addressText = getAddressText();
+  const orderNotes = getOrderNotes();
   const subtotal = getCartSubtotal();
   const deliveryFee = getDeliveryFee();
   const totalWithDelivery = getCartTotalWithDelivery();
@@ -126,6 +139,10 @@ function finishOrder() {
 
   message += `\n*Endereço de entrega:*\n${addressText}\n`;
 
+  if (orderNotes) {
+    message += `\n*Observações do pedido:*\n${orderNotes}\n`;
+  }
+
   const url = `https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent(
     message
   )}`;
@@ -136,6 +153,7 @@ function finishOrder() {
     clearCart();
     updateCart();
     resetAddressForm();
+    clearOrderNotes();
     closeAllModals();
     setFinishButtonLoading(false);
     showToast("Pedido enviado! Seu carrinho foi limpo.", "#16a34a");
