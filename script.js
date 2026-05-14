@@ -1,5 +1,6 @@
 // ===== CONFIG =====
 const DELIVERY_FEE = 5;
+const FORCE_STORE_OPEN = true; // Mudar o horário para fins de teste
 
 const MENU_CATEGORIES = [
   {
@@ -184,6 +185,7 @@ function getCartTotalWithDelivery() {
 }
 
 function isStoreOpenNow() {
+   if (FORCE_STORE_OPEN) return false; // Mudar o horário para fins de testes
   const now = new Date();
   const hour = now.getHours();
 
@@ -243,6 +245,13 @@ function clearAddressFields() {
   if (streetInput) streetInput.value = "";
   if (neighborhoodInput) neighborhoodInput.value = "";
   if (cityInput) cityInput.value = "";
+}
+
+function clearDeliveryFields() {
+  clearAddressFields();
+
+  if (houseNumberInput) houseNumberInput.value = "";
+  if (complementInput) complementInput.value = "";
 }
 
 function isValidHouseNumber(value) {
@@ -343,12 +352,7 @@ function clearCartAfterOrder() {
 
 function resetAddressForm() {
   if (cepInput) cepInput.value = "";
-  if (streetInput) streetInput.value = "";
-  if (neighborhoodInput) neighborhoodInput.value = "";
-  if (cityInput) cityInput.value = "";
-  if (houseNumberInput) houseNumberInput.value = "";
-  if (complementInput) complementInput.value = "";
-
+  clearDeliveryFields();
   hideAddressWarning();
   lastFetchedCep = "";
 }
@@ -732,7 +736,7 @@ async function fetchAddressByCep() {
   const cep = cepInput.value.replace(/\D/g, "");
 
   if (cep.length !== 8) {
-    clearAddressFields();
+    clearDeliveryFields();
     hideAddressWarning();
     lastFetchedCep = "";
     return;
@@ -759,29 +763,37 @@ async function fetchAddressByCep() {
     const data = await response.json();
 
     if (data.erro) {
-      clearAddressFields();
-      showAddressWarning("CEP não encontrado. Verifique e tente novamente.");
+      clearDeliveryFields();
+      lastFetchedCep = "";
+      showAddressWarning("CEP não encontrado. Verifique o número informado.");
       return;
     }
 
-    if (streetInput) streetInput.value = data.logradouro || "";
-    if (neighborhoodInput) neighborhoodInput.value = data.bairro || "";
-    if (cityInput) cityInput.value = data.localidade || "";
+    const street = data.logradouro || "";
+    const neighborhood = data.bairro || "";
+    const city = data.localidade || "";
 
-    if (
-      !streetInput?.value ||
-      !neighborhoodInput?.value ||
-      !cityInput?.value
-    ) {
-      showAddressWarning("Não foi possível preencher o endereço completo com esse CEP.");
+    if (streetInput) streetInput.value = street;
+    if (neighborhoodInput) neighborhoodInput.value = neighborhood;
+    if (cityInput) cityInput.value = city;
+
+    if (!street || !neighborhood || !city) {
+      clearAddressFields();
+      showAddressWarning(
+        "Não foi possível preencher o endereço completo com esse CEP."
+      );
       return;
     }
 
     hideAddressWarning();
-  } catch {
-    clearAddressFields();
-    showAddressWarning("Erro ao buscar o CEP. Tente novamente.");
+  } catch (error) {
+    console.error("Erro ao buscar CEP:", error);
+
+    clearDeliveryFields();
     lastFetchedCep = "";
+    showAddressWarning(
+      "Erro ao buscar o CEP. Verifique sua conexão e tente novamente."
+    );
   } finally {
     isFetchingCep = false;
 
@@ -801,7 +813,7 @@ if (cepInput) {
     const cep = cepInput.value.replace(/\D/g, "");
 
     if (cep.length < 8) {
-      clearAddressFields();
+      clearDeliveryFields();
       hideAddressWarning();
       lastFetchedCep = "";
 
