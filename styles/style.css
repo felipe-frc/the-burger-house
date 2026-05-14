@@ -626,6 +626,36 @@
     background: linear-gradient(135deg, #10b981 0%, #059669 100%);
     box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
   }
+
+    .field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .readonly-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    color: #71717a;
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .readonly-field {
+    background: #f4f4f5;
+    border-color: #d4d4d8;
+    color: #52525b;
+    cursor: not-allowed;
+  }
+
+  .readonly-field:focus {
+    border-color: #a1a1aa;
+    box-shadow: 0 0 0 3px rgba(161, 161, 170, 0.2);
+  }
 }
 
 @layer utilities {
