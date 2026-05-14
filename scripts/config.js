@@ -8,4 +8,4 @@ export const WHATSAPP_PHONE_NUMBER = "5564999244855";
 /*
   Mudar apenas para fins de teste para true
 */
-export const FORCE_STORE_OPEN = true;
+export const FORCE_STORE_OPEN = false;
