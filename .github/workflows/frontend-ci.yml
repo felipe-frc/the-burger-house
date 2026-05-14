@@ -2,12 +2,19 @@ name: CI (Front-end)
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
+      - "fix/**"
+      - "refactor/**"
+      - "feature/**"
+      - "chore/**"
   pull_request:
-    branches: ["main"]
+    branches:
+      - main
 
 jobs:
   build:
+    name: build
     runs-on: ubuntu-latest
 
     steps:
@@ -29,6 +36,20 @@ jobs:
       - name: Verificar arquivos principais
         run: |
           test -f index.html
-          test -f script.js
+          test -f package.json
+          test -f package-lock.json
+          test -f tailwind.config.js
+          test -f styles/style.css
           test -f output.css
-          echo "Arquivos principais encontrados com sucesso"
+
+      - name: Verificar módulos JavaScript
+        run: |
+          test -f scripts/main.js
+          test -f scripts/config.js
+          test -f scripts/data.js
+          test -f scripts/state.js
+          test -f scripts/utils.js
+          test -f scripts/ui.js
+          test -f scripts/cart.js
+          test -f scripts/address.js
+          test -f scripts/order.js
