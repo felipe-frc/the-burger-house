@@ -221,17 +221,24 @@
 
             <div class="grid grid-cols-3 gap-2">
               <div class="col-span-2">
-                <label
-                  class="block text-sm font-bold text-zinc-700 mb-1"
-                  for="street"
-                >
-                  Rua*
-                </label>
+                <div class="field-label-row">
+                  <label
+                    class="block text-sm font-bold text-zinc-700"
+                    for="street"
+                  >
+                    Rua*
+                  </label>
+                  <span class="readonly-hint" id="street-hint">
+                    <i class="fa fa-lock" aria-hidden="true"></i>
+                    Preenchido via CEP
+                  </span>
+                </div>
                 <input
                   type="text"
                   id="street"
                   readonly
-                  class="w-full border-2 p-2 rounded bg-zinc-50 text-zinc-500"
+                  aria-describedby="street-hint"
+                  class="readonly-field w-full border-2 p-2 rounded outline-none"
                 />
               </div>
               <div>
@@ -256,31 +263,45 @@
 
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label
-                  class="block text-sm font-bold text-zinc-700 mb-1"
-                  for="neighborhood"
-                >
-                  Bairro*
-                </label>
+                <div class="field-label-row">
+                  <label
+                    class="block text-sm font-bold text-zinc-700"
+                    for="neighborhood"
+                  >
+                    Bairro*
+                  </label>
+                  <span class="readonly-hint" id="neighborhood-hint">
+                    <i class="fa fa-lock" aria-hidden="true"></i>
+                    Via CEP
+                  </span>
+                </div>
                 <input
                   type="text"
                   id="neighborhood"
                   readonly
-                  class="w-full border-2 p-2 rounded bg-zinc-50 text-zinc-500"
+                  aria-describedby="neighborhood-hint"
+                  class="readonly-field w-full border-2 p-2 rounded outline-none"
                 />
               </div>
               <div>
-                <label
-                  class="block text-sm font-bold text-zinc-700 mb-1"
-                  for="city"
-                >
-                  Cidade*
-                </label>
+                <div class="field-label-row">
+                  <label
+                    class="block text-sm font-bold text-zinc-700"
+                    for="city"
+                  >
+                    Cidade*
+                  </label>
+                  <span class="readonly-hint" id="city-hint">
+                    <i class="fa fa-lock" aria-hidden="true"></i>
+                    Via CEP
+                  </span>
+                </div>
                 <input
                   type="text"
                   id="city"
                   readonly
-                  class="w-full border-2 p-2 rounded bg-zinc-50 text-zinc-500"
+                  aria-describedby="city-hint"
+                  class="readonly-field w-full border-2 p-2 rounded outline-none"
                 />
               </div>
             </div>

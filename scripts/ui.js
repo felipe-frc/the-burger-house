@@ -1,6 +1,9 @@
 import { MENU_CATEGORIES } from "./data.js";
 import { escapeHTML, formatPrice, isStoreOpenNow } from "./utils.js";
 
+let activeModal = null;
+let previouslyFocusedElement = null;
+
 export const elements = {
   get menuSection() {
     return document.getElementById("menu");
@@ -42,32 +45,110 @@ export const elements = {
   statusText: document.getElementById("status-text"),
 };
 
+function getFocusableElements(container) {
+  if (!container) return [];
+
+  const focusableSelector = [
+    "a[href]",
+    "button:not([disabled])",
+    "input:not([disabled])",
+    "select:not([disabled])",
+    "textarea:not([disabled])",
+    "[tabindex]:not([tabindex='-1'])",
+  ].join(",");
+
+  return Array.from(container.querySelectorAll(focusableSelector)).filter(
+    (element) =>
+      element.offsetParent !== null || element === document.activeElement
+  );
+}
+
+function focusFirstElement(modal) {
+  const focusableElements = getFocusableElements(modal);
+
+  if (focusableElements.length > 0) {
+    focusableElements[0].focus();
+    return;
+  }
+
+  modal.setAttribute("tabindex", "-1");
+  modal.focus();
+}
+
+function trapFocus(event) {
+  if (!activeModal || event.key !== "Tab") return;
+
+  const focusableElements = getFocusableElements(activeModal);
+
+  if (focusableElements.length === 0) {
+    event.preventDefault();
+    activeModal.focus();
+    return;
+  }
+
+  const firstElement = focusableElements[0];
+  const lastElement = focusableElements[focusableElements.length - 1];
+
+  if (event.shiftKey && document.activeElement === firstElement) {
+    event.preventDefault();
+    lastElement.focus();
+    return;
+  }
+
+  if (!event.shiftKey && document.activeElement === lastElement) {
+    event.preventDefault();
+    firstElement.focus();
+  }
+}
+
 export function openModal(modal) {
-  closeAllModals();
+  closeAllModals(false);
 
   if (!modal) return;
 
+  previouslyFocusedElement = document.activeElement;
+  activeModal = modal;
+
   modal.classList.remove("hidden");
   document.body.style.overflow = "hidden";
+
+  requestAnimationFrame(() => {
+    focusFirstElement(modal);
+  });
 }
 
-export function closeAllModals() {
+export function closeAllModals(restoreFocus = true) {
   if (elements.cartModal) elements.cartModal.classList.add("hidden");
   if (elements.addressModal) elements.addressModal.classList.add("hidden");
   if (elements.reviewModal) elements.reviewModal.classList.add("hidden");
 
   document.body.style.overflow = "";
+
+  activeModal = null;
+
+  if (
+    restoreFocus &&
+    previouslyFocusedElement &&
+    typeof previouslyFocusedElement.focus === "function"
+  ) {
+    previouslyFocusedElement.focus();
+  }
+
+  previouslyFocusedElement = null;
 }
 
 export function bindModalCloseEvents() {
   document.querySelectorAll(".close-modal-x").forEach((button) => {
-    button.addEventListener("click", closeAllModals);
+    button.addEventListener("click", () => closeAllModals());
   });
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeAllModals();
+      return;
     }
+
+    trapFocus(event);
   });
 
   [elements.cartModal, elements.addressModal, elements.reviewModal].forEach(
@@ -178,12 +259,14 @@ function renderProductCard(product) {
     ? `<span class="product-item-tag">${escapeHTML(product.tag)}</span>`
     : "";
 
+  const imageAlt = product.imageAlt || product.name;
+
   return `
     <article class="product-item-card reveal">
       <div class="product-item-img-wrapper">
         <img
           src="${escapeHTML(product.image)}"
-          alt="${escapeHTML(product.name)}"
+          alt="${escapeHTML(imageAlt)}"
           class="product-item-img"
           loading="lazy"
         />
