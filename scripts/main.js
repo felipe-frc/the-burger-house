@@ -7,6 +7,7 @@ import {
   renderMenu,
   revealOnScroll,
   setupCartVisibility,
+  setupCategoryNavigation,
   updateStoreStatus,
 } from "./ui.js";
 
@@ -25,6 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
   updateCart();
   updateStoreStatus();
   setupCartVisibility();
+  setupCategoryNavigation();
   revealOnScroll();
 });
 

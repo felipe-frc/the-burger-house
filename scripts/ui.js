@@ -123,7 +123,6 @@ export function closeAllModals(restoreFocus = true) {
   if (elements.reviewModal) elements.reviewModal.classList.add("hidden");
 
   document.body.style.overflow = "";
-
   activeModal = null;
 
   if (
@@ -237,7 +236,7 @@ export function renderMenu() {
 
 function renderMenuCategory(category) {
   return `
-    <section id="${escapeHTML(category.id)}" class="max-w-5xl mx-auto px-4 scroll-mt-8">
+    <section id="${escapeHTML(category.id)}" class="max-w-5xl mx-auto px-4 scroll-mt-28">
       <div class="section-header">
         <h2 class="section-title">
           <i class="${escapeHTML(category.icon)} text-amber-500" aria-hidden="true"></i>
@@ -329,7 +328,10 @@ export function revealOnScroll() {
 export function showFloatingCart() {
   if (!elements.cartFooter) return;
 
-  elements.cartFooter.classList.remove("cart-footer-hidden", "cart-footer-bottom");
+  elements.cartFooter.classList.remove(
+    "cart-footer-hidden",
+    "cart-footer-bottom"
+  );
   elements.cartFooter.classList.add("cart-footer-visible");
 }
 
@@ -343,17 +345,23 @@ export function showBottomCart() {
 export function hideCartFooter() {
   if (!elements.cartFooter) return;
 
-  elements.cartFooter.classList.remove("cart-footer-visible", "cart-footer-bottom");
+  elements.cartFooter.classList.remove(
+    "cart-footer-visible",
+    "cart-footer-bottom"
+  );
   elements.cartFooter.classList.add("cart-footer-hidden");
 }
 
 export function setupCartVisibility() {
   const menuSection = elements.menuSection;
+  const categoryNav = document.getElementById("category-nav");
 
   if (!menuSection) return;
 
   function updateCartVisibility() {
-    const menuStart = menuSection.offsetTop - 80;
+    const navHeight = categoryNav ? categoryNav.offsetHeight : 0;
+    const menuStart = Math.max(menuSection.offsetTop - navHeight - 160, 0);
+
     const pageBottomThreshold =
       document.documentElement.scrollHeight - window.innerHeight - 40;
 
@@ -375,6 +383,116 @@ export function setupCartVisibility() {
 
   updateCartVisibility();
 
-  window.addEventListener("scroll", updateCartVisibility);
+  window.addEventListener("scroll", updateCartVisibility, {
+    passive: true,
+  });
+
   window.addEventListener("resize", updateCartVisibility);
+}
+
+export function setupCategoryNavigation() {
+  const nav = document.getElementById("category-nav");
+  const navLinks = Array.from(document.querySelectorAll("[data-category-link]"));
+  const sections = ["menu", "sides", "drinks"]
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+
+  if (!nav || navLinks.length === 0 || sections.length === 0) return;
+
+  let isClickScrolling = false;
+  let clickScrollTimeout = null;
+  let scrollFrame = null;
+
+  function setActiveLink(sectionId) {
+    navLinks.forEach((link) => {
+      const isActive = link.dataset.categoryLink === sectionId;
+
+      link.classList.toggle("active", isActive);
+
+      if (isActive) {
+        link.setAttribute("aria-current", "true");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+  }
+
+  function isNearPageBottom() {
+    const scrollPosition = window.scrollY + window.innerHeight;
+    const pageHeight = document.documentElement.scrollHeight;
+
+    return scrollPosition >= pageHeight - 80;
+  }
+
+  function getCurrentSectionId() {
+    if (isNearPageBottom()) {
+      return sections[sections.length - 1].id;
+    }
+
+    const navHeight = nav.offsetHeight || 0;
+    const referenceLine = navHeight + 140;
+
+    let currentSectionId = sections[0].id;
+
+    sections.forEach((section) => {
+      const sectionTop = section.getBoundingClientRect().top;
+
+      if (sectionTop <= referenceLine) {
+        currentSectionId = section.id;
+      }
+    });
+
+    return currentSectionId;
+  }
+
+  function updateActiveLinkOnScroll() {
+    if (isClickScrolling) return;
+
+    if (scrollFrame) {
+      window.cancelAnimationFrame(scrollFrame);
+    }
+
+    scrollFrame = window.requestAnimationFrame(() => {
+      setActiveLink(getCurrentSectionId());
+    });
+  }
+
+  navLinks.forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+
+      const sectionId = link.dataset.categoryLink;
+      const section = sectionId ? document.getElementById(sectionId) : null;
+
+      if (!section) return;
+
+      const navHeight = nav.offsetHeight || 0;
+      const targetPosition = Math.max(section.offsetTop - navHeight - 24, 0);
+
+      isClickScrolling = true;
+      setActiveLink(sectionId);
+
+      window.scrollTo({
+        top: targetPosition,
+        behavior: "smooth",
+      });
+
+      if (clickScrollTimeout) {
+        window.clearTimeout(clickScrollTimeout);
+      }
+
+      clickScrollTimeout = window.setTimeout(() => {
+        setActiveLink(getCurrentSectionId());
+        isClickScrolling = false;
+      }, 900);
+    });
+  });
+
+  setActiveLink(getCurrentSectionId());
+
+  window.addEventListener("scroll", updateActiveLinkOnScroll, {
+    passive: true,
+  });
+
+  window.addEventListener("resize", updateActiveLinkOnScroll);
 }
