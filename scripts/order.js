@@ -8,10 +8,11 @@ import {
 import {
   getAddressText,
   getIsFetchingCep,
+  isPickupOrder,
   resetAddressForm,
   validateAddressFields,
 } from "./address.js";
-import { clearCart, getCart } from "./state.js";
+import { clearCart, getCart, getOrderType, ORDER_TYPES, resetOrderType } from "./state.js";
 import { escapeHTML, formatPrice, isStoreOpenNow } from "./utils.js";
 import {
   closeAllModals,
@@ -33,6 +34,12 @@ function clearOrderNotes() {
   if (!elements.orderNotesInput) return;
 
   elements.orderNotesInput.value = "";
+}
+
+function getOrderTypeLabel() {
+  return getOrderType() === ORDER_TYPES.PICKUP
+    ? "Retirada no local"
+    : "Entrega";
 }
 
 export function loadReview() {
@@ -77,17 +84,26 @@ export function loadReview() {
     elements.reviewItems.appendChild(itemRow);
   });
 
+  const deliveryFeeLabel = isPickupOrder()
+    ? "Taxa de entrega"
+    : "Taxa de entrega";
+
   const summaryDiv = document.createElement("div");
   summaryDiv.className = "pt-3 mt-2 space-y-2";
 
   summaryDiv.innerHTML = `
+    <div class="flex items-center justify-between text-sm text-zinc-600">
+      <span>Tipo de pedido</span>
+      <span>${escapeHTML(getOrderTypeLabel())}</span>
+    </div>
+
     <div class="flex items-center justify-between text-sm text-zinc-600">
       <span>Subtotal</span>
       <span>${formatPrice(subtotal)}</span>
     </div>
 
     <div class="flex items-center justify-between text-sm text-zinc-600">
-      <span>Taxa de entrega</span>
+      <span>${deliveryFeeLabel}</span>
       <span>${formatPrice(deliveryFee)}</span>
     </div>
   `;
@@ -96,6 +112,16 @@ export function loadReview() {
 
   elements.reviewAddress.textContent = getAddressText();
   elements.reviewTotal.textContent = formatPrice(totalWithDelivery);
+}
+
+function resetOrderAfterFinish() {
+  clearCart();
+  updateCart();
+  resetOrderType();
+  resetAddressForm();
+  clearOrderNotes();
+  closeAllModals();
+  setFinishButtonLoading(false);
 }
 
 function finishOrder() {
@@ -125,6 +151,7 @@ function finishOrder() {
   const totalWithDelivery = getCartTotalWithDelivery();
 
   let message = "🍔 *Novo Pedido - The Burger House*\n\n";
+  message += `*Tipo de pedido:* ${getOrderTypeLabel()}\n\n`;
   message += "*Itens do pedido:*\n";
 
   cart.forEach((item) => {
@@ -137,7 +164,9 @@ function finishOrder() {
   message += `Taxa de entrega: ${formatPrice(deliveryFee)}\n`;
   message += `Total: ${formatPrice(totalWithDelivery)}\n`;
 
-  message += `\n*Endereço de entrega:*\n${addressText}\n`;
+  message += isPickupOrder()
+    ? `\n*Retirada no local:*\n${addressText}\n`
+    : `\n*Endereço de entrega:*\n${addressText}\n`;
 
   if (orderNotes) {
     message += `\n*Observações do pedido:*\n${orderNotes}\n`;
@@ -150,12 +179,7 @@ function finishOrder() {
   window.open(url, "_blank");
 
   setTimeout(() => {
-    clearCart();
-    updateCart();
-    resetAddressForm();
-    clearOrderNotes();
-    closeAllModals();
-    setFinishButtonLoading(false);
+    resetOrderAfterFinish();
     showToast("Pedido enviado! Seu carrinho foi limpo.", "#16a34a");
   }, 900);
 }
@@ -196,7 +220,7 @@ export function bindOrderEvents() {
         return;
       }
 
-      if (getIsFetchingCep()) {
+      if (!isPickupOrder() && getIsFetchingCep()) {
         showAddressWarning("Aguarde a busca do CEP terminar.");
         return;
       }

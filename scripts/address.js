@@ -1,3 +1,5 @@
+import { STORE_ADDRESS } from "./config.js";
+import { getOrderType, ORDER_TYPES, setOrderType } from "./state.js";
 import { elements, hideAddressWarning, showAddressWarning } from "./ui.js";
 import { isValidHouseNumber } from "./utils.js";
 
@@ -6,6 +8,10 @@ let lastFetchedCep = "";
 
 export function getIsFetchingCep() {
   return isFetchingCep;
+}
+
+export function isPickupOrder() {
+  return getOrderType() === ORDER_TYPES.PICKUP;
 }
 
 export function clearAddressFields() {
@@ -27,9 +33,14 @@ export function resetAddressForm() {
   clearDeliveryFields();
   hideAddressWarning();
   lastFetchedCep = "";
+  updateOrderTypeUI();
 }
 
 export function getAddressText() {
+  if (isPickupOrder()) {
+    return `Retirada no local - ${STORE_ADDRESS}`;
+  }
+
   const street = elements.streetInput ? elements.streetInput.value.trim() : "";
   const houseNumber = elements.houseNumberInput
     ? elements.houseNumberInput.value.trim()
@@ -48,6 +59,11 @@ export function getAddressText() {
 }
 
 export function validateAddressFields() {
+  if (isPickupOrder()) {
+    hideAddressWarning();
+    return true;
+  }
+
   const cep = elements.cepInput ? elements.cepInput.value.replace(/\D/g, "") : "";
   const number = elements.houseNumberInput
     ? elements.houseNumberInput.value.trim()
@@ -79,8 +95,32 @@ export function validateAddressFields() {
   return true;
 }
 
+export function updateOrderTypeUI() {
+  const orderType = getOrderType();
+  const isPickup = orderType === ORDER_TYPES.PICKUP;
+
+  if (elements.orderTypeInputs) {
+    elements.orderTypeInputs.forEach((input) => {
+      input.checked = input.value === orderType;
+    });
+  }
+
+  if (elements.deliveryFields) {
+    elements.deliveryFields.classList.toggle("hidden", isPickup);
+    elements.deliveryFields.setAttribute("aria-hidden", String(isPickup));
+  }
+
+  if (elements.pickupInfo) {
+    elements.pickupInfo.classList.toggle("hidden", !isPickup);
+  }
+
+  if (isPickup) {
+    hideAddressWarning();
+  }
+}
+
 async function fetchAddressByCep() {
-  if (!elements.cepInput) return;
+  if (!elements.cepInput || isPickupOrder()) return;
 
   const cep = elements.cepInput.value.replace(/\D/g, "");
 
@@ -153,6 +193,17 @@ async function fetchAddressByCep() {
 }
 
 export function bindAddressEvents() {
+  updateOrderTypeUI();
+
+  if (elements.orderTypeInputs) {
+    elements.orderTypeInputs.forEach((input) => {
+      input.addEventListener("change", () => {
+        setOrderType(input.value);
+        updateOrderTypeUI();
+      });
+    });
+  }
+
   if (elements.cepInput) {
     elements.cepInput.addEventListener("input", () => {
       elements.cepInput.value = elements.cepInput.value

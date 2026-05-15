@@ -42,6 +42,10 @@ export const elements = {
   reviewTotal: document.getElementById("review-total"),
   orderNotesInput: document.getElementById("order-notes"),
 
+  orderTypeInputs: document.querySelectorAll("input[name='order-type']"),
+  deliveryFields: document.getElementById("delivery-fields"),
+  pickupInfo: document.getElementById("pickup-info"),
+
   dateSpan: document.getElementById("date-span"),
   statusText: document.getElementById("status-text"),
 };
@@ -289,6 +293,7 @@ function renderProductCard(product) {
             data-id="${escapeHTML(product.id)}"
             aria-label="Adicionar ${escapeHTML(product.name)} ao carrinho"
           >
+            <span class="product-cart-indicator hidden" data-product-count="${escapeHTML(product.id)}">0</span>
             <i class="fa fa-plus" aria-hidden="true"></i>
           </button>
         </div>
