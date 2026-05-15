@@ -1092,6 +1092,10 @@
 }
 
 @media (max-width: 768px) {
+  .hero-overlay {
+    background-attachment: scroll !important;
+  }
+
   .hero-content {
     padding-top: 2rem;
     padding-bottom: 4.5rem;

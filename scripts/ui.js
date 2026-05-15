@@ -271,6 +271,8 @@ function renderProductCard(product) {
         <img
           src="${escapeHTML(product.image)}"
           alt="${escapeHTML(imageAlt)}"
+          width="110"
+          height="110"
           class="product-item-img"
           loading="lazy"
         />
