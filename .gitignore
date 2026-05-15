@@ -5,6 +5,7 @@ dist/
 .env.local
 
 output.css
+/style.css
 
 .DS_Store
 Thumbs.db
