@@ -84,9 +84,7 @@ export function loadReview() {
     elements.reviewItems.appendChild(itemRow);
   });
 
-  const deliveryFeeLabel = isPickupOrder()
-    ? "Taxa de entrega"
-    : "Taxa de entrega";
+  const deliveryFeeLabel = "Taxa de entrega";
 
   const summaryDiv = document.createElement("div");
   summaryDiv.className = "pt-3 mt-2 space-y-2";
