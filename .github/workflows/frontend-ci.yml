@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: build
+    name: Testar e gerar build
     runs-on: ubuntu-latest
 
     steps:
@@ -29,6 +29,9 @@ jobs:
 
       - name: Instalar dependências
         run: npm ci
+
+      - name: Executar testes automatizados
+        run: npm test
 
       - name: Gerar CSS de produção
         run: npm run build
@@ -53,3 +56,8 @@ jobs:
           test -f scripts/cart.js
           test -f scripts/address.js
           test -f scripts/order.js
+
+      - name: Verificar arquivos de teste
+        run: |
+          test -f tests/utils.test.js
+          test -f tests/data.test.js
