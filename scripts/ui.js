@@ -1,8 +1,13 @@
 import { MENU_CATEGORIES } from "./data.js";
+import {
+  getLocalizedEntity,
+  translate,
+} from "./i18n.js";
 import { escapeHTML, formatPrice, isStoreOpenNow } from "./utils.js";
 
 let activeModal = null;
 let previouslyFocusedElement = null;
+let cleanupCategoryNavigation = null;
 
 export const elements = {
   get menuSection() {
@@ -189,7 +194,7 @@ export function showToast(message, background = "#ef4444") {
 }
 
 export function showClosedStoreMessage() {
-  showToast("Estamos fechados no momento. Funcionamos das 18h às 23h.");
+  showToast(translate("status.closedMessage"));
 }
 
 export function showAddressWarning(message) {
@@ -217,7 +222,7 @@ export function setFinishButtonLoading(isLoading) {
     button.innerHTML = `
       <span class="inline-flex items-center gap-2">
         <span class="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
-        Enviando pedido...
+        ${translate("order.sending")}
       </span>
     `;
     return;
@@ -240,15 +245,17 @@ export function renderMenu() {
 }
 
 function renderMenuCategory(category) {
+  const localizedCategory = getLocalizedEntity(category);
+
   return `
     <section id="${escapeHTML(category.id)}" class="max-w-5xl mx-auto px-4 scroll-mt-28">
       <div class="section-header">
         <h2 class="section-title">
           <i class="${escapeHTML(category.icon)} text-amber-500" aria-hidden="true"></i>
-          <span class="section-title-text">${escapeHTML(category.title)}</span>
+          <span class="section-title-text">${escapeHTML(localizedCategory.title)}</span>
         </h2>
 
-        <p class="section-subtitle">${escapeHTML(category.subtitle)}</p>
+        <p class="section-subtitle">${escapeHTML(localizedCategory.subtitle)}</p>
       </div>
 
       <div class="products-list-container">
@@ -259,11 +266,13 @@ function renderMenuCategory(category) {
 }
 
 function renderProductCard(product) {
-  const tagHTML = product.tag
-    ? `<span class="product-item-tag">${escapeHTML(product.tag)}</span>`
+  const localizedProduct = getLocalizedEntity(product);
+
+  const tagHTML = localizedProduct.tag
+    ? `<span class="product-item-tag">${escapeHTML(localizedProduct.tag)}</span>`
     : "";
 
-  const imageAlt = product.imageAlt || product.name;
+  const imageAlt = localizedProduct.imageAlt || localizedProduct.name;
 
   return `
     <article class="product-item-card reveal">
@@ -275,16 +284,17 @@ function renderProductCard(product) {
           height="110"
           class="product-item-img"
           loading="lazy"
+          decoding="async"
         />
       </div>
 
       <div class="product-item-info">
         <div class="product-item-name-row">
-          <h3 class="product-item-name">${escapeHTML(product.name)}</h3>
+          <h3 class="product-item-name">${escapeHTML(localizedProduct.name)}</h3>
           ${tagHTML}
         </div>
 
-        <p class="product-item-desc">${escapeHTML(product.description)}</p>
+        <p class="product-item-desc">${escapeHTML(localizedProduct.description)}</p>
 
         <div class="product-item-footer">
           <span class="product-item-price">${formatPrice(product.price)}</span>
@@ -293,7 +303,7 @@ function renderProductCard(product) {
             type="button"
             class="btn-add-item add-to-cart-btn"
             data-id="${escapeHTML(product.id)}"
-            aria-label="Adicionar ${escapeHTML(product.name)} ao carrinho"
+            aria-label="${escapeHTML(translate("cart.addAria", undefined, { name: localizedProduct.name }))}"
           >
             <span class="product-cart-indicator hidden" data-product-count="${escapeHTML(product.id)}">0</span>
             <i class="fa fa-plus" aria-hidden="true"></i>
@@ -312,11 +322,11 @@ export function updateStoreStatus() {
   if (isOpen) {
     elements.dateSpan.classList.remove("badge-closed");
     elements.dateSpan.classList.add("badge-open");
-    elements.statusText.textContent = "Aberto agora";
+    elements.statusText.textContent = translate("status.open");
   } else {
     elements.dateSpan.classList.remove("badge-open");
     elements.dateSpan.classList.add("badge-closed");
-    elements.statusText.textContent = "Fechado no momento";
+    elements.statusText.textContent = translate("status.closed");
   }
 }
 
@@ -399,6 +409,11 @@ export function setupCartVisibility() {
 }
 
 export function setupCategoryNavigation() {
+  if (typeof cleanupCategoryNavigation === "function") {
+    cleanupCategoryNavigation();
+    cleanupCategoryNavigation = null;
+  }
+
   const nav = document.getElementById("category-nav");
   const navLinks = Array.from(document.querySelectorAll("[data-category-link]"));
   const sections = ["menu", "sides", "drinks"]
@@ -410,6 +425,7 @@ export function setupCategoryNavigation() {
   let isClickScrolling = false;
   let clickScrollTimeout = null;
   let scrollFrame = null;
+  const clickHandlers = new Map();
 
   function setActiveLink(sectionId) {
     navLinks.forEach((link) => {
@@ -466,7 +482,7 @@ export function setupCategoryNavigation() {
   }
 
   navLinks.forEach((link) => {
-    link.addEventListener("click", (event) => {
+    const clickHandler = (event) => {
       event.preventDefault();
 
       const sectionId = link.dataset.categoryLink;
@@ -493,7 +509,10 @@ export function setupCategoryNavigation() {
         setActiveLink(getCurrentSectionId());
         isClickScrolling = false;
       }, 900);
-    });
+    };
+
+    clickHandlers.set(link, clickHandler);
+    link.addEventListener("click", clickHandler);
   });
 
   setActiveLink(getCurrentSectionId());
@@ -503,4 +522,21 @@ export function setupCategoryNavigation() {
   });
 
   window.addEventListener("resize", updateActiveLinkOnScroll);
+
+  cleanupCategoryNavigation = () => {
+    clickHandlers.forEach((handler, link) => {
+      link.removeEventListener("click", handler);
+    });
+
+    window.removeEventListener("scroll", updateActiveLinkOnScroll);
+    window.removeEventListener("resize", updateActiveLinkOnScroll);
+
+    if (clickScrollTimeout) {
+      window.clearTimeout(clickScrollTimeout);
+    }
+
+    if (scrollFrame) {
+      window.cancelAnimationFrame(scrollFrame);
+    }
+  };
 }

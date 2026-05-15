@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-br">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -53,6 +53,18 @@
       <div
         class="hero-content w-full h-full flex flex-col justify-start items-center text-center px-4 pb-20"
       >
+        <div class="language-switcher" aria-label="Selecionar idioma">
+          <label for="language-select" class="sr-only" data-i18n="language.label">
+            Idioma
+          </label>
+          <i class="fa fa-globe" aria-hidden="true"></i>
+          <select id="language-select" class="language-select">
+            <option value="pt-BR">PT</option>
+            <option value="en-US">EN</option>
+          </select>
+        </div>
+
+        
         <div class="hero-logo-wrap animate-float">
           <img
             src="./assets/logo-burger.png"
@@ -64,14 +76,14 @@
         </div>
 
         <div class="hero-info-stack">
-          <h1 class="hero-title font-black font-poppins">The Burger House</h1>
+          <h1 class="hero-title font-black font-poppins" data-i18n="hero.title">The Burger House</h1>
 
           <div class="hero-meta-row text-white">
             <i
               class="fas fa-map-marker-alt text-amber-400 text-xl"
               aria-hidden="true"
             ></i>
-            <p class="text-lg font-medium">Rua Dev 25, Uberlândia - MG</p>
+            <p class="text-lg font-medium" data-i18n="hero.address">Rua Dev 25, Uberlândia - MG</p>
           </div>
 
           <div class="hero-meta-row text-white">
@@ -79,7 +91,7 @@
               class="fas fa-clock text-amber-400 text-lg"
               aria-hidden="true"
             ></i>
-            <p class="text-base font-medium">Seg à Dom • 18h às 23h</p>
+            <p class="text-base font-medium" data-i18n="hero.hours">Seg à Dom • 18h às 23h</p>
           </div>
 
           <div
@@ -94,10 +106,10 @@
           <a
             href="#menu"
             class="hero-cta inline-flex items-center gap-2 bg-gradient-to-r from-amber-400 to-amber-500 text-zinc-900 px-8 py-4 rounded-full font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
-            aria-label="Ir para o cardápio"
+            aria-label="Ir para o cardápio" data-i18n-aria-label="hero.ctaAria"
           >
             <i class="fas fa-utensils" aria-hidden="true"></i>
-            Explorar Cardápio
+            <span data-i18n="hero.cta">Explorar Cardápio</span>
           </a>
         </div>
 
@@ -113,7 +125,7 @@
     <nav
       id="category-nav"
       class="category-nav"
-      aria-label="Navegação por categorias do cardápio"
+      aria-label="Navegação por categorias do cardápio" data-i18n-aria-label="nav.aria"
     >
       <div class="category-nav-container">
         <a
@@ -123,17 +135,17 @@
           aria-current="true"
         >
           <i class="fa fa-burger" aria-hidden="true"></i>
-          Hambúrgueres
+          <span data-i18n="nav.burgers">Hambúrgueres</span>
         </a>
 
         <a href="#sides" class="category-nav-link" data-category-link="sides">
           <i class="fa fa-utensils" aria-hidden="true"></i>
-          Acompanhamentos
+          <span data-i18n="nav.sides">Acompanhamentos</span>
         </a>
 
         <a href="#drinks" class="category-nav-link" data-category-link="drinks">
           <i class="fa fa-glass-cheers" aria-hidden="true"></i>
-          Bebidas
+          <span data-i18n="nav.drinks">Bebidas</span>
         </a>
       </div>
     </nav>
@@ -159,17 +171,17 @@
             </div>
             <div>
               <h2 id="cart-modal-title" class="cart-modal-title">
-                Meu Carrinho
+                <span data-i18n="cart.title">Meu Carrinho</span>
               </h2>
               <p class="cart-modal-subtitle">
-                <span id="cart-item-count-label">0 itens</span> selecionados
+                <span id="cart-item-count-label">0 itens</span> <span data-i18n="cart.selected">selecionados</span>
               </p>
             </div>
           </div>
           <button
             type="button"
             class="close-modal-x cart-modal-close"
-            aria-label="Fechar"
+            aria-label="Fechar" data-i18n-aria-label="cart.closeAria"
           >
             <i class="fa fa-times" aria-hidden="true"></i>
           </button>
@@ -183,9 +195,9 @@
         <div class="cart-modal-footer">
           <div class="cart-subtotal-row">
             <div class="cart-subtotal-info">
-              <span class="cart-subtotal-label">Subtotal dos itens</span>
+              <span class="cart-subtotal-label" data-i18n="cart.subtotal">Subtotal dos itens</span>
               <span class="cart-subtotal-hint">
-                Entrega: R$ 5,00 | Retirada no local: grátis
+                <span data-i18n="cart.deliveryHint">Entrega: R$ 5,00 | Retirada no local: grátis</span>
               </span>
             </div>
 
@@ -199,14 +211,14 @@
               class="cart-btn-secondary"
             >
               <i class="fa fa-arrow-left" aria-hidden="true"></i>
-              Voltar
+              <span data-i18n="cart.back">Voltar</span>
             </button>
             <button
               type="button"
               id="go-to-address-btn"
               class="cart-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <span>Continuar</span>
+              <span data-i18n="cart.continue">Continuar</span>
               <i class="fa fa-arrow-right" aria-hidden="true"></i>
             </button>
           </div>
@@ -229,24 +241,24 @@
             </div>
             <div>
               <h2 id="address-modal-title" class="cart-modal-title">
-                Tipo de Pedido
+                <span data-i18n="orderType.title">Tipo de Pedido</span>
               </h2>
-              <p class="cart-modal-subtitle">Escolha entrega ou retirada</p>
+              <p class="cart-modal-subtitle" data-i18n="orderType.subtitle">Escolha entrega ou retirada</p>
             </div>
           </div>
           <button
             type="button"
             class="close-modal-x cart-modal-close"
-            aria-label="Fechar"
+            aria-label="Fechar" data-i18n-aria-label="cart.closeAria"
           >
             <i class="fa fa-times" aria-hidden="true"></i>
           </button>
         </div>
 
         <div class="cart-modal-items overflow-y-auto flex-grow">
-          <fieldset class="order-type-group" aria-label="Tipo de pedido">
+          <fieldset class="order-type-group" aria-label="Tipo de pedido" data-i18n-aria-label="orderType.title">
             <legend class="order-type-title">
-              Como deseja receber o pedido?
+              <span data-i18n="orderType.question">Como deseja receber o pedido?</span>
             </legend>
 
             <div class="order-type-options">
@@ -265,8 +277,8 @@
                   </span>
 
                   <span class="order-type-content">
-                    <strong>Entrega</strong>
-                    <small>Receber no endereço informado</small>
+                    <strong data-i18n="orderType.delivery">Entrega</strong>
+                    <small data-i18n="orderType.deliveryDescription">Receber no endereço informado</small>
                   </span>
                 </span>
               </label>
@@ -285,8 +297,8 @@
                   </span>
 
                   <span class="order-type-content">
-                    <strong>Retirada no local</strong>
-                    <small>Buscar diretamente na hamburgueria</small>
+                    <strong data-i18n="orderType.pickup">Retirada no local</strong>
+                    <small data-i18n="orderType.pickupDescription">Buscar diretamente na hamburgueria</small>
                   </span>
                 </span>
               </label>
@@ -299,17 +311,17 @@
                 class="block text-sm font-bold text-zinc-700 mb-1"
                 for="cep"
               >
-                CEP*
+                <span data-i18n="address.cep">CEP*</span>
               </label>
               <input
                 type="text"
                 id="cep"
-                placeholder="00000-000"
+                placeholder="00000-000" data-i18n-placeholder="address.cepPlaceholder"
                 maxlength="9"
                 class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none transition-colors"
               />
               <p id="cep-loading" class="text-xs text-amber-600 mt-1 hidden">
-                Buscando CEP...
+                <span data-i18n="address.loadingCep">Buscando CEP...</span>
               </p>
             </div>
 
@@ -320,11 +332,11 @@
                     class="block text-sm font-bold text-zinc-700"
                     for="street"
                   >
-                    Rua*
+                    <span data-i18n="address.street">Rua*</span>
                   </label>
                   <span class="readonly-hint" id="street-hint">
                     <i class="fa fa-lock" aria-hidden="true"></i>
-                    Preenchido via CEP
+                    <span data-i18n="address.streetHint">Preenchido via CEP</span>
                   </span>
                 </div>
                 <input
@@ -340,12 +352,12 @@
                   class="block text-sm font-bold text-zinc-700 mb-1"
                   for="house-number"
                 >
-                  Número*
+                  <span data-i18n="address.number">Número*</span>
                 </label>
                 <input
                   type="text"
                   id="house-number"
-                  placeholder="Ex: 123"
+                  placeholder="Ex: 123" data-i18n-placeholder="address.numberPlaceholder"
                   inputmode="numeric"
                   pattern="[0-9]*"
                   maxlength="6"
@@ -362,11 +374,11 @@
                     class="block text-sm font-bold text-zinc-700"
                     for="neighborhood"
                   >
-                    Bairro*
+                    <span data-i18n="address.neighborhood">Bairro*</span>
                   </label>
                   <span class="readonly-hint" id="neighborhood-hint">
                     <i class="fa fa-lock" aria-hidden="true"></i>
-                    Via CEP
+                    <span data-i18n="address.neighborhoodHint">Via CEP</span>
                   </span>
                 </div>
                 <input
@@ -383,11 +395,11 @@
                     class="block text-sm font-bold text-zinc-700"
                     for="city"
                   >
-                    Cidade*
+                    <span data-i18n="address.city">Cidade*</span>
                   </label>
                   <span class="readonly-hint" id="city-hint">
                     <i class="fa fa-lock" aria-hidden="true"></i>
-                    Via CEP
+                    <span data-i18n="address.cityHint">Via CEP</span>
                   </span>
                 </div>
                 <input
@@ -405,12 +417,12 @@
                 class="block text-sm font-bold text-zinc-700 mb-1"
                 for="complement"
               >
-                Complemento (Opcional)
+                <span data-i18n="address.complement">Complemento (Opcional)</span>
               </label>
               <input
                 type="text"
                 id="complement"
-                placeholder="Apto, Bloco, etc."
+                placeholder="Apto, Bloco, etc." data-i18n-placeholder="address.complementPlaceholder"
                 class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none"
               />
             </div>
@@ -422,10 +434,9 @@
             </span>
 
             <div class="pickup-info-content">
-              <strong>Retirada no local selecionada</strong>
+              <strong data-i18n="address.pickupSelected">Retirada no local selecionada</strong>
               <p>
-                O pedido será preparado para retirada no balcão da The Burger
-                House. Nenhuma taxa de entrega será aplicada.
+                <span data-i18n="address.pickupMessage">O pedido será preparado para retirada no balcão da The Burger House. Nenhuma taxa de entrega será aplicada.</span>
               </p>
             </div>
           </div>
@@ -436,7 +447,7 @@
             role="alert"
             aria-live="polite"
           >
-            Preencha os campos obrigatórios (*)
+            <span data-i18n="address.requiredFields">Preencha os campos obrigatórios (*)</span>
           </p>
         </div>
 
@@ -448,14 +459,14 @@
               class="cart-btn-secondary"
             >
               <i class="fa fa-arrow-left" aria-hidden="true"></i>
-              Voltar
+              <span data-i18n="cart.back">Voltar</span>
             </button>
             <button
               type="button"
               id="go-to-review-btn"
               class="cart-btn-primary"
             >
-              <span>Continuar</span>
+              <span data-i18n="cart.continue">Continuar</span>
               <i class="fa fa-arrow-right" aria-hidden="true"></i>
             </button>
           </div>
@@ -478,17 +489,17 @@
             </div>
             <div>
               <h2 id="review-modal-title" class="cart-modal-title">
-                Revisão do Pedido
+                <span data-i18n="review.title">Revisão do Pedido</span>
               </h2>
               <p class="cart-modal-subtitle">
-                Confirme os dados antes de finalizar
+                <span data-i18n="review.subtitle">Confirme os dados antes de finalizar</span>
               </p>
             </div>
           </div>
           <button
             type="button"
             class="close-modal-x cart-modal-close"
-            aria-label="Fechar"
+            aria-label="Fechar" data-i18n-aria-label="cart.closeAria"
           >
             <i class="fa fa-times" aria-hidden="true"></i>
           </button>
@@ -502,7 +513,7 @@
                   class="fa fa-shopping-basket text-amber-600"
                   aria-hidden="true"
                 ></i>
-                Itens do Pedido
+                <span data-i18n="review.items">Itens do Pedido</span>
               </h3>
               <div
                 id="review-items"
@@ -516,7 +527,7 @@
                   class="fa fa-map-marker-alt text-amber-600"
                   aria-hidden="true"
                 ></i>
-                Endereço de Entrega
+                <span data-i18n="review.address">Endereço de Entrega</span>
               </h3>
               <div
                 id="review-address"
@@ -533,27 +544,26 @@
                   class="fa fa-clipboard-list text-amber-600"
                   aria-hidden="true"
                 ></i>
-                Observações do Pedido
+                <span data-i18n="review.notes">Observações do Pedido</span>
               </label>
 
               <textarea
                 id="order-notes"
                 maxlength="280"
                 rows="4"
-                placeholder="Ex: sem cebola, carne bem passada, alergia a glúten, enviar ketchup extra..."
+                placeholder="Ex: sem cebola, carne bem passada, alergia a glúten, enviar ketchup extra..." data-i18n-placeholder="review.notesPlaceholder"
                 class="order-notes-field"
                 aria-describedby="order-notes-hint"
               ></textarea>
 
               <p id="order-notes-hint" class="order-notes-hint">
-                Campo opcional. Use para informar preferências, restrições ou
-                alergias.
+                <span data-i18n="review.notesHint">Campo opcional. Use para informar preferências, restrições ou alergias.</span>
               </p>
             </div>
 
             <div class="flex justify-between items-center border-t pt-3 mt-3">
               <span class="text-base font-bold text-zinc-700">
-                Total Final:
+                <span data-i18n="review.total">Total Final:</span>
               </span>
               <span id="review-total" class="text-xl font-bold text-amber-600">
                 R$ 0,00
@@ -570,7 +580,7 @@
               class="cart-btn-secondary"
             >
               <i class="fa fa-arrow-left" aria-hidden="true"></i>
-              Voltar
+              <span data-i18n="cart.back">Voltar</span>
             </button>
             <button
               type="button"
@@ -578,7 +588,7 @@
               class="cart-btn-primary cart-btn-success"
             >
               <i class="fab fa-whatsapp" aria-hidden="true"></i>
-              <span>Finalizar</span>
+              <span data-i18n="review.finish">Finalizar</span>
             </button>
           </div>
         </div>
@@ -592,11 +602,11 @@
         type="button"
         class="cart-button"
         id="cart-btn"
-        aria-label="Abrir carrinho"
+        aria-label="Abrir carrinho" data-i18n-aria-label="cart.openAria"
       >
         <i class="fa fa-shopping-cart text-2xl" aria-hidden="true"></i>
         <span class="cart-count">(<span id="cart-count">0</span>)</span>
-        <span>Meu Carrinho</span>
+        <span data-i18n="cart.footer">Meu Carrinho</span>
       </button>
     </footer>
 

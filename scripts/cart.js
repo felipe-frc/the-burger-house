@@ -1,5 +1,10 @@
 import { DELIVERY_FEE } from "./config.js";
 import { MENU_PRODUCT_BY_ID } from "./data.js";
+import {
+  getLocalizedEntity,
+  translate,
+  translateItemCount,
+} from "./i18n.js";
 import { getCart, getOrderType, ORDER_TYPES, saveCart, setCart } from "./state.js";
 import { escapeHTML, formatPrice } from "./utils.js";
 import { elements, showToast } from "./ui.js";
@@ -18,6 +23,21 @@ export function getCartTotalWithDelivery() {
   return getCartSubtotal() + getDeliveryFee();
 }
 
+function getLocalizedCartItem(item) {
+  const product = MENU_PRODUCT_BY_ID.get(item.id);
+
+  if (!product) {
+    return item;
+  }
+
+  return {
+    ...item,
+    ...getLocalizedEntity(product),
+    quantity: item.quantity,
+    price: item.price,
+  };
+}
+
 export function updateProceedButtonState() {
   if (!elements.goToAddressBtn) return;
 
@@ -32,12 +52,22 @@ export function updateProductButtonsState() {
     const id = button.dataset.id;
     const item = cart.find((cartItem) => cartItem.id === id);
     const indicator = button.querySelector(".product-cart-indicator");
+    const product = MENU_PRODUCT_BY_ID.get(id);
+    const localizedProduct = getLocalizedEntity(product);
 
     if (item) {
+      const unit = translate(
+        item.quantity === 1 ? "cart.unitSingular" : "cart.unitPlural"
+      );
+
       button.classList.add("btn-add-item-active");
       button.setAttribute(
         "aria-label",
-        `${item.quantity} ${item.quantity === 1 ? "unidade" : "unidades"} de ${item.name} no carrinho. Adicionar mais uma unidade.`
+        translate("cart.activeAddAria", undefined, {
+          quantity: item.quantity,
+          unit,
+          name: localizedProduct ? localizedProduct.name : item.name,
+        })
       );
 
       if (indicator) {
@@ -48,12 +78,12 @@ export function updateProductButtonsState() {
       return;
     }
 
-    const product = MENU_PRODUCT_BY_ID.get(id);
-
     button.classList.remove("btn-add-item-active");
     button.setAttribute(
       "aria-label",
-      `Adicionar ${product ? product.name : "produto"} ao carrinho`
+      translate("cart.addAria", undefined, {
+        name: localizedProduct ? localizedProduct.name : "produto",
+      })
     );
 
     if (indicator) {
@@ -78,14 +108,15 @@ export function updateCart() {
     elements.cartItemsContainer.innerHTML = `
       <div class="flex flex-col items-center justify-center text-center py-8 text-zinc-500">
         <i class="fa fa-shopping-basket text-4xl mb-3 text-zinc-300" aria-hidden="true"></i>
-        <p class="font-semibold">Seu carrinho está vazio</p>
-        <p class="text-sm">Adicione itens do cardápio para continuar.</p>
+        <p class="font-semibold">${escapeHTML(translate("cart.emptyTitle"))}</p>
+        <p class="text-sm">${escapeHTML(translate("cart.emptyDescription"))}</p>
       </div>
     `;
   } else {
     cart.forEach((item) => {
       count += item.quantity;
 
+      const localizedItem = getLocalizedCartItem(item);
       const itemSubtotal = item.price * item.quantity;
       const div = document.createElement("div");
 
@@ -93,15 +124,17 @@ export function updateCart() {
 
       div.innerHTML = `
         <div class="cart-item-main">
-          <p class="cart-item-name">${escapeHTML(item.name)}</p>
-          <p class="cart-item-unit-price">${formatPrice(item.price)} cada</p>
+          <p class="cart-item-name">${escapeHTML(localizedItem.name)}</p>
+          <p class="cart-item-unit-price">
+            ${formatPrice(item.price)} ${escapeHTML(translate("cart.unitPriceSuffix"))}
+          </p>
 
           <div class="cart-item-quantity-controls">
             <button
               type="button"
               class="cart-quantity-btn minus-btn"
               data-id="${escapeHTML(item.id)}"
-              aria-label="Diminuir quantidade de ${escapeHTML(item.name)}"
+              aria-label="${escapeHTML(translate("cart.decreaseAria", undefined, { name: localizedItem.name }))}"
             >
               -
             </button>
@@ -112,7 +145,7 @@ export function updateCart() {
               type="button"
               class="cart-quantity-btn plus-btn"
               data-id="${escapeHTML(item.id)}"
-              aria-label="Aumentar quantidade de ${escapeHTML(item.name)}"
+              aria-label="${escapeHTML(translate("cart.increaseAria", undefined, { name: localizedItem.name }))}"
             >
               +
             </button>
@@ -126,9 +159,9 @@ export function updateCart() {
             type="button"
             class="cart-item-remove remove-btn"
             data-id="${escapeHTML(item.id)}"
-            aria-label="Remover ${escapeHTML(item.name)} do carrinho"
+            aria-label="${escapeHTML(translate("cart.removeAria", undefined, { name: localizedItem.name }))}"
           >
-            Remover
+            ${escapeHTML(translate("cart.remove"))}
           </button>
         </div>
       `;
@@ -143,7 +176,7 @@ export function updateCart() {
   const cartItemCountLabel = document.getElementById("cart-item-count-label");
 
   if (cartItemCountLabel) {
-    cartItemCountLabel.textContent = count === 1 ? "1 item" : `${count} itens`;
+    cartItemCountLabel.textContent = translateItemCount(count);
   }
 
   saveCart();
@@ -162,6 +195,7 @@ export function addItemToCart(button) {
     return;
   }
 
+  const localizedProduct = getLocalizedEntity(product);
   const cart = getCart();
   const existingItem = cart.find((item) => item.id === product.id);
 
@@ -179,7 +213,10 @@ export function addItemToCart(button) {
   saveCart();
   updateCart();
   animateAddToCart(button);
-  showToast(`${product.name} adicionado ao carrinho!`, "#16a34a");
+  showToast(
+    translate("cart.addedToast", undefined, { name: localizedProduct.name }),
+    "#16a34a"
+  );
 }
 
 function animateAddToCart(button) {

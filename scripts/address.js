@@ -1,4 +1,5 @@
 import { STORE_ADDRESS } from "./config.js";
+import { translate } from "./i18n.js";
 import { getOrderType, ORDER_TYPES, setOrderType } from "./state.js";
 import { elements, hideAddressWarning, showAddressWarning } from "./ui.js";
 import { isValidHouseNumber } from "./utils.js";
@@ -38,7 +39,7 @@ export function resetAddressForm() {
 
 export function getAddressText() {
   if (isPickupOrder()) {
-    return `Retirada no local - ${STORE_ADDRESS}`;
+    return `${translate("address.pickupPrefix")} - ${STORE_ADDRESS}`;
   }
 
   const street = elements.streetInput ? elements.streetInput.value.trim() : "";
@@ -54,7 +55,7 @@ export function getAddressText() {
     : "";
 
   return `${street}, ${houseNumber} - ${neighborhood}, ${city}${
-    complement ? ` | Complemento: ${complement}` : ""
+    complement ? ` | ${translate("address.complementPrefix")}: ${complement}` : ""
   }`;
 }
 
@@ -75,19 +76,19 @@ export function validateAddressFields() {
   const city = elements.cityInput ? elements.cityInput.value.trim() : "";
 
   if (isFetchingCep) {
-    showAddressWarning("Aguarde a busca do CEP terminar.");
+    showAddressWarning(translate("address.waitCep"));
     return false;
   }
 
   if (cep.length !== 8 || street === "" || neighborhood === "" || city === "") {
     showAddressWarning(
-      "Preencha os campos obrigatórios e informe um CEP válido para carregar o endereço."
+      translate("address.invalidCep")
     );
     return false;
   }
 
   if (!isValidHouseNumber(number)) {
-    showAddressWarning("Informe um número válido usando apenas dígitos.");
+    showAddressWarning(translate("address.invalidNumber"));
     return false;
   }
 
@@ -146,7 +147,7 @@ async function fetchAddressByCep() {
     const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
 
     if (!response.ok) {
-      throw new Error("Falha ao consultar o CEP.");
+      throw new Error(translate("address.fetchFailed"));
     }
 
     const data = await response.json();
@@ -154,7 +155,7 @@ async function fetchAddressByCep() {
     if (data.erro) {
       clearDeliveryFields();
       lastFetchedCep = "";
-      showAddressWarning("CEP não encontrado. Verifique o número informado.");
+      showAddressWarning(translate("address.notFound"));
       return;
     }
 
@@ -169,7 +170,7 @@ async function fetchAddressByCep() {
     if (!street || !neighborhood || !city) {
       clearAddressFields();
       showAddressWarning(
-        "Não foi possível preencher o endereço completo com esse CEP."
+        translate("address.incompleteCep")
       );
       return;
     }
@@ -181,7 +182,7 @@ async function fetchAddressByCep() {
     clearDeliveryFields();
     lastFetchedCep = "";
     showAddressWarning(
-      "Erro ao buscar o CEP. Verifique sua conexão e tente novamente."
+      translate("address.connectionError")
     );
   } finally {
     isFetchingCep = false;

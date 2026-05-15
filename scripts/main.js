@@ -1,5 +1,13 @@
-import { bindAddressEvents } from "./address.js";
+import {
+  bindAddressEvents,
+  updateOrderTypeUI,
+} from "./address.js";
 import { bindAddToCartButtons, bindCartControls, updateCart } from "./cart.js";
+import {
+  applyStaticTranslations,
+  bindLanguageSwitcher,
+  getCurrentLanguage,
+} from "./i18n.js";
 import { bindOrderEvents } from "./order.js";
 import {
   bindModalCloseEvents,
@@ -11,7 +19,17 @@ import {
   updateStoreStatus,
 } from "./ui.js";
 
+function refreshLocalizedUI() {
+  renderMenu();
+  updateCart();
+  updateStoreStatus();
+  updateOrderTypeUI();
+  setupCategoryNavigation();
+  revealOnScroll();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  applyStaticTranslations(getCurrentLanguage());
   renderMenu();
 
   hideCartFooter();
@@ -22,6 +40,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   bindAddressEvents();
   bindOrderEvents();
+
+  bindLanguageSwitcher(() => {
+    refreshLocalizedUI();
+  });
 
   updateCart();
   updateStoreStatus();

@@ -29,6 +29,19 @@ describe("menu data", () => {
     });
   });
 
+  it("has English translations for categories and products", () => {
+    MENU_CATEGORIES.forEach((category) => {
+      expect(category.translations?.["en-US"]?.title).toBeTruthy();
+      expect(category.translations?.["en-US"]?.subtitle).toBeTruthy();
+
+      category.items.forEach((product) => {
+        expect(product.translations?.["en-US"]?.name).toBeTruthy();
+        expect(product.translations?.["en-US"]?.description).toBeTruthy();
+        expect(product.translations?.["en-US"]?.imageAlt).toBeTruthy();
+      });
+    });
+  });
+
   it("maps every product by id", () => {
     MENU_PRODUCTS.forEach((product) => {
       expect(MENU_PRODUCT_BY_ID.get(product.id)).toEqual(product);

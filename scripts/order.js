@@ -12,6 +12,11 @@ import {
   resetAddressForm,
   validateAddressFields,
 } from "./address.js";
+import {
+  getLocalizedEntity,
+  translate,
+} from "./i18n.js";
+import { MENU_PRODUCT_BY_ID } from "./data.js";
 import { clearCart, getCart, getOrderType, ORDER_TYPES, resetOrderType } from "./state.js";
 import { escapeHTML, formatPrice, isStoreOpenNow } from "./utils.js";
 import {
@@ -36,10 +41,25 @@ function clearOrderNotes() {
   elements.orderNotesInput.value = "";
 }
 
+function getLocalizedCartItem(item) {
+  const product = MENU_PRODUCT_BY_ID.get(item.id);
+
+  if (!product) {
+    return item;
+  }
+
+  return {
+    ...item,
+    ...getLocalizedEntity(product),
+    quantity: item.quantity,
+    price: item.price,
+  };
+}
+
 function getOrderTypeLabel() {
   return getOrderType() === ORDER_TYPES.PICKUP
-    ? "Retirada no local"
-    : "Entrega";
+    ? translate("orderType.pickup")
+    : translate("orderType.delivery");
 }
 
 export function loadReview() {
@@ -52,8 +72,8 @@ export function loadReview() {
   elements.reviewItems.innerHTML = "";
 
   if (cart.length === 0) {
-    elements.reviewItems.innerHTML = `<p class="text-zinc-500 italic">Nenhum item no pedido.</p>`;
-    elements.reviewAddress.textContent = "Endereço não informado.";
+    elements.reviewItems.innerHTML = `<p class="text-zinc-500 italic">${escapeHTML(translate("review.empty"))}</p>`;
+    elements.reviewAddress.textContent = translate("review.addressMissing");
     elements.reviewTotal.textContent = formatPrice(0);
     return;
   }
@@ -63,6 +83,7 @@ export function loadReview() {
   const totalWithDelivery = getCartTotalWithDelivery();
 
   cart.forEach((item) => {
+    const localizedItem = getLocalizedCartItem(item);
     const itemSubtotal = item.price * item.quantity;
     const itemRow = document.createElement("div");
 
@@ -72,7 +93,7 @@ export function loadReview() {
     itemRow.innerHTML = `
       <div class="min-w-0">
         <p class="font-medium text-zinc-800 break-words">
-          ${item.quantity}x ${escapeHTML(item.name)}
+          ${item.quantity}x ${escapeHTML(localizedItem.name)}
         </p>
       </div>
 
@@ -84,24 +105,22 @@ export function loadReview() {
     elements.reviewItems.appendChild(itemRow);
   });
 
-  const deliveryFeeLabel = "Taxa de entrega";
-
   const summaryDiv = document.createElement("div");
   summaryDiv.className = "pt-3 mt-2 space-y-2";
 
   summaryDiv.innerHTML = `
     <div class="flex items-center justify-between text-sm text-zinc-600">
-      <span>Tipo de pedido</span>
+      <span>${escapeHTML(translate("review.orderType"))}</span>
       <span>${escapeHTML(getOrderTypeLabel())}</span>
     </div>
 
     <div class="flex items-center justify-between text-sm text-zinc-600">
-      <span>Subtotal</span>
+      <span>${escapeHTML(translate("review.subtotal"))}</span>
       <span>${formatPrice(subtotal)}</span>
     </div>
 
     <div class="flex items-center justify-between text-sm text-zinc-600">
-      <span>${deliveryFeeLabel}</span>
+      <span>${escapeHTML(translate("review.deliveryFee"))}</span>
       <span>${formatPrice(deliveryFee)}</span>
     </div>
   `;
@@ -126,7 +145,7 @@ function finishOrder() {
   const cart = getCart();
 
   if (cart.length === 0) {
-    showToast("Seu carrinho está vazio.");
+    showToast(translate("cart.emptyToast"));
     return;
   }
 
@@ -148,26 +167,28 @@ function finishOrder() {
   const deliveryFee = getDeliveryFee();
   const totalWithDelivery = getCartTotalWithDelivery();
 
-  let message = "🍔 *Novo Pedido - The Burger House*\n\n";
-  message += `*Tipo de pedido:* ${getOrderTypeLabel()}\n\n`;
-  message += "*Itens do pedido:*\n";
+  let message = `🍔 *${translate("whatsapp.newOrder")}*\n\n`;
+  message += `*${translate("whatsapp.orderType")}:* ${getOrderTypeLabel()}\n\n`;
+  message += `*${translate("whatsapp.items")}:*\n`;
 
   cart.forEach((item) => {
+    const localizedItem = getLocalizedCartItem(item);
     const itemSubtotal = item.price * item.quantity;
-    message += `- ${item.quantity}x ${item.name} (${formatPrice(itemSubtotal)})\n`;
+
+    message += `- ${item.quantity}x ${localizedItem.name} (${formatPrice(itemSubtotal)})\n`;
   });
 
-  message += "\n*Resumo:*\n";
-  message += `Subtotal: ${formatPrice(subtotal)}\n`;
-  message += `Taxa de entrega: ${formatPrice(deliveryFee)}\n`;
-  message += `Total: ${formatPrice(totalWithDelivery)}\n`;
+  message += `\n*${translate("whatsapp.summary")}:*\n`;
+  message += `${translate("whatsapp.subtotal")}: ${formatPrice(subtotal)}\n`;
+  message += `${translate("whatsapp.deliveryFee")}: ${formatPrice(deliveryFee)}\n`;
+  message += `${translate("whatsapp.total")}: ${formatPrice(totalWithDelivery)}\n`;
 
   message += isPickupOrder()
-    ? `\n*Retirada no local:*\n${addressText}\n`
-    : `\n*Endereço de entrega:*\n${addressText}\n`;
+    ? `\n*${translate("whatsapp.pickupAddress")}:*\n${addressText}\n`
+    : `\n*${translate("whatsapp.deliveryAddress")}:*\n${addressText}\n`;
 
   if (orderNotes) {
-    message += `\n*Observações do pedido:*\n${orderNotes}\n`;
+    message += `\n*${translate("whatsapp.notes")}:*\n${orderNotes}\n`;
   }
 
   const url = `https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent(
@@ -178,7 +199,7 @@ function finishOrder() {
 
   setTimeout(() => {
     resetOrderAfterFinish();
-    showToast("Pedido enviado! Seu carrinho foi limpo.", "#16a34a");
+    showToast(translate("order.sentToast"), "#16a34a");
   }, 900);
 }
 
@@ -194,7 +215,7 @@ export function bindOrderEvents() {
   if (elements.goToAddressBtn) {
     elements.goToAddressBtn.onclick = () => {
       if (getCart().length === 0) {
-        showToast("Adicione pelo menos 1 item ao carrinho para continuar.");
+        showToast(translate("cart.needItemToast"));
         return;
       }
 
@@ -219,7 +240,7 @@ export function bindOrderEvents() {
       }
 
       if (!isPickupOrder() && getIsFetchingCep()) {
-        showAddressWarning("Aguarde a busca do CEP terminar.");
+        showAddressWarning(translate("address.waitCep"));
         return;
       }
 

@@ -1045,6 +1045,38 @@
     color: #b91c1c;
   }
 
+  .language-switcher {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 9999px;
+    background: rgba(24, 24, 27, 0.72);
+    color: #fde68a;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(12px);
+  }
+
+  .language-select {
+    border: 0;
+    background: transparent;
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 800;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .language-select option {
+    color: #18181b;
+    background: #ffffff;
+  }
+
 }
 
 @layer utilities {
@@ -1109,6 +1141,13 @@
 }
 
 @media (max-width: 640px) {
+
+  .language-switcher {
+    top: 0.75rem;
+    right: 0.75rem;
+    padding: 0.4rem 0.55rem;
+  }
+
 
   .cart-item-row {
     gap: 0.85rem;
