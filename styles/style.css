@@ -212,7 +212,7 @@
     color: #52525b;
     background: #ffffff;
     border: 1px solid #f4f4f5;
-    font-size: 0.82rem;
+    font-size: 0.90rem;
     font-weight: 800;
     text-decoration: none;
     box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
@@ -256,7 +256,7 @@
     align-items: center;
     gap: 0.35rem;
     margin: 0 auto;
-    font-size: clamp(1.3rem, 1.8vw, 1.65rem);
+    font-size: clamp(1.6rem, 1.8vw, 1.65rem);
     font-weight: 900;
     color: #18181b;
     line-height: 1.1;
@@ -268,7 +268,7 @@
   justify-content: center;
   width: 1em;
   min-width: 1em;
-  font-size: 0.68em;
+  font-size: 1em;
   line-height: 1;
   transform: translateY(0.02em);
 }
