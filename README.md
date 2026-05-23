@@ -268,25 +268,53 @@ O Tailwind CSS foi utilizado para construção rápida do layout e responsividad
 
 ## 🧾 Releases
 
+### v2.4.0 — Internacionalização inicial
+
+Versão que adicionou suporte inicial à internacionalização no projeto, permitindo alternar a interface entre Português e Inglês. Foram incluídos seletor de idioma, persistência da preferência no `localStorage`, tradução dos principais textos estáticos, tradução dos dados do cardápio renderizado dinamicamente e teste automatizado para a camada de internacionalização.
+
+### v2.3.0 — Testes automatizados com Vitest
+
+Versão que adicionou uma camada inicial de testes automatizados com Vitest, aumentando a confiabilidade do projeto e reduzindo o risco de regressões. Foram criados testes para funções utilitárias, validações, formatação de valores, escape de HTML e consistência dos dados do cardápio. O workflow de CI também passou a executar os testes antes do build.
+
+### v2.2.2 — Correções de consistência estrutural
+
+Versão voltada à correção de inconsistências entre documentação, releases e código-fonte real da branch `main`. Foram reforçadas a remoção do `output.css` do versionamento, a manutenção do arquivo no `.gitignore`, a estrutura modular em `scripts/`, a centralização dos dados do cardápio em `scripts/data.js` e a remoção da dependência do antigo `script.js` na raiz.
+
+### v2.2.1 — Melhorias de SEO e performance
+
+Versão que adicionou melhorias técnicas de SEO, compartilhamento e estabilidade visual. Foram incluídas `meta description` e tags Open Graph (`og:title`, `og:description`, `og:image` e `og:type`), melhorando o preview do site ao ser compartilhado em redes sociais e aplicativos como WhatsApp. Também foram adicionados atributos `width` e `height` nas imagens dos produtos para reduzir o risco de CLS e ajustado o comportamento do background fixo em dispositivos móveis.
+
+### v2.2.0 — Retirada no local e melhorias no carrinho
+
+Versão que tornou o fluxo de pedido mais completo ao adicionar a escolha entre **Entrega** e **Retirada no local**. A taxa de entrega passou a ser removida automaticamente quando o cliente escolhe retirada, e o carrinho recebeu melhorias visuais, incluindo indicador de produto já adicionado, melhor espaçamento dos itens, melhoria no layout do modal e atualização mais consistente do contador de itens.
+
+### v2.1.0 — Campo de observações no pedido
+
+Versão que adicionou um campo opcional de observações na revisão do pedido, permitindo informar preferências, restrições alimentares, ponto da carne, alergias, adicionais ou instruções especiais. As observações passaram a ser incluídas na mensagem enviada pelo WhatsApp, com limite de 280 caracteres e limpeza automática após a finalização do pedido.
+
+### v2.0.0 — Melhorias de navegação, UX e experiência do cardápio
+
+Versão que trouxe melhorias importantes na navegação e na experiência do usuário. Foi adicionada navegação sticky por categorias, com links rápidos para Hambúrgueres, Acompanhamentos e Bebidas, além de estado ativo para indicar a categoria atual. Também foram corrigidos comportamentos de scroll, navegação no final da página e inconsistências do carrinho durante a troca de categorias.
+
 ### v1.3.0 — Melhorias de acessibilidade e experiência nos modais
 
-Versão que melhorou a acessibilidade do projeto com foco em navegação por teclado e leitores de tela. Implementado focus trap nos modais, foco automático ao abrir, fechamento por `Esc` e overlay, textos alternativos descritivos nas imagens e indicações de preenchimento via CEP nos campos readonly.
+Versão que melhorou a acessibilidade do projeto com foco em navegação por teclado, leitores de tela e clareza no formulário de endereço. Foram adicionados textos alternativos mais descritivos nas imagens, gerenciamento básico de foco nos modais, foco automático ao abrir, focus trap, fechamento por `Esc` e overlay, além de feedback visual e textual para campos preenchidos automaticamente via CEP.
 
 ### v1.2.1 — Correções de CI e configuração de produção
 
-Versão com ajustes técnicos no workflow do GitHub Actions após a modularização do JavaScript. Atualizada a validação dos módulos na pasta `scripts/` e corrigida a configuração de ambiente que deixava a loja forçada como aberta.
+Versão com ajustes técnicos após a modularização do JavaScript. O workflow do GitHub Actions foi atualizado para validar a nova estrutura da pasta `scripts/`, a verificação do antigo `script.js` foi removida, os arquivos obrigatórios passaram a ser validados de forma mais coerente e a configuração que deixava a loja forçada como aberta foi corrigida para produção.
 
 ### v1.2.0 — Correções no formulário de endereço
 
-Versão que corrigiu a validação do campo de número da casa (bloqueando letras, emojis e símbolos), melhorou o tratamento de CEP inválido com mensagens de erro claras e adicionou `role="alert"` e `aria-live="polite"` às mensagens de validação.
+Versão que corrigiu a validação do formulário de endereço durante o fluxo de pedido. O campo de número passou a aceitar apenas dígitos, bloqueando letras, emojis, espaços e símbolos. Também foram melhorados o tratamento de CEP inválido, as falhas de rede na consulta da ViaCEP, a limpeza de campos inconsistentes e as mensagens acessíveis com `role="alert"` e `aria-live="polite"`.
 
 ### v1.1.0 — Refatoração estrutural e melhorias no fluxo do pedido
 
-Versão que refatorou o cardápio para renderização dinâmica via JavaScript, unificou o botão de carrinho, removeu o `output.css` do versionamento, centralizou os estilos em `style.css` e corrigiu o fluxo de taxa de entrega com exibição do total final na revisão do pedido.
+Versão que melhorou a organização interna do projeto, reduziu duplicações e corrigiu inconsistências no fluxo de pedido. O cardápio passou a ser renderizado dinamicamente via JavaScript, os dados dos produtos foram centralizados em um array de objetos, o botão de carrinho foi unificado, o `output.css` foi removido do versionamento e os estilos inline foram movidos para `styles/style.css`. Também foram corrigidos o cálculo e a exibição da taxa de entrega no resumo do pedido.
 
 ### v1.0.0 — Burger Shop
 
-Primeira versão do projeto com exibição de cardápio estático, carrinho de compras com localStorage, adição e remoção de itens, checkout via WhatsApp e interface responsiva com Tailwind CSS.
+Primeira versão do projeto, com exibição de cardápio, carrinho de compras com persistência em `localStorage`, adição e remoção de itens, checkout via WhatsApp e interface responsiva com Tailwind CSS.
 
 ---
 
