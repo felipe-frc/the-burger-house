@@ -61,3 +61,4 @@ jobs:
         run: |
           test -f tests/utils.test.js
           test -f tests/data.test.js
+          test -f tests/i18n.test.js

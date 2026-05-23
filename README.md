@@ -2,9 +2,9 @@
 
 [![CI (Front-end)](https://github.com/felipe-frc/burger-shop/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/felipe-frc/burger-shop/actions)
 
-Aplicação web de cardápio digital para hamburgueria desenvolvida com **HTML5**, **JavaScript Vanilla** e **Tailwind CSS**, com foco em manipulação de DOM, gerenciamento de estado, integração com APIs externas e experiência do usuário.
+Aplicação web de cardápio digital para hamburgueria desenvolvida com **HTML5**, **JavaScript Vanilla** e **Tailwind CSS**, com foco em manipulação de DOM, gerenciamento de estado, integração com APIs externas, testes automatizados, acessibilidade e experiência do usuário.
 
-O projeto permite ao cliente explorar o cardápio por categorias, montar seu pedido com controle de quantidade, preencher o endereço de entrega com busca automática por CEP e finalizar o pedido diretamente pelo WhatsApp — tudo em um fluxo estruturado em etapas, com persistência do carrinho e feedback visual em tempo real.
+O projeto permite ao cliente explorar o cardápio por categorias, montar seu pedido com controle de quantidade, escolher entre entrega ou retirada no local, preencher o endereço com busca automática por CEP e finalizar o pedido diretamente pelo WhatsApp — tudo em um fluxo estruturado em etapas, com persistência do carrinho e feedback visual em tempo real.
 
 ---
 
@@ -26,11 +26,14 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 - Manipulação do DOM com JavaScript puro;
 - Renderização dinâmica de componentes via JavaScript;
 - Gerenciamento de estado do carrinho sem frameworks;
+- Modularização de código JavaScript por responsabilidade;
 - Persistência de dados com localStorage;
 - Integração com API externa (ViaCEP) para preenchimento de endereço;
 - Validações de formulário no front-end;
 - Feedback visual com animações, toasts e animações de scroll;
-- Acessibilidade com focus trap, aria-live e navegação por teclado;
+- Acessibilidade com focus trap, aria-live, aria-modal e navegação por teclado;
+- Internacionalização inicial da interface em Português e Inglês;
+- Testes automatizados com Vitest;
 - Integração contínua e deploy automatizado com GitHub Actions;
 - Documentação técnica para portfólio profissional.
 
@@ -42,6 +45,8 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 
 - Exibição do cardápio separado por categorias: Hambúrgueres, Acompanhamentos e Bebidas;
 - Renderização dinâmica dos produtos via JavaScript;
+- Dados do cardápio centralizados em módulo próprio;
+- Tradução dos principais textos do cardápio com suporte inicial a Português e Inglês;
 - Tags de destaque por produto (Mais Pedido, Premium, Exclusivo, Destaque);
 - Animação de entrada dos cards ao rolar a página (Intersection Observer).
 
@@ -49,10 +54,12 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 
 - Adição e remoção de produtos no carrinho;
 - Controle de quantidade de itens por produto;
-- Cálculo automático de subtotal e taxa de entrega;
+- Cálculo automático de subtotal, taxa de entrega e total final;
+- Remoção automática da taxa de entrega quando o cliente escolhe retirada no local;
 - Persistência do carrinho com localStorage;
 - Validação de carrinho vazio antes de prosseguir;
-- Feedback visual com toast de confirmação ao adicionar itens.
+- Feedback visual com toast de confirmação ao adicionar itens;
+- Indicador visual de itens adicionados ao carrinho.
 
 ### 📍 Endereço de Entrega
 
@@ -67,8 +74,18 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 
 - Revisão completa do pedido antes de finalizar;
 - Exibição de itens, quantidades, subtotal, taxa de entrega e total final;
+- Campo opcional de observações do pedido;
 - Envio do pedido formatado diretamente para o WhatsApp;
 - Limpeza automática do carrinho e do localStorage após finalização.
+
+### 🌎 Internacionalização
+
+- Suporte inicial para Português e Inglês;
+- Seletor de idioma na interface;
+- Persistência da preferência de idioma no localStorage;
+- Tradução dos principais textos estáticos;
+- Tradução dos dados do cardápio renderizado dinamicamente;
+- Teste automatizado para a camada de internacionalização.
 
 ### ⚙️ Experiência e Interface
 
@@ -76,7 +93,8 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 - Interface responsiva para dispositivos móveis e desktop;
 - Modais com focus trap para navegação por teclado;
 - Fechamento dos modais pela tecla `Esc` e pelo clique no overlay;
-- Acessibilidade com `aria-live`, `aria-modal`, `aria-describedby` e textos alternativos descritivos.
+- Acessibilidade com `aria-live`, `aria-modal`, `aria-describedby` e textos alternativos descritivos;
+- Meta tags de SEO e Open Graph para melhor compartilhamento em redes sociais.
 
 ---
 
@@ -91,6 +109,7 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 | Tipografia | Google Fonts (Inter + Poppins) |
 | API de Endereço | ViaCEP |
 | Persistência | localStorage |
+| Testes | Vitest |
 | Deploy | Vercel |
 | CI/CD | GitHub Actions |
 | Versionamento | Git / GitHub |
@@ -99,18 +118,28 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 
 ## 🏗️ Estrutura do Projeto
 
-```
+```txt
 burger-shop/
 │
 ├── scripts/                  # Módulos JavaScript da aplicação
-│   ├── products.js           # Dados dos produtos e renderização do cardápio
-│   ├── cart.js               # Gerenciamento do carrinho e localStorage
 │   ├── address.js            # Integração com ViaCEP e validações de endereço
+│   ├── cart.js               # Gerenciamento do carrinho e localStorage
+│   ├── config.js             # Configurações gerais da aplicação
+│   ├── data.js               # Dados do cardápio, categorias, preços, imagens e traduções
+│   ├── i18n.js               # Internacionalização e troca de idioma
+│   ├── main.js               # Inicialização da aplicação e eventos principais
 │   ├── order.js              # Revisão e finalização do pedido via WhatsApp
-│   └── ui.js                 # Controle de modais, animações e status da loja
+│   ├── state.js              # Estado compartilhado da aplicação
+│   ├── ui.js                 # Controle de interface, modais, animações e status da loja
+│   └── utils.js              # Funções utilitárias reutilizáveis
 │
 ├── styles/
 │   └── style.css             # Estilos customizados e componentes
+│
+├── tests/                    # Testes automatizados com Vitest
+│   ├── data.test.js          # Testes de consistência dos dados do cardápio
+│   ├── i18n.test.js          # Testes da camada de internacionalização
+│   └── utils.test.js         # Testes de funções utilitárias
 │
 ├── assets/                   # Imagens e recursos visuais
 │
@@ -120,10 +149,13 @@ burger-shop/
 │   └── frontend-ci.yml
 │
 ├── index.html                # Estrutura principal da aplicação
-├── output.css                # CSS gerado pelo Tailwind (gitignore)
+├── output.css                # CSS gerado pelo Tailwind (ignorado pelo Git)
 ├── tailwind.config.js        # Configuração do Tailwind CSS
-├── package.json              # Configuração do projeto e scripts
-└── vercel.json               # Configuração de deploy na Vercel
+├── package.json              # Configuração do projeto, scripts e dependências
+├── package-lock.json         # Versões travadas das dependências
+├── vercel.json               # Configuração de deploy na Vercel
+├── LICENSE                   # Licença MIT
+└── README.md                 # Documentação do projeto
 ```
 
 ---
@@ -195,6 +227,12 @@ cd burger-shop
 npm install
 ```
 
+Ou, para instalar exatamente as versões registradas no `package-lock.json`:
+
+```bash
+npm ci
+```
+
 ---
 
 ### 3. Execute o projeto em desenvolvimento
@@ -213,7 +251,15 @@ Abra o arquivo `index.html` diretamente no navegador ou utilize a extensão **Li
 
 ---
 
-### 5. Gere o build de produção
+### 5. Execute os testes
+
+```bash
+npm test
+```
+
+---
+
+### 6. Gere o build de produção
 
 ```bash
 npm run build
@@ -227,10 +273,15 @@ O projeto possui uma pipeline de **GitHub Actions** configurada para garantir a 
 
 O workflow valida:
 
+- Instalação das dependências com npm;
+- Execução dos testes automatizados com Vitest;
 - Build do Tailwind CSS com `npm run build`;
 - Presença dos arquivos obrigatórios do projeto;
+- Presença dos arquivos de teste;
 - Ausência do arquivo gerado `output.css` no repositório;
 - Estrutura dos módulos JavaScript na pasta `scripts/`.
+
+Essa configuração reduz o risco de regressões, evita inconsistências estruturais e aumenta a confiabilidade do projeto para manutenção futura.
 
 ---
 
@@ -238,11 +289,11 @@ O workflow valida:
 
 ### Renderização dinâmica do cardápio
 
-Os dados dos produtos são centralizados em um array de objetos no módulo `products.js` e renderizados dinamicamente via JavaScript. Essa abordagem elimina a duplicação entre HTML e atributos `data-*`, facilita a manutenção e aproxima o projeto de uma arquitetura orientada a componentes.
+Os dados dos produtos são centralizados no módulo `data.js`, facilitando a manutenção do cardápio, categorias, preços, imagens e traduções. Essa abordagem elimina duplicações no HTML, permite renderização dinâmica via JavaScript e aproxima o projeto de uma arquitetura mais organizada e orientada a componentes.
 
 ### Modularização do JavaScript
 
-A lógica da aplicação foi separada em módulos por responsabilidade: produtos, carrinho, endereço, pedido e interface. Essa organização melhora a legibilidade, facilita testes e demonstra separação de responsabilidades em projetos front-end sem frameworks.
+A lógica da aplicação foi separada em módulos por responsabilidade: dados, carrinho, endereço, pedido, interface, estado, internacionalização e funções utilitárias. Essa organização melhora a legibilidade, facilita testes e demonstra separação de responsabilidades em projetos front-end sem frameworks.
 
 ### Persistência com localStorage
 
@@ -256,13 +307,21 @@ A API ViaCEP automatiza o preenchimento dos campos de endereço a partir do CEP 
 
 Os modais implementam focus trap básico, movendo o foco automaticamente ao abrir e mantendo a navegação por teclado dentro do modal. O fechamento por `Esc` e pelo clique no overlay também está disponível, seguindo os padrões de acessibilidade esperados em fluxos modais.
 
+### Internacionalização inicial
+
+A aplicação possui suporte inicial a Português e Inglês, com seletor de idioma e persistência da preferência no localStorage. Os principais textos da interface e os dados do cardápio são traduzidos dinamicamente, demonstrando preocupação com escalabilidade e experiência do usuário.
+
+### Testes automatizados
+
+O projeto utiliza Vitest para validar funções utilitárias, dados do cardápio e camada de internacionalização. A presença dos testes ajuda a evitar regressões e aumenta a confiabilidade do código durante refatorações.
+
 ### CI/CD com GitHub Actions
 
-A integração contínua automatiza o processo de build e validação do projeto, aumentando a confiabilidade do repositório e demonstrando cuidado com a qualidade do software.
+A integração contínua automatiza o processo de instalação, testes, build e validação estrutural do projeto, aumentando a confiabilidade do repositório e demonstrando cuidado com qualidade de software.
 
 ### Tailwind CSS + estilos customizados
 
-O Tailwind CSS foi utilizado para construção rápida do layout e responsividade. Os estilos específicos de componentes foram centralizados em `styles/style.css`, evitando blocos `<style>` inline no HTML.
+O Tailwind CSS foi utilizado para construção rápida do layout e responsividade. Os estilos específicos de componentes foram centralizados em `styles/style.css`, evitando blocos `<style>` inline no HTML e mantendo a estilização mais organizada.
 
 ---
 
@@ -320,17 +379,17 @@ Primeira versão do projeto, com exibição de cardápio, carrinho de compras co
 
 ## 📈 Melhorias Futuras
 
-- Campo de observações por item (restrições, ponto da carne, alergias);
-- Opção de retirada no local como alternativa à entrega;
-- Navegação por categorias com barra sticky;
+- Campo de observações por item, permitindo instruções específicas para cada produto;
 - Indicador visual de quantidade diretamente no card do produto;
 - Filtro e busca por nome de produto;
 - Cálculo de frete por faixa de CEP;
-- Meta tags de Open Graph para preview rico ao compartilhar o link;
+- Otimização das imagens principais do projeto, especialmente a logo;
 - Integração com backend para gerenciamento de pedidos em tempo real;
 - Sistema de autenticação de usuários;
 - Painel administrativo para gestão do cardápio;
-- Integração com banco de dados.
+- Integração com banco de dados;
+- Histórico de pedidos;
+- Página de acompanhamento do pedido.
 
 ---
 
