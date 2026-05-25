@@ -9,3 +9,4 @@ output.css
 
 .DS_Store
 Thumbs.db
+coverage/
