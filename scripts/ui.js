@@ -1,8 +1,6 @@
+import { TOAST_DURATION_MS } from "./config.js";
 import { MENU_CATEGORIES } from "./data.js";
-import {
-  getLocalizedEntity,
-  translate,
-} from "./i18n.js";
+import { getLocalizedEntity, translate } from "./i18n.js";
 import { escapeHTML, formatPrice, isStoreOpenNow } from "./utils.js";
 
 let activeModal = null;
@@ -181,7 +179,7 @@ export function showToast(message, background = "#ef4444") {
 
   Toastify({
     text: message,
-    duration: 3000,
+    duration: TOAST_DURATION_MS,
     gravity: "top",
     position: "right",
     stopOnFocus: true,
