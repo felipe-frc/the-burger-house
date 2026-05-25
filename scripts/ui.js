@@ -343,7 +343,7 @@ export function revealOnScroll() {
   });
 }
 
-export function showFloatingCart() {
+function showFloatingCart() {
   if (!elements.cartFooter) return;
 
   elements.cartFooter.classList.remove(
@@ -353,7 +353,7 @@ export function showFloatingCart() {
   elements.cartFooter.classList.add("cart-footer-visible");
 }
 
-export function showBottomCart() {
+function showBottomCart() {
   if (!elements.cartFooter) return;
 
   elements.cartFooter.classList.remove("cart-footer-hidden");

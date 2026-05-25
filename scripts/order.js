@@ -62,7 +62,7 @@ function getOrderTypeLabel() {
     : translate("orderType.delivery");
 }
 
-export function loadReview() {
+function loadReview() {
   if (!elements.reviewItems || !elements.reviewAddress || !elements.reviewTotal) {
     return;
   }

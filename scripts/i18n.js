@@ -275,7 +275,7 @@ export function getCurrentLanguage() {
   return DEFAULT_LANGUAGE;
 }
 
-export function setCurrentLanguage(language) {
+function setCurrentLanguage(language) {
   const normalizedLanguage = isSupportedLanguage(language)
     ? language
     : DEFAULT_LANGUAGE;
