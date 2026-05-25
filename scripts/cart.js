@@ -1,30 +1,29 @@
-import { DELIVERY_FEE } from "./config.js";
-import { MENU_PRODUCT_BY_ID } from "./data.js";
+import {
+  addProductToCart,
+  decreaseCartItemQuantity,
+  findProductById,
+  getCartItemCount,
+  getCartSubtotal,
+  increaseCartItemQuantity,
+  removeProductFromCart,
+} from "./cart-service.js";
 import {
   getLocalizedEntity,
   translate,
   translateItemCount,
 } from "./i18n.js";
-import { getCart, getOrderType, ORDER_TYPES, saveCart, setCart } from "./state.js";
+import { getCart, setCart } from "./state.js";
 import { escapeHTML, formatPrice } from "./utils.js";
 import { elements, showToast } from "./ui.js";
 
-export function getCartSubtotal() {
-  return getCart().reduce((acc, item) => acc + item.price * item.quantity, 0);
-}
-
-export function getDeliveryFee() {
-  return getCart().length > 0 && getOrderType() === ORDER_TYPES.DELIVERY
-    ? DELIVERY_FEE
-    : 0;
-}
-
-export function getCartTotalWithDelivery() {
-  return getCartSubtotal() + getDeliveryFee();
-}
+export {
+  getCartSubtotal,
+  getDeliveryFee,
+  getCartTotalWithDelivery,
+} from "./cart-service.js";
 
 function getLocalizedCartItem(item) {
-  const product = MENU_PRODUCT_BY_ID.get(item.id);
+  const product = findProductById(item.id);
 
   if (!product) {
     return item;
@@ -52,8 +51,8 @@ function updateProductButtonsState() {
     const id = button.dataset.id;
     const item = cart.find((cartItem) => cartItem.id === id);
     const indicator = button.querySelector(".product-cart-indicator");
-    const product = MENU_PRODUCT_BY_ID.get(id);
-    const localizedProduct = getLocalizedEntity(product);
+    const product = findProductById(id);
+    const localizedProduct = product ? getLocalizedEntity(product) : null;
 
     if (item) {
       const unit = translate(
@@ -100,7 +99,7 @@ export function updateCart() {
   }
 
   const cart = getCart();
-  let count = 0;
+  const count = getCartItemCount(cart);
 
   elements.cartItemsContainer.innerHTML = "";
 
@@ -114,8 +113,6 @@ export function updateCart() {
     `;
   } else {
     cart.forEach((item) => {
-      count += item.quantity;
-
       const localizedItem = getLocalizedCartItem(item);
       const itemSubtotal = item.price * item.quantity;
       const div = document.createElement("div");
@@ -170,7 +167,7 @@ export function updateCart() {
     });
   }
 
-  elements.cartTotal.textContent = formatPrice(getCartSubtotal());
+  elements.cartTotal.textContent = formatPrice(getCartSubtotal(cart));
   elements.cartCount.textContent = count;
 
   const cartItemCountLabel = document.getElementById("cart-item-count-label");
@@ -179,7 +176,6 @@ export function updateCart() {
     cartItemCountLabel.textContent = translateItemCount(count);
   }
 
-  saveCart();
   updateProductButtonsState();
   updateProceedButtonState();
 }
@@ -188,7 +184,7 @@ function addItemToCart(button) {
   if (!button) return;
 
   const id = button.dataset.id;
-  const product = MENU_PRODUCT_BY_ID.get(id);
+  const product = findProductById(id);
 
   if (!product) {
     console.error(`Produto não encontrado no cardápio: ${id}`);
@@ -196,21 +192,9 @@ function addItemToCart(button) {
   }
 
   const localizedProduct = getLocalizedEntity(product);
-  const cart = getCart();
-  const existingItem = cart.find((item) => item.id === product.id);
+  const updatedCart = addProductToCart(getCart(), product);
 
-  if (existingItem) {
-    existingItem.quantity += 1;
-  } else {
-    cart.push({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      quantity: 1,
-    });
-  }
-
-  saveCart();
+  setCart(updatedCart);
   updateCart();
   animateAddToCart(button);
   showToast(
@@ -262,7 +246,7 @@ export function bindCartControls() {
 
     if (removeBtn) {
       const id = removeBtn.dataset.id;
-      const updatedCart = getCart().filter((item) => item.id !== id);
+      const updatedCart = removeProductFromCart(getCart(), id);
 
       setCart(updatedCart);
       updateCart();
@@ -271,33 +255,18 @@ export function bindCartControls() {
 
     if (plusBtn) {
       const id = plusBtn.dataset.id;
-      const cart = getCart();
-      const item = cart.find((cartItem) => cartItem.id === id);
+      const updatedCart = increaseCartItemQuantity(getCart(), id);
 
-      if (item) {
-        item.quantity += 1;
-        saveCart();
-        updateCart();
-      }
-
+      setCart(updatedCart);
+      updateCart();
       return;
     }
 
     if (minusBtn) {
       const id = minusBtn.dataset.id;
-      const cart = getCart();
-      const item = cart.find((cartItem) => cartItem.id === id);
+      const updatedCart = decreaseCartItemQuantity(getCart(), id);
 
-      if (!item) return;
-
-      item.quantity -= 1;
-
-      if (item.quantity <= 0) {
-        setCart(cart.filter((cartItem) => cartItem.id !== id));
-      } else {
-        saveCart();
-      }
-
+      setCart(updatedCart);
       updateCart();
     }
   });
