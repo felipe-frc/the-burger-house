@@ -26,6 +26,7 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 - Manipulação do DOM com JavaScript puro;
 - Renderização dinâmica de componentes via JavaScript;
 - Gerenciamento de estado do carrinho sem frameworks;
+- Separação entre regra de negócio e manipulação da interface;
 - Modularização de código JavaScript por responsabilidade;
 - Persistência de dados com localStorage;
 - Integração com API externa (ViaCEP) para preenchimento de endereço;
@@ -34,6 +35,7 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 - Acessibilidade com focus trap, aria-live, aria-modal e navegação por teclado;
 - Internacionalização inicial da interface em Português e Inglês;
 - Testes automatizados com Vitest;
+- Geração de cobertura de testes com Vitest Coverage V8;
 - Integração contínua e deploy automatizado com GitHub Actions;
 - Documentação técnica para portfólio profissional.
 
@@ -54,12 +56,14 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 
 - Adição e remoção de produtos no carrinho;
 - Controle de quantidade de itens por produto;
+- Regras do carrinho separadas em módulo próprio (`cart-service.js`);
 - Cálculo automático de subtotal, taxa de entrega e total final;
 - Remoção automática da taxa de entrega quando o cliente escolhe retirada no local;
 - Persistência do carrinho com localStorage;
 - Validação de carrinho vazio antes de prosseguir;
 - Feedback visual com toast de confirmação ao adicionar itens;
-- Indicador visual de itens adicionados ao carrinho.
+- Indicador visual de itens adicionados ao carrinho;
+- Testes automatizados cobrindo as principais regras do carrinho.
 
 ### 📍 Endereço de Entrega
 
@@ -110,6 +114,7 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 | API de Endereço | ViaCEP |
 | Persistência | localStorage |
 | Testes | Vitest |
+| Cobertura de Testes | Vitest Coverage V8 |
 | Deploy | Vercel |
 | CI/CD | GitHub Actions |
 | Versionamento | Git / GitHub |
@@ -123,13 +128,14 @@ burger-shop/
 │
 ├── scripts/                  # Módulos JavaScript da aplicação
 │   ├── address.js            # Integração com ViaCEP e validações de endereço
-│   ├── cart.js               # Gerenciamento do carrinho e localStorage
+│   ├── cart.js               # Eventos, renderização e integração do carrinho com a interface
+│   ├── cart-service.js       # Regras de negócio, cálculos e manipulação dos dados do carrinho
 │   ├── config.js             # Configurações gerais da aplicação
 │   ├── data.js               # Dados do cardápio, categorias, preços, imagens e traduções
 │   ├── i18n.js               # Internacionalização e troca de idioma
 │   ├── main.js               # Inicialização da aplicação e eventos principais
 │   ├── order.js              # Revisão e finalização do pedido via WhatsApp
-│   ├── state.js              # Estado compartilhado da aplicação
+│   ├── state.js              # Estado compartilhado da aplicação e persistência no localStorage
 │   ├── ui.js                 # Controle de interface, modais, animações e status da loja
 │   └── utils.js              # Funções utilitárias reutilizáveis
 │
@@ -137,6 +143,7 @@ burger-shop/
 │   └── style.css             # Estilos customizados e componentes
 │
 ├── tests/                    # Testes automatizados com Vitest
+│   ├── cart-service.test.js  # Testes das regras de negócio do carrinho
 │   ├── data.test.js          # Testes de consistência dos dados do cardápio
 │   ├── i18n.test.js          # Testes da camada de internacionalização
 │   └── utils.test.js         # Testes de funções utilitárias
@@ -259,7 +266,17 @@ npm test
 
 ---
 
-### 6. Gere o build de produção
+### 6. Gere a cobertura dos testes
+
+```bash
+npm test -- --coverage
+```
+
+O relatório de cobertura é gerado localmente na pasta `coverage/`, que fica ignorada pelo Git.
+
+---
+
+### 7. Gere o build de produção
 
 ```bash
 npm run build
@@ -281,6 +298,8 @@ O workflow valida:
 - Ausência do arquivo gerado `output.css` no repositório;
 - Estrutura dos módulos JavaScript na pasta `scripts/`.
 
+Além disso, o projeto possui geração local de cobertura de testes com **Vitest Coverage V8**, permitindo acompanhar quais módulos estão protegidos por testes e identificar pontos de melhoria para novas refatorações.
+
 Essa configuração reduz o risco de regressões, evita inconsistências estruturais e aumenta a confiabilidade do projeto para manutenção futura.
 
 ---
@@ -293,7 +312,13 @@ Os dados dos produtos são centralizados no módulo `data.js`, facilitando a man
 
 ### Modularização do JavaScript
 
-A lógica da aplicação foi separada em módulos por responsabilidade: dados, carrinho, endereço, pedido, interface, estado, internacionalização e funções utilitárias. Essa organização melhora a legibilidade, facilita testes e demonstra separação de responsabilidades em projetos front-end sem frameworks.
+A lógica da aplicação foi separada em módulos por responsabilidade: dados, carrinho, regras do carrinho, endereço, pedido, interface, estado, internacionalização e funções utilitárias. Essa organização melhora a legibilidade, facilita testes e demonstra separação de responsabilidades em projetos front-end sem frameworks.
+
+### Separação da regra de negócio do carrinho
+
+As principais regras do carrinho foram extraídas para o módulo `cart-service.js`, separando cálculos e manipulação de dados da camada de interface. Com isso, funções como adicionar produto, remover produto, aumentar ou diminuir quantidade, calcular subtotal, calcular taxa de entrega e calcular total final passaram a ser mais fáceis de testar e manter.
+
+Essa decisão reduz o acoplamento entre DOM e regra de negócio, melhora a clareza do `cart.js` e torna o projeto mais preparado para futuras evoluções, como integração com backend, novos tipos de desconto, cálculo de frete por região ou histórico de pedidos.
 
 ### Persistência com localStorage
 
@@ -313,7 +338,26 @@ A aplicação possui suporte inicial a Português e Inglês, com seletor de idio
 
 ### Testes automatizados
 
-O projeto utiliza Vitest para validar funções utilitárias, dados do cardápio e camada de internacionalização. A presença dos testes ajuda a evitar regressões e aumenta a confiabilidade do código durante refatorações.
+O projeto utiliza Vitest para validar funções utilitárias, dados do cardápio, camada de internacionalização e regras de negócio do carrinho. A presença dos testes ajuda a evitar regressões e aumenta a confiabilidade do código durante refatorações.
+
+Atualmente, os testes cobrem cenários como:
+
+- Consistência dos dados do cardápio;
+- Tradução de textos da interface;
+- Formatação de valores;
+- Escape de HTML;
+- Busca de produtos por identificador;
+- Adição de produtos ao carrinho;
+- Remoção de produtos do carrinho;
+- Incremento e decremento de quantidade;
+- Remoção automática quando a quantidade chega a zero;
+- Cálculo de subtotal;
+- Cálculo da taxa de entrega;
+- Cálculo do total final com entrega ou retirada.
+
+### Cobertura de testes
+
+A geração de cobertura com Vitest Coverage V8 foi adicionada para apoiar a evolução técnica do projeto. A pasta `coverage/` é gerada localmente e ignorada pelo Git, mantendo o repositório limpo enquanto permite análise dos módulos mais e menos testados.
 
 ### CI/CD com GitHub Actions
 
@@ -326,6 +370,12 @@ O Tailwind CSS foi utilizado para construção rápida do layout e responsividad
 ---
 
 ## 🧾 Releases
+
+### v2.5.0 — Refatoração do carrinho e cobertura de testes
+
+Versão focada em melhoria de arquitetura, organização interna e confiabilidade da aplicação. A lógica de negócio do carrinho foi extraída para o novo módulo `cart-service.js`, separando regras de manipulação de dados da camada de interface. Com isso, o `cart.js` passou a concentrar eventos, renderização e integração com a tela, enquanto o novo serviço concentra operações como adicionar produto, remover produto, alterar quantidade, calcular subtotal, taxa de entrega e total final.
+
+Também foram adicionados testes automatizados para o `cart-service.js`, cobrindo os principais fluxos do carrinho, incluindo adição de itens, incremento e decremento de quantidade, remoção automática ao chegar em zero, cálculo de subtotal, taxa de entrega e total com entrega ou retirada. A versão também adicionou suporte à geração de cobertura com Vitest Coverage V8, incluiu `coverage/` no `.gitignore`, removeu exports internos desnecessários, eliminou estilos residuais e extraiu a duração dos toasts para uma constante centralizada em `config.js`.
 
 ### v2.4.0 — Internacionalização inicial
 
@@ -383,6 +433,7 @@ Primeira versão do projeto, com exibição de cardápio, carrinho de compras co
 - Indicador visual de quantidade diretamente no card do produto;
 - Filtro e busca por nome de produto;
 - Cálculo de frete por faixa de CEP;
+- Ampliação da cobertura de testes para os módulos de endereço, pedido e interface;
 - Otimização das imagens principais do projeto, especialmente a logo;
 - Integração com backend para gerenciamento de pedidos em tempo real;
 - Sistema de autenticação de usuários;
