@@ -38,13 +38,13 @@ function getLocalizedCartItem(item) {
   };
 }
 
-export function updateProceedButtonState() {
+function updateProceedButtonState() {
   if (!elements.goToAddressBtn) return;
 
   elements.goToAddressBtn.disabled = getCart().length === 0;
 }
 
-export function updateProductButtonsState() {
+function updateProductButtonsState() {
   const cart = getCart();
   const buttons = document.querySelectorAll(".add-to-cart-btn");
 
@@ -184,7 +184,7 @@ export function updateCart() {
   updateProceedButtonState();
 }
 
-export function addItemToCart(button) {
+function addItemToCart(button) {
   if (!button) return;
 
   const id = button.dataset.id;

@@ -656,11 +656,6 @@
     gap: 0.3rem;
   }
 
-  .cart-subtotal-hint .fa-truck {
-    color: #f59e0b;
-    font-size: 0.7rem;
-  }
-
   .cart-subtotal-value {
     font-size: 1.12rem;
     font-weight: 900;
@@ -1102,10 +1097,6 @@
 }
 
 @layer utilities {
-  .animate-fade-in-up {
-    animation: fadeInUp 0.8s ease-out forwards;
-  }
-
   .animate-float {
     animation: float 3s ease-in-out infinite;
   }

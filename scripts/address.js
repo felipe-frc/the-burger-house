@@ -15,13 +15,13 @@ export function isPickupOrder() {
   return getOrderType() === ORDER_TYPES.PICKUP;
 }
 
-export function clearAddressFields() {
+function clearAddressFields() {
   if (elements.streetInput) elements.streetInput.value = "";
   if (elements.neighborhoodInput) elements.neighborhoodInput.value = "";
   if (elements.cityInput) elements.cityInput.value = "";
 }
 
-export function clearDeliveryFields() {
+function clearDeliveryFields() {
   clearAddressFields();
 
   if (elements.houseNumberInput) elements.houseNumberInput.value = "";
