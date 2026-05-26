@@ -2,7 +2,7 @@
 
 [![CI (Front-end)](https://github.com/felipe-frc/burger-shop/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/felipe-frc/burger-shop/actions)
 
-Aplicação web de cardápio digital para hamburgueria desenvolvida com **HTML5**, **JavaScript Vanilla** e **Tailwind CSS**, com foco em manipulação de DOM, gerenciamento de estado, integração com APIs externas, testes automatizados, acessibilidade e experiência do usuário.
+Aplicação web de cardápio digital para hamburgueria desenvolvida com **HTML5**, **JavaScript Vanilla** e **Tailwind CSS**, com foco em manipulação de DOM, gerenciamento de estado, integração com APIs externas, testes automatizados, testes E2E, acessibilidade e experiência do usuário.
 
 O projeto permite ao cliente explorar o cardápio por categorias, montar seu pedido com controle de quantidade, escolher entre entrega ou retirada no local, preencher o endereço com busca automática por CEP e finalizar o pedido diretamente pelo WhatsApp — tudo em um fluxo estruturado em etapas, com persistência do carrinho e feedback visual em tempo real.
 
@@ -36,6 +36,7 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 - Internacionalização inicial da interface em Português e Inglês;
 - Testes automatizados com Vitest;
 - Geração de cobertura de testes com Vitest Coverage V8;
+- Testes E2E com Playwright simulando fluxos reais de compra;
 - Integração contínua e deploy automatizado com GitHub Actions;
 - Documentação técnica para portfólio profissional.
 
@@ -50,7 +51,7 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 - Dados do cardápio centralizados em módulo próprio;
 - Tradução dos principais textos do cardápio com suporte inicial a Português e Inglês;
 - Tags de destaque por produto (Mais Pedido, Premium, Exclusivo, Destaque);
-- Animação de entrada dos cards ao rolar a página (Intersection Observer).
+- Animação de entrada dos cards ao rolar a página.
 
 ### 🛒 Carrinho
 
@@ -91,6 +92,18 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 - Tradução dos dados do cardápio renderizado dinamicamente;
 - Teste automatizado para a camada de internacionalização.
 
+### 🧪 Testes e Qualidade
+
+- Testes unitários com Vitest;
+- Testes de consistência dos dados do cardápio;
+- Testes da camada de internacionalização;
+- Testes das funções utilitárias;
+- Testes das regras de negócio do carrinho;
+- Cobertura local com Vitest Coverage V8;
+- Testes E2E com Playwright;
+- Validação automatizada do fluxo completo de compra com entrega;
+- Validação automatizada do fluxo de retirada no local.
+
 ### ⚙️ Experiência e Interface
 
 - Status dinâmico da loja (Aberto / Fechado) baseado no horário real;
@@ -104,20 +117,22 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 
 ## 🛠️ Tecnologias
 
-| Camada | Tecnologia |
-| --- | --- |
-| Linguagem | HTML5 / CSS3 / JavaScript (ES6+) |
-| Estilização | Tailwind CSS |
-| Notificações | Toastify JS |
-| Ícones | Font Awesome 6 |
-| Tipografia | Google Fonts (Inter + Poppins) |
-| API de Endereço | ViaCEP |
-| Persistência | localStorage |
-| Testes | Vitest |
-| Cobertura de Testes | Vitest Coverage V8 |
-| Deploy | Vercel |
-| CI/CD | GitHub Actions |
-| Versionamento | Git / GitHub |
+| Camada                  | Tecnologia                       |
+| ----------------------- | -------------------------------- |
+| Linguagem               | HTML5 / CSS3 / JavaScript (ES6+) |
+| Estilização             | Tailwind CSS                     |
+| Servidor local para E2E | Vite                             |
+| Notificações            | Toastify JS                      |
+| Ícones                  | Font Awesome 6                   |
+| Tipografia              | Google Fonts (Inter + Poppins)   |
+| API de Endereço         | ViaCEP                           |
+| Persistência            | localStorage                     |
+| Testes unitários        | Vitest                           |
+| Cobertura de testes     | Vitest Coverage V8               |
+| Testes E2E              | Playwright                       |
+| Deploy                  | Vercel                           |
+| CI/CD                   | GitHub Actions                   |
+| Versionamento           | Git / GitHub                     |
 
 ---
 
@@ -126,43 +141,59 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 ```txt
 burger-shop/
 │
-├── scripts/                  # Módulos JavaScript da aplicação
-│   ├── address.js            # Integração com ViaCEP e validações de endereço
-│   ├── cart.js               # Eventos, renderização e integração do carrinho com a interface
-│   ├── cart-service.js       # Regras de negócio, cálculos e manipulação dos dados do carrinho
-│   ├── config.js             # Configurações gerais da aplicação
-│   ├── data.js               # Dados do cardápio, categorias, preços, imagens e traduções
-│   ├── i18n.js               # Internacionalização e troca de idioma
-│   ├── main.js               # Inicialização da aplicação e eventos principais
-│   ├── order.js              # Revisão e finalização do pedido via WhatsApp
-│   ├── state.js              # Estado compartilhado da aplicação e persistência no localStorage
-│   ├── ui.js                 # Controle de interface, modais, animações e status da loja
-│   └── utils.js              # Funções utilitárias reutilizáveis
+├── .github/
+│   └── workflows/
+│       └── frontend-ci.yml        # Pipeline de CI com testes, build e E2E
+│
+├── assets/                        # Imagens e recursos visuais da aplicação
+│   ├── logo-burger.webp
+│   ├── bg.png
+│   ├── icon.ico
+│   └── ...
+│
+├── docs/
+│   └── images/                    # Imagens utilizadas na documentação
+│       ├── cardapio.png
+|       ├── home.png
+│       ├── cart.png
+│       ├── pedido.png
+│       ├── endereco.png
+│       └── revisao.png
+│
+├── scripts/                       # Módulos JavaScript da aplicação
+│   ├── address.js                 # Integração com ViaCEP e validações de endereço
+│   ├── cart.js                    # Eventos, renderização e integração do carrinho com a interface
+│   ├── cart-service.js            # Regras de negócio, cálculos e manipulação dos dados do carrinho
+│   ├── config.js                  # Configurações gerais da aplicação
+│   ├── data.js                    # Dados do cardápio, categorias, preços, imagens e traduções
+│   ├── i18n.js                    # Internacionalização e troca de idioma
+│   ├── main.js                    # Inicialização da aplicação e eventos principais
+│   ├── order.js                   # Revisão e finalização do pedido via WhatsApp
+│   ├── state.js                   # Estado compartilhado da aplicação e persistência no localStorage
+│   ├── ui.js                      # Controle de interface, modais, animações e status da loja
+│   └── utils.js                   # Funções utilitárias reutilizáveis
 │
 ├── styles/
-│   └── style.css             # Estilos customizados e componentes
+│   └── style.css                  # Estilos customizados e componentes visuais
 │
-├── tests/                    # Testes automatizados com Vitest
-│   ├── cart-service.test.js  # Testes das regras de negócio do carrinho
-│   ├── data.test.js          # Testes de consistência dos dados do cardápio
-│   ├── i18n.test.js          # Testes da camada de internacionalização
-│   └── utils.test.js         # Testes de funções utilitárias
+├── tests/                         # Testes automatizados
+│   ├── cart-service.test.js       # Testes das regras de negócio do carrinho
+│   ├── data.test.js               # Testes de consistência dos dados do cardápio
+│   ├── i18n.test.js               # Testes da camada de internacionalização
+│   ├── utils.test.js              # Testes de funções utilitárias
+│   └── e2e/
+│       └── checkout.e2e.js        # Testes E2E do fluxo de compra com Playwright
 │
-├── assets/                   # Imagens e recursos visuais
-│
-├── docs/images/              # Imagens utilizadas na documentação
-│
-├── .github/workflows/        # Pipeline de CI/CD
-│   └── frontend-ci.yml
-│
-├── index.html                # Estrutura principal da aplicação
-├── output.css                # CSS gerado pelo Tailwind (ignorado pelo Git)
-├── tailwind.config.js        # Configuração do Tailwind CSS
-├── package.json              # Configuração do projeto, scripts e dependências
-├── package-lock.json         # Versões travadas das dependências
-├── vercel.json               # Configuração de deploy na Vercel
-├── LICENSE                   # Licença MIT
-└── README.md                 # Documentação do projeto
+├── .gitignore                     # Arquivos e pastas ignorados pelo Git
+├── index.html                     # Estrutura principal da aplicação
+├── output.css                     # CSS gerado pelo Tailwind em build local
+├── package.json                   # Scripts, metadados e dependências do projeto
+├── package-lock.json              # Versões travadas das dependências
+├── playwright.config.js           # Configuração dos testes E2E com Playwright
+├── tailwind.config.js             # Configuração do Tailwind CSS
+├── vercel.json                    # Configuração de deploy na Vercel
+├── LICENSE                        # Licença MIT
+└── README.md                      # Documentação do projeto
 ```
 
 ---
@@ -173,7 +204,7 @@ burger-shop/
 
 Tela inicial com hero section, logo, endereço, horário de funcionamento e status dinâmico da loja.
 
-![Home](https://github.com/felipe-frc/burger-shop/raw/main/docs/images/home.png)
+![Home](/docs/images/home.png)
 
 ---
 
@@ -181,7 +212,7 @@ Tela inicial com hero section, logo, endereço, horário de funcionamento e stat
 
 Cardápio dividido por categorias, com imagens, descrições, tags de destaque e botão de adição ao carrinho.
 
-![Cardápio](https://github.com/felipe-frc/burger-shop/raw/main/docs/images/menu.png)
+![Cardápio](/docs/images/cardapio.png)
 
 ---
 
@@ -189,7 +220,15 @@ Cardápio dividido por categorias, com imagens, descrições, tags de destaque e
 
 Modal de carrinho com listagem de itens, controle de quantidade, subtotal, taxa de entrega e ações de navegação.
 
-![Carrinho](https://github.com/felipe-frc/burger-shop/raw/main/docs/images/cart.png)
+![Carrinho](/docs/images/cart.png)
+
+---
+
+### 🚚 Tipo de Pedido
+
+Etapa para escolha entre **Entrega** ou **Retirada no local**, permitindo que o cliente defina como deseja receber o pedido antes de prosseguir para endereço ou revisão.
+
+![Tipo de Pedido](/docs/images/pedido.png)
 
 ---
 
@@ -197,7 +236,7 @@ Modal de carrinho com listagem de itens, controle de quantidade, subtotal, taxa 
 
 Formulário de endereço com busca automática por CEP, validações e indicação de campos preenchidos automaticamente.
 
-![Endereço](https://github.com/felipe-frc/burger-shop/raw/main/docs/images/address.png)
+![Endereço](/docs/images/endereco.png)
 
 ---
 
@@ -205,7 +244,7 @@ Formulário de endereço com busca automática por CEP, validações e indicaç�
 
 Tela de revisão com itens, endereço, subtotal, taxa de entrega, total final e botão de finalização via WhatsApp.
 
-![Revisão](https://github.com/felipe-frc/burger-shop/raw/main/docs/images/review.png)
+![Revisão](/docs/images/revisao.png)
 
 ---
 
@@ -258,7 +297,7 @@ Abra o arquivo `index.html` diretamente no navegador ou utilize a extensão **Li
 
 ---
 
-### 5. Execute os testes
+### 5. Execute os testes unitários
 
 ```bash
 npm test
@@ -276,7 +315,33 @@ O relatório de cobertura é gerado localmente na pasta `coverage/`, que fica ig
 
 ---
 
-### 7. Gere o build de produção
+### 7. Execute os testes E2E
+
+```bash
+npm run e2e
+```
+
+O Playwright sobe a aplicação localmente com Vite, executa os fluxos automatizados e valida o comportamento da aplicação no navegador.
+
+---
+
+### 8. Execute os testes E2E com navegador visível
+
+```bash
+npm run e2e:headed
+```
+
+---
+
+### 9. Abra a interface visual do Playwright
+
+```bash
+npm run e2e:ui
+```
+
+---
+
+### 10. Gere o build de produção
 
 ```bash
 npm run build
@@ -290,12 +355,14 @@ O projeto possui uma pipeline de **GitHub Actions** configurada para garantir a 
 
 O workflow valida:
 
-- Instalação das dependências com npm;
-- Execução dos testes automatizados com Vitest;
+- Instalação das dependências com `npm ci`;
+- Instalação do navegador Chromium usado pelo Playwright;
+- Execução dos testes unitários com Vitest;
 - Build do Tailwind CSS com `npm run build`;
+- Execução dos testes E2E com Playwright;
 - Presença dos arquivos obrigatórios do projeto;
-- Presença dos arquivos de teste;
-- Ausência do arquivo gerado `output.css` no repositório;
+- Presença dos módulos JavaScript principais;
+- Presença dos arquivos de teste unitário e E2E;
 - Estrutura dos módulos JavaScript na pasta `scripts/`.
 
 Além disso, o projeto possui geração local de cobertura de testes com **Vitest Coverage V8**, permitindo acompanhar quais módulos estão protegidos por testes e identificar pontos de melhoria para novas refatorações.
@@ -320,9 +387,9 @@ As principais regras do carrinho foram extraídas para o módulo `cart-service.j
 
 Essa decisão reduz o acoplamento entre DOM e regra de negócio, melhora a clareza do `cart.js` e torna o projeto mais preparado para futuras evoluções, como integração com backend, novos tipos de desconto, cálculo de frete por região ou histórico de pedidos.
 
-### Persistência com localStorage
+### Estado compartilhado e persistência
 
-O carrinho é persistido no localStorage, garantindo que os itens não sejam perdidos ao atualizar a página. Após a finalização do pedido, o localStorage é limpo automaticamente para evitar dados residuais de pedidos anteriores.
+O estado do carrinho e do tipo de pedido é centralizado em `state.js`, com persistência no localStorage. Essa separação evita espalhar acesso direto ao armazenamento por toda a aplicação e facilita futuras alterações na estratégia de persistência.
 
 ### Integração com ViaCEP
 
@@ -336,11 +403,11 @@ Os modais implementam focus trap básico, movendo o foco automaticamente ao abri
 
 A aplicação possui suporte inicial a Português e Inglês, com seletor de idioma e persistência da preferência no localStorage. Os principais textos da interface e os dados do cardápio são traduzidos dinamicamente, demonstrando preocupação com escalabilidade e experiência do usuário.
 
-### Testes automatizados
+### Testes unitários
 
 O projeto utiliza Vitest para validar funções utilitárias, dados do cardápio, camada de internacionalização e regras de negócio do carrinho. A presença dos testes ajuda a evitar regressões e aumenta a confiabilidade do código durante refatorações.
 
-Atualmente, os testes cobrem cenários como:
+Atualmente, os testes unitários cobrem cenários como:
 
 - Consistência dos dados do cardápio;
 - Tradução de textos da interface;
@@ -355,13 +422,22 @@ Atualmente, os testes cobrem cenários como:
 - Cálculo da taxa de entrega;
 - Cálculo do total final com entrega ou retirada.
 
+### Testes E2E com Playwright
+
+Os testes E2E simulam fluxos reais de uso da aplicação no navegador. O arquivo `tests/e2e/checkout.e2e.js` valida dois cenários principais:
+
+- Fluxo completo de compra com entrega, incluindo adição de produto, abertura do carrinho, preenchimento de CEP, revisão do pedido, observações e finalização via WhatsApp;
+- Fluxo de retirada no local, garantindo que o usuário consiga prosseguir sem preencher endereço de entrega e sem aplicação de taxa de entrega.
+
+Essa camada complementa os testes unitários porque valida a integração entre interface, estado, carrinho, endereço, revisão e finalização do pedido.
+
 ### Cobertura de testes
 
 A geração de cobertura com Vitest Coverage V8 foi adicionada para apoiar a evolução técnica do projeto. A pasta `coverage/` é gerada localmente e ignorada pelo Git, mantendo o repositório limpo enquanto permite análise dos módulos mais e menos testados.
 
 ### CI/CD com GitHub Actions
 
-A integração contínua automatiza o processo de instalação, testes, build e validação estrutural do projeto, aumentando a confiabilidade do repositório e demonstrando cuidado com qualidade de software.
+A integração contínua automatiza o processo de instalação, testes unitários, build, testes E2E e validação estrutural do projeto, aumentando a confiabilidade do repositório e demonstrando cuidado com qualidade de software.
 
 ### Tailwind CSS + estilos customizados
 
@@ -370,6 +446,12 @@ O Tailwind CSS foi utilizado para construção rápida do layout e responsividad
 ---
 
 ## 🧾 Releases
+
+### v2.6.0 — Testes E2E com Playwright
+
+Versão focada em confiabilidade de fluxo e validação da experiência real do usuário. Foram adicionados testes E2E com Playwright para simular a jornada completa de compra dentro do navegador, cobrindo o fluxo de entrega com preenchimento de endereço via CEP e o fluxo de retirada no local sem necessidade de informar endereço.
+
+Também foi adicionada a configuração `playwright.config.js`, integração dos testes E2E ao workflow de CI do GitHub Actions e inclusão dos relatórios temporários do Playwright no `.gitignore`. Essa evolução complementa os testes unitários existentes e aumenta a segurança para futuras refatorações no carrinho, modais, endereço e finalização do pedido.
 
 ### v2.5.0 — Refatoração do carrinho e cobertura de testes
 
@@ -434,6 +516,7 @@ Primeira versão do projeto, com exibição de cardápio, carrinho de compras co
 - Filtro e busca por nome de produto;
 - Cálculo de frete por faixa de CEP;
 - Ampliação da cobertura de testes para os módulos de endereço, pedido e interface;
+- Testes E2E adicionais para validação de erro de CEP, carrinho vazio e troca de idioma;
 - Otimização das imagens principais do projeto, especialmente a logo;
 - Integração com backend para gerenciamento de pedidos em tempo real;
 - Sistema de autenticação de usuários;
