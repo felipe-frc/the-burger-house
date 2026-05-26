@@ -14,7 +14,7 @@ on:
 
 jobs:
   build:
-    name: Testar e gerar build
+    name: Testar, gerar build e validar E2E
     runs-on: ubuntu-latest
 
     steps:
@@ -30,11 +30,17 @@ jobs:
       - name: Instalar dependências
         run: npm ci
 
+      - name: Instalar navegador do Playwright
+        run: npx playwright install --with-deps chromium
+
       - name: Executar testes automatizados
         run: npm test
 
       - name: Gerar CSS de produção
         run: npm run build
+
+      - name: Executar testes E2E
+        run: npm run e2e
 
       - name: Verificar arquivos principais
         run: |
@@ -44,6 +50,7 @@ jobs:
           test -f tailwind.config.js
           test -f styles/style.css
           test -f output.css
+          test -f playwright.config.js
 
       - name: Verificar módulos JavaScript
         run: |
@@ -54,6 +61,7 @@ jobs:
           test -f scripts/utils.js
           test -f scripts/ui.js
           test -f scripts/cart.js
+          test -f scripts/cart-service.js
           test -f scripts/address.js
           test -f scripts/order.js
 
@@ -62,3 +70,5 @@ jobs:
           test -f tests/utils.test.js
           test -f tests/data.test.js
           test -f tests/i18n.test.js
+          test -f tests/cart-service.test.js
+          test -f tests/e2e/checkout.e2e.js
