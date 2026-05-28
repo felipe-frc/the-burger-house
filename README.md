@@ -19,7 +19,7 @@ O projeto permite ao cliente explorar o cardápio por categorias, montar seu ped
 
 🔗 **Deploy:** [The Burger House na Vercel](https://burger-shop-aiib.vercel.app/)
 
-📂 **Repositório:** [github.com/felipe-frc/burger-shop](https://github.com/felipe-frc/burger-shop)
+📂 **Repositório:** [github.com/felipe-frc/burger-shop](https://github.com/felipe-frc/the-burger-house)
 
 A aplicação está publicada na **Vercel** com CI/CD automatizado via **GitHub Actions**.
 
