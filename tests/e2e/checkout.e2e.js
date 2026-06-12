@@ -149,3 +149,109 @@ test("deve permitir retirada no local sem preencher endereço", async ({
   await expect(page.locator("#review-address")).toContainText(/retirada/i);
   await expect(page.locator("#review-total")).toContainText("R$");
 });
+
+test("deve exibir aviso para CEP inválido", async ({ page }) => {
+  await page.route("**/ws/00000000/json/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ erro: true }),
+    });
+  });
+
+  await page.goto("/");
+
+  await addFirstProductToCart(page);
+  await openCart(page);
+  await page.locator("#go-to-address-btn").click();
+  await page.locator("#cep").fill("00000000");
+
+  await expect(page.locator("#address-warn")).toContainText(/CEP n.o encontrado/i);
+  await expect(page.locator("#street")).toHaveValue("");
+});
+
+test("deve manter o fluxo bloqueado quando o carrinho ficar vazio antes da revisão", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  await addFirstProductToCart(page);
+  await openCart(page);
+
+  await page.locator(".remove-btn").click();
+
+  await expect(page.locator("#cart-items")).toContainText(/carrinho est. vazio/i);
+  await expect(page.locator("#go-to-address-btn")).toBeDisabled();
+});
+
+test("deve trocar o idioma da interface e refletir os textos do pedido", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  await page.locator("#language-select").selectOption("en-US");
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(page.locator("#category-nav")).toContainText("Burgers");
+
+  await addFirstProductToCart(page);
+  await openCart(page);
+
+  await expect(page.locator("#cart-items")).toContainText("The Beach Burger");
+});
+
+test("deve enviar observações longas no pedido final", async ({ page }) => {
+  const longNotes =
+    "Sem cebola, sem picles, carne ao ponto, molho separado, enviar ketchup extra e guardanapos adicionais por favor.";
+
+  await page.goto("/");
+
+  await addFirstProductToCart(page);
+  await openCart(page);
+  await page.locator("#go-to-address-btn").click();
+  await page.locator("#cep").fill("38400000");
+  await page.locator("#house-number").fill("123");
+  await page.locator("#go-to-review-btn").click();
+  await page.locator("#order-notes").fill(longNotes);
+  await page.locator("#finish-order-btn").click();
+
+  await expect
+    .poll(async () => {
+      return page.evaluate(() => window.__openedUrls?.[0] || "");
+    })
+    .not.toBe("");
+
+  const whatsappUrl = await page.evaluate(() => window.__openedUrls[0]);
+  const decodedUrl = decodeURIComponent(whatsappUrl);
+
+  expect(decodedUrl).toContain(longNotes);
+});
+
+test("deve permitir remover item antes da revisão e seguir com o item restante", async ({
+  page,
+}) => {
+  await page.goto("/");
+
+  const addButtons = page.locator(".add-to-cart-btn");
+
+  await addButtons.nth(0).click();
+  await addButtons.nth(1).click();
+  await expect(page.locator("#cart-count")).toHaveText("2");
+
+  await openCart(page);
+  await expect(page.locator("#cart-items")).toContainText("O Praiano");
+  await expect(page.locator("#cart-items")).toContainText("O Famoso Onion Ring");
+
+  await page.locator(".remove-btn").nth(0).click();
+
+  await expect(page.locator("#cart-items")).not.toContainText("O Praiano");
+  await expect(page.locator("#cart-items")).toContainText("O Famoso Onion Ring");
+
+  await page.locator("#go-to-address-btn").click();
+  await page.locator("#cep").fill("38400000");
+  await page.locator("#house-number").fill("123");
+  await page.locator("#go-to-review-btn").click();
+
+  await expect(page.locator("#review-items")).not.toContainText("O Praiano");
+  await expect(page.locator("#review-items")).toContainText("O Famoso Onion Ring");
+});

@@ -336,7 +336,7 @@ O relatório de cobertura é gerado localmente na pasta `coverage/`, que fica ig
 npm run e2e
 ```
 
-O Playwright gera o CSS com `npm run build`, sobe a aplicação localmente com `vite preview`, executa os fluxos automatizados e valida o comportamento da aplicação no navegador.
+O Playwright gera o CSS com `npm run build`, sobe a aplicação localmente com Vite, executa os fluxos automatizados e valida o comportamento da aplicação no navegador.
 
 ---
 
@@ -387,7 +387,7 @@ Essa configuração reduz o risco de regressões, evita inconsistências estrutu
 O projeto **não versiona** o `output.css`.
 
 - Em desenvolvimento, `npm run dev` gera e atualiza o arquivo automaticamente.
-- Em build e CI, `npm run build` gera o arquivo antes do preview e dos testes E2E.
+- Em build e CI, `npm run build` gera o arquivo antes de subir a aplicação local para os testes E2E.
 - A fonte de verdade dos estilos é `styles/style.css`; `output.css` é apenas o artefato compilado consumido pelo `index.html`.
 
 ---
