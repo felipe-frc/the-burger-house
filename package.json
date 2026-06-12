@@ -1,5 +1,5 @@
 {
-  "name": "the-burger-house",
+  "name": "burger-shop",
   "version": "1.7.0",
   "description": "Cardápio digital para hamburgueria com carrinho interativo, integração com WhatsApp e busca automática de endereço por CEP.",
   "author": "Felipe França",

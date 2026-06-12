@@ -1,4 +1,4 @@
-# 🍔 The Burger House
+# 🍔 burger-shop
 
 [![CI (Front-end)](https://github.com/felipe-frc/burger-shop/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/felipe-frc/burger-shop/actions)
 [![Deploy Vercel](https://img.shields.io/badge/deploy-Vercel-black?logo=vercel)](https://burger-shop-aiib.vercel.app/)
@@ -17,9 +17,9 @@ O projeto permite ao cliente explorar o cardápio por categorias, montar seu ped
 
 ## 🌐 Acesse o Projeto
 
-🔗 **Deploy:** [The Burger House na Vercel](https://burger-shop-aiib.vercel.app/)
+🔗 **Deploy:** [burger-shop na Vercel](https://burger-shop-aiib.vercel.app/)
 
-📁 **Repositório:** [The Burger House no GitHub](https://github.com/felipe-frc/the-burger-house)
+📁 **Repositório:** [burger-shop no GitHub](https://github.com/felipe-frc/burger-shop)
 
 A aplicação está publicada na **Vercel** com CI/CD automatizado via **GitHub Actions**.
 
