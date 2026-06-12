@@ -336,7 +336,7 @@ O relatório de cobertura é gerado localmente na pasta `coverage/`, que fica ig
 npm run e2e
 ```
 
-O Playwright sobe a aplicação localmente com Vite, executa os fluxos automatizados e valida o comportamento da aplicação no navegador.
+O Playwright gera o CSS com `npm run build`, sobe a aplicação localmente com `vite preview`, executa os fluxos automatizados e valida o comportamento da aplicação no navegador.
 
 ---
 
@@ -370,17 +370,13 @@ O comando gera o arquivo `output.css` a partir de `styles/style.css`. Esse arqui
 
 O projeto possui uma pipeline de **GitHub Actions** configurada para garantir a integridade do repositório a cada alteração enviada para a branch `main`.
 
-O workflow valida:
+O workflow é separado em três etapas principais:
 
 - Instalação das dependências com `npm ci`;
-- Instalação do navegador Chromium usado pelo Playwright;
 - Execução dos testes unitários com Vitest;
 - Geração do CSS do Tailwind com `npm run build`;
+- Instalação do navegador Chromium usado pelo Playwright;
 - Execução dos testes E2E com Playwright;
-- Presença dos arquivos obrigatórios do projeto;
-- Presença dos módulos JavaScript principais;
-- Presença dos arquivos de teste unitário e E2E;
-- Estrutura dos módulos JavaScript na pasta `scripts/`.
 
 Além disso, o projeto possui geração local de cobertura de testes com **Vitest Coverage V8**, permitindo acompanhar quais módulos estão protegidos por testes e identificar pontos de melhoria para novas refatorações.
 
@@ -391,7 +387,7 @@ Essa configuração reduz o risco de regressões, evita inconsistências estrutu
 O projeto **não versiona** o `output.css`.
 
 - Em desenvolvimento, `npm run dev` gera e atualiza o arquivo automaticamente.
-- Em build e CI, `npm run build` gera o arquivo antes das validações e dos testes E2E.
+- Em build e CI, `npm run build` gera o arquivo antes do preview e dos testes E2E.
 - A fonte de verdade dos estilos é `styles/style.css`; `output.css` é apenas o artefato compilado consumido pelo `index.html`.
 
 ---
@@ -462,7 +458,7 @@ A geração de cobertura com Vitest Coverage V8 foi adicionada para apoiar a evo
 
 ### CI/CD com GitHub Actions
 
-A integração contínua automatiza o processo de instalação, testes unitários, build, testes E2E e validação estrutural do projeto, aumentando a confiabilidade do repositório e demonstrando cuidado com qualidade de software.
+A integração contínua automatiza o processo de instalação, testes unitários, build e testes E2E do projeto, aumentando a confiabilidade do repositório e demonstrando cuidado com qualidade de software.
 
 ### Tailwind CSS + estilos customizados
 

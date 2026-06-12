@@ -7,11 +7,12 @@
   "scripts": {
     "dev": "tailwindcss -i ./styles/style.css -o ./output.css --watch",
     "build": "tailwindcss -i ./styles/style.css -o ./output.css --minify",
+    "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test",
-    "e2e:headed": "playwright test --headed",
-    "e2e:ui": "playwright test --ui"
+    "e2e": "npm run build && playwright test",
+    "e2e:headed": "npm run build && playwright test --headed",
+    "e2e:ui": "npm run build && playwright test --ui"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

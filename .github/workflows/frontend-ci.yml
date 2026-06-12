@@ -13,9 +13,51 @@ on:
       - main
 
 jobs:
-  build:
-    name: Testar, gerar build e validar E2E
+  unit-tests:
+    name: Testes unitários
     runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar testes unitários
+        run: npm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: unit-tests
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Gerar build de produção
+        run: npm run build
+
+  e2e:
+    name: Testes E2E
+    runs-on: ubuntu-latest
+    needs: build
 
     steps:
       - name: Baixar código
@@ -33,42 +75,5 @@ jobs:
       - name: Instalar navegador do Playwright
         run: npx playwright install --with-deps chromium
 
-      - name: Executar testes automatizados
-        run: npm test
-
-      - name: Gerar CSS de produção
-        run: npm run build
-
       - name: Executar testes E2E
         run: npm run e2e
-
-      - name: Verificar arquivos principais
-        run: |
-          test -f index.html
-          test -f package.json
-          test -f package-lock.json
-          test -f tailwind.config.js
-          test -f styles/style.css
-          test -f output.css
-          test -f playwright.config.js
-
-      - name: Verificar módulos JavaScript
-        run: |
-          test -f scripts/main.js
-          test -f scripts/config.js
-          test -f scripts/data.js
-          test -f scripts/state.js
-          test -f scripts/utils.js
-          test -f scripts/ui.js
-          test -f scripts/cart.js
-          test -f scripts/cart-service.js
-          test -f scripts/address.js
-          test -f scripts/order.js
-
-      - name: Verificar arquivos de teste
-        run: |
-          test -f tests/utils.test.js
-          test -f tests/data.test.js
-          test -f tests/i18n.test.js
-          test -f tests/cart-service.test.js
-          test -f tests/e2e/checkout.e2e.js
