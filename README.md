@@ -193,7 +193,7 @@ the-burger-house/
 │
 ├── .gitignore                     # Arquivos e pastas ignorados pelo Git
 ├── index.html                     # Estrutura principal da aplicação
-├── output.css                     # CSS gerado pelo Tailwind em build local
+├── output.css                     # CSS gerado pelo Tailwind em dev/build local (ignorado no Git)
 ├── package.json                   # Scripts, metadados e dependências do projeto
 ├── package-lock.json              # Versões travadas das dependências
 ├── playwright.config.js           # Configuração dos testes E2E com Playwright
@@ -300,7 +300,15 @@ O Tailwind CSS ficará em modo watch, recompilando o `output.css` automaticament
 
 ### 4. Acesse no navegador
 
-Abra o arquivo `index.html` diretamente no navegador ou utilize a extensão **Live Server** do VS Code para um servidor local com hot reload.
+Com o `npm run dev` rodando em um terminal, abra o `index.html` no navegador ou utilize a extensão **Live Server** do VS Code para servir a aplicação localmente.
+
+Se preferir não deixar o watch ativo, gere o CSS antes com:
+
+```bash
+npm run build
+```
+
+Depois disso, o `index.html` já encontrará o `output.css` gerado localmente.
 
 ---
 
@@ -354,6 +362,8 @@ npm run e2e:ui
 npm run build
 ```
 
+O comando gera o arquivo `output.css` a partir de `styles/style.css`. Esse arquivo é um artefato local de build e fica **ignorado no Git**.
+
 ---
 
 ## ✅ Qualidade e CI/CD
@@ -365,7 +375,7 @@ O workflow valida:
 - Instalação das dependências com `npm ci`;
 - Instalação do navegador Chromium usado pelo Playwright;
 - Execução dos testes unitários com Vitest;
-- Build do Tailwind CSS com `npm run build`;
+- Geração do CSS do Tailwind com `npm run build`;
 - Execução dos testes E2E com Playwright;
 - Presença dos arquivos obrigatórios do projeto;
 - Presença dos módulos JavaScript principais;
@@ -375,6 +385,14 @@ O workflow valida:
 Além disso, o projeto possui geração local de cobertura de testes com **Vitest Coverage V8**, permitindo acompanhar quais módulos estão protegidos por testes e identificar pontos de melhoria para novas refatorações.
 
 Essa configuração reduz o risco de regressões, evita inconsistências estruturais e aumenta a confiabilidade do projeto para manutenção futura.
+
+### Fluxo do `output.css`
+
+O projeto **não versiona** o `output.css`.
+
+- Em desenvolvimento, `npm run dev` gera e atualiza o arquivo automaticamente.
+- Em build e CI, `npm run build` gera o arquivo antes das validações e dos testes E2E.
+- A fonte de verdade dos estilos é `styles/style.css`; `output.css` é apenas o artefato compilado consumido pelo `index.html`.
 
 ---
 

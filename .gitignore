@@ -4,8 +4,8 @@ dist/
 .env
 .env.local
 
+# Arquivo gerado pelo Tailwind durante dev/build
 output.css
-/style.css
 
 .DS_Store
 Thumbs.db
