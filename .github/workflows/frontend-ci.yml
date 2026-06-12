@@ -75,5 +75,27 @@ jobs:
       - name: Instalar navegador do Playwright
         run: npx playwright install --with-deps chromium
 
+      - name: Gerar CSS de produção
+        run: npm run build
+
+      - name: Subir servidor local para E2E
+        run: nohup npm run serve:e2e > vite-e2e.log 2>&1 &
+
+      - name: Aguardar servidor local
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:4173 > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          cat vite-e2e.log
+          exit 1
+
       - name: Executar testes E2E
-        run: npm run e2e
+        run: npm run e2e:ci
+
+      - name: Exibir log do servidor em caso de falha
+        if: failure()
+        run: cat vite-e2e.log

@@ -7,9 +7,11 @@
   "scripts": {
     "dev": "tailwindcss -i ./styles/style.css -o ./output.css --watch",
     "build": "tailwindcss -i ./styles/style.css -o ./output.css --minify",
+    "serve:e2e": "vite --host 127.0.0.1 --port 4173 --strictPort",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "npm run build && playwright test",
+    "e2e:ci": "playwright test",
     "e2e:headed": "npm run build && playwright test --headed",
     "e2e:ui": "npm run build && playwright test --ui"
   },

@@ -12,12 +12,14 @@ export default defineConfig({
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
-  webServer: {
-    command: "npx vite --host 127.0.0.1 --port 4173",
-    url: "http://127.0.0.1:4173",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
+  webServer: process.env.CI
+    ? undefined
+    : {
+        command: "npm run serve:e2e",
+        url: "http://127.0.0.1:4173",
+        reuseExistingServer: true,
+        timeout: 120000,
+      },
   projects: [
     {
       name: "chromium",
