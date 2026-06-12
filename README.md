@@ -1,6 +1,6 @@
-# 🍔 burger-shop
+# 🍔 The Burger House
 
-[![CI (Front-end)](https://github.com/felipe-frc/burger-shop/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/felipe-frc/burger-shop/actions)
+[![CI (Front-end)](https://github.com/felipe-frc/the-burger-house/actions/workflows/frontend-ci.yml/badge.svg)](https://github.com/felipe-frc/the-burger-house/actions)
 [![Deploy Vercel](https://img.shields.io/badge/deploy-Vercel-black?logo=vercel)](https://burger-shop-aiib.vercel.app/)
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?logo=javascript&logoColor=black)
@@ -17,9 +17,9 @@ O projeto permite ao cliente explorar o cardápio por categorias, montar seu ped
 
 ## 🌐 Acesse o Projeto
 
-🔗 **Deploy:** [burger-shop na Vercel](https://burger-shop-aiib.vercel.app/)
+🔗 **Deploy:** [The Burger House na Vercel](https://burger-shop-aiib.vercel.app/)
 
-📁 **Repositório:** [burger-shop no GitHub](https://github.com/felipe-frc/burger-shop)
+📁 **Repositório:** [The Burger House no GitHub](https://github.com/felipe-frc/the-burger-house)
 
 A aplicação está publicada na **Vercel** com CI/CD automatizado via **GitHub Actions**.
 
@@ -146,7 +146,7 @@ Este projeto foi desenvolvido com o objetivo de praticar e demonstrar conhecimen
 ## 🏗️ Estrutura do Projeto
 
 ```txt
-burger-shop/
+the-burger-house/
 │
 ├── .github/
 │   └── workflows/
@@ -268,8 +268,8 @@ Tela de revisão com itens, endereço, subtotal, taxa de entrega, total final e 
 ### 1. Clone o repositório
 
 ```bash
-git clone https://github.com/felipe-frc/burger-shop.git
-cd burger-shop
+git clone https://github.com/felipe-frc/the-burger-house.git
+cd the-burger-house
 ```
 
 ---
@@ -510,7 +510,7 @@ Versão que corrigiu a validação do formulário de endereço durante o fluxo d
 
 Versão que melhorou a organização interna do projeto, reduziu duplicações e corrigiu inconsistências no fluxo de pedido. O cardápio passou a ser renderizado dinamicamente via JavaScript, os dados dos produtos foram centralizados em um array de objetos, o botão de carrinho foi unificado, o `output.css` foi removido do versionamento e os estilos inline foram movidos para `styles/style.css`. Também foram corrigidos o cálculo e a exibição da taxa de entrega no resumo do pedido.
 
-### v1.0.0 — Burger Shop
+### v1.0.0 — The Burger House
 
 Primeira versão do projeto, com exibição de cardápio, carrinho de compras com persistência em `localStorage`, adição e remoção de itens, checkout via WhatsApp e interface responsiva com Tailwind CSS.
 
