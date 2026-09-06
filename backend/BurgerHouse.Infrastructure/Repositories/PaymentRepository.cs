@@ -1,5 +1,6 @@
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Domain.Entities;
+using BurgerHouse.Domain.Enums;
 using BurgerHouse.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,7 +27,24 @@ public class PaymentRepository : IPaymentRepository
         );
     }
 
-    public async Task<Payment?> GetByOrderIdAsync(
+    public async Task<Payment?> GetByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+            return null;
+
+        var normalizedKey = idempotencyKey.Trim();
+
+        return await _dbContext.Payments
+            .FirstOrDefaultAsync(
+                payment =>
+                    payment.IdempotencyKey == normalizedKey,
+                cancellationToken
+            );
+    }
+
+    public async Task<Payment?> GetActiveByOrderIdAsync(
         int orderId,
         CancellationToken cancellationToken = default)
     {
@@ -35,7 +53,12 @@ public class PaymentRepository : IPaymentRepository
 
         return await _dbContext.Payments
             .FirstOrDefaultAsync(
-                payment => payment.OrderId == orderId,
+                payment =>
+                    payment.OrderId == orderId &&
+                    (
+                        payment.Status == PaymentStatus.Pending ||
+                        payment.Status == PaymentStatus.Approved
+                    ),
                 cancellationToken
             );
     }

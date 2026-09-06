@@ -8,6 +8,12 @@ namespace BurgerHouse.Application.Tests;
 
 public class CreatePaymentHandlerTests
 {
+    private const string Key1 =
+        "11111111-1111-4111-8111-111111111111";
+
+    private const string Key2 =
+        "22222222-2222-4222-8222-222222222222";
+
     [Fact]
     public async Task HandleAsync_ShouldCreatePaymentUsingOrderTotal()
     {
@@ -17,8 +23,11 @@ public class CreatePaymentHandlerTests
             unitPrice: 43.90m
         );
 
-        var orderRepository = new FakeOrderRepository(order);
-        var paymentRepository = new FakePaymentRepository();
+        var orderRepository =
+            new FakeOrderRepository(order);
+
+        var paymentRepository =
+            new FakePaymentRepository();
 
         var handler = new CreatePaymentHandler(
             orderRepository,
@@ -27,7 +36,8 @@ public class CreatePaymentHandlerTests
 
         var request = new CreatePaymentRequest
         {
-            OrderId = 1
+            OrderId = 1,
+            IdempotencyKey = Key1
         };
 
         var response = await handler.HandleAsync(request);
@@ -38,14 +48,39 @@ public class CreatePaymentHandlerTests
         Assert.Equal(PaymentStatus.Pending, response.Status);
 
         Assert.NotNull(paymentRepository.AddedPayment);
-        Assert.Equal(87.80m, paymentRepository.AddedPayment.Amount);
+
+        Assert.Equal(
+            Key1,
+            paymentRepository.AddedPayment.IdempotencyKey
+        );
+
+        Assert.Equal(
+            87.80m,
+            paymentRepository.AddedPayment.Amount
+        );
     }
 
     [Fact]
-    public async Task HandleAsync_ShouldThrow_WhenOrderIdIsInvalid()
+    public async Task HandleAsync_ShouldReturnExistingPayment_WhenIdempotencyKeyIsRepeated()
     {
-        var orderRepository = new FakeOrderRepository();
-        var paymentRepository = new FakePaymentRepository();
+        var order = CreateOrder(
+            id: 1,
+            quantity: 2,
+            unitPrice: 43.90m
+        );
+
+        var existingPayment = CreatePayment(
+            id: 50,
+            orderId: 1,
+            amount: 87.80m,
+            key: Key1
+        );
+
+        var orderRepository =
+            new FakeOrderRepository(order);
+
+        var paymentRepository =
+            new FakePaymentRepository(existingPayment);
 
         var handler = new CreatePaymentHandler(
             orderRepository,
@@ -54,7 +89,50 @@ public class CreatePaymentHandlerTests
 
         var request = new CreatePaymentRequest
         {
-            OrderId = 0
+            OrderId = 1,
+            IdempotencyKey = Key1
+        };
+
+        var response = await handler.HandleAsync(request);
+
+        Assert.Equal(50, response.PaymentId);
+        Assert.Equal(1, response.OrderId);
+        Assert.Equal(87.80m, response.Amount);
+
+        Assert.Null(paymentRepository.AddedPayment);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldThrow_WhenOrderIdIsInvalid()
+    {
+        var handler = new CreatePaymentHandler(
+            new FakeOrderRepository(),
+            new FakePaymentRepository()
+        );
+
+        var request = new CreatePaymentRequest
+        {
+            OrderId = 0,
+            IdempotencyKey = Key1
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => handler.HandleAsync(request)
+        );
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldThrow_WhenIdempotencyKeyIsInvalid()
+    {
+        var handler = new CreatePaymentHandler(
+            new FakeOrderRepository(),
+            new FakePaymentRepository()
+        );
+
+        var request = new CreatePaymentRequest
+        {
+            OrderId = 1,
+            IdempotencyKey = "invalid-key"
         };
 
         await Assert.ThrowsAsync<ArgumentException>(
@@ -65,17 +143,15 @@ public class CreatePaymentHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldThrow_WhenOrderDoesNotExist()
     {
-        var orderRepository = new FakeOrderRepository();
-        var paymentRepository = new FakePaymentRepository();
-
         var handler = new CreatePaymentHandler(
-            orderRepository,
-            paymentRepository
+            new FakeOrderRepository(),
+            new FakePaymentRepository()
         );
 
         var request = new CreatePaymentRequest
         {
-            OrderId = 9999
+            OrderId = 9999,
+            IdempotencyKey = Key1
         };
 
         await Assert.ThrowsAsync<KeyNotFoundException>(
@@ -84,34 +160,80 @@ public class CreatePaymentHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_ShouldThrow_WhenPaymentAlreadyExists()
+    public async Task HandleAsync_ShouldThrow_WhenActivePaymentAlreadyExists()
     {
         var order = CreateOrder(
             id: 1,
-            quantity: 2,
+            quantity: 1,
             unitPrice: 43.90m
         );
 
-        var existingPayment = new Payment(
-            order.Id,
-            order.Total
+        var existingPayment = CreatePayment(
+            id: 10,
+            orderId: 1,
+            amount: 43.90m,
+            key: Key1
         );
 
-        var orderRepository = new FakeOrderRepository(order);
-        var paymentRepository = new FakePaymentRepository(existingPayment);
+        var handler = new CreatePaymentHandler(
+            new FakeOrderRepository(order),
+            new FakePaymentRepository(existingPayment)
+        );
+
+        var request = new CreatePaymentRequest
+        {
+            OrderId = 1,
+            IdempotencyKey = Key2
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.HandleAsync(request)
+        );
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldAllowRetry_WhenPreviousPaymentWasRejected()
+    {
+        var order = CreateOrder(
+            id: 1,
+            quantity: 1,
+            unitPrice: 43.90m
+        );
+
+        var rejectedPayment = CreatePayment(
+            id: 10,
+            orderId: 1,
+            amount: 43.90m,
+            key: Key1
+        );
+
+        rejectedPayment.Reject();
+
+        var paymentRepository =
+            new FakePaymentRepository(rejectedPayment);
 
         var handler = new CreatePaymentHandler(
-            orderRepository,
+            new FakeOrderRepository(order),
             paymentRepository
         );
 
         var request = new CreatePaymentRequest
         {
-            OrderId = 1
+            OrderId = 1,
+            IdempotencyKey = Key2
         };
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => handler.HandleAsync(request)
+        var response = await handler.HandleAsync(request);
+
+        Assert.Equal(200, response.PaymentId);
+
+        Assert.NotNull(
+            paymentRepository.AddedPayment
+        );
+
+        Assert.Equal(
+            Key2,
+            paymentRepository.AddedPayment.IdempotencyKey
         );
     }
 
@@ -126,17 +248,41 @@ public class CreatePaymentHandlerTests
 
         order.MarkAsReceived();
 
-        var orderRepository = new FakeOrderRepository(order);
-        var paymentRepository = new FakePaymentRepository();
-
         var handler = new CreatePaymentHandler(
-            orderRepository,
-            paymentRepository
+            new FakeOrderRepository(order),
+            new FakePaymentRepository()
         );
 
         var request = new CreatePaymentRequest
         {
-            OrderId = 1
+            OrderId = 1,
+            IdempotencyKey = Key1
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => handler.HandleAsync(request)
+        );
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldThrow_WhenIdempotencyKeyBelongsToAnotherOrder()
+    {
+        var existingPayment = CreatePayment(
+            id: 10,
+            orderId: 1,
+            amount: 43.90m,
+            key: Key1
+        );
+
+        var handler = new CreatePaymentHandler(
+            new FakeOrderRepository(),
+            new FakePaymentRepository(existingPayment)
+        );
+
+        var request = new CreatePaymentRequest
+        {
+            OrderId = 2,
+            IdempotencyKey = Key1
         };
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -168,6 +314,27 @@ public class CreatePaymentHandlerTests
         return order;
     }
 
+    private static Payment CreatePayment(
+        int id,
+        int orderId,
+        decimal amount,
+        string key)
+    {
+        var payment = new Payment(
+            orderId,
+            amount,
+            key
+        );
+
+        SetPrivateProperty(
+            payment,
+            nameof(Payment.Id),
+            id
+        );
+
+        return payment;
+    }
+
     private static void SetPrivateProperty<T>(
         T instance,
         string propertyName,
@@ -175,7 +342,8 @@ public class CreatePaymentHandlerTests
     {
         var property = typeof(T).GetProperty(
             propertyName,
-            BindingFlags.Instance | BindingFlags.Public
+            BindingFlags.Instance |
+            BindingFlags.Public
         );
 
         property?.SetValue(instance, value);
@@ -216,14 +384,14 @@ public class CreatePaymentHandlerTests
 
     private sealed class FakePaymentRepository : IPaymentRepository
     {
-        private readonly Payment? _existingPayment;
+        private readonly List<Payment> _payments;
 
         public Payment? AddedPayment { get; private set; }
 
         public FakePaymentRepository(
-            Payment? existingPayment = null)
+            params Payment[] payments)
         {
-            _existingPayment = existingPayment;
+            _payments = [.. payments];
         }
 
         public Task AddAsync(
@@ -231,24 +399,45 @@ public class CreatePaymentHandlerTests
             CancellationToken cancellationToken = default)
         {
             AddedPayment = payment;
+            _payments.Add(payment);
 
             return Task.CompletedTask;
         }
 
-        public Task<Payment?> GetByOrderIdAsync(
+        public Task<Payment?> GetByIdempotencyKeyAsync(
+            string idempotencyKey,
+            CancellationToken cancellationToken = default)
+        {
+            var payment = _payments.FirstOrDefault(
+                item =>
+                    item.IdempotencyKey ==
+                    idempotencyKey
+            );
+
+            return Task.FromResult(payment);
+        }
+
+        public Task<Payment?> GetActiveByOrderIdAsync(
             int orderId,
             CancellationToken cancellationToken = default)
         {
-            if (_existingPayment?.OrderId == orderId)
-                return Task.FromResult<Payment?>(_existingPayment);
+            var payment = _payments.FirstOrDefault(
+                item =>
+                    item.OrderId == orderId &&
+                    (
+                        item.Status == PaymentStatus.Pending ||
+                        item.Status == PaymentStatus.Approved
+                    )
+            );
 
-            return Task.FromResult<Payment?>(null);
+            return Task.FromResult(payment);
         }
 
         public Task SaveChangesAsync(
             CancellationToken cancellationToken = default)
         {
-            if (AddedPayment is not null)
+            if (AddedPayment is not null &&
+                AddedPayment.Id == 0)
             {
                 SetPrivateProperty(
                     AddedPayment,

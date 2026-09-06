@@ -197,14 +197,28 @@ public class BurgerHouseDbContext : DbContext
             entity.Property(payment => payment.OrderId)
                 .IsRequired();
 
+            entity.HasIndex(payment => payment.OrderId)
+                .IsUnique()
+                .HasFilter("\"Status\" IN (1, 2)");
+
             entity.Property(payment => payment.Amount)
                 .HasPrecision(10, 2);
 
             entity.Property(payment => payment.Status)
                 .IsRequired();
 
+            entity.Property(payment => payment.IdempotencyKey)
+                .IsRequired()
+                .HasMaxLength(36);
+
+            entity.HasIndex(payment => payment.IdempotencyKey)
+                .IsUnique();
+
             entity.Property(payment => payment.ExternalPaymentId)
                 .HasMaxLength(100);
+
+            entity.HasIndex(payment => payment.ExternalPaymentId)
+                .IsUnique();
 
             entity.Property(payment => payment.CreatedAt)
                 .IsRequired();

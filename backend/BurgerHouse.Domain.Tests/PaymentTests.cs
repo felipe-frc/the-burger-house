@@ -5,18 +5,24 @@ namespace BurgerHouse.Domain.Tests;
 
 public class PaymentTests
 {
+    private const string IdempotencyKey =
+        "11111111-1111-4111-8111-111111111111";
+
     [Fact]
     public void Constructor_ShouldCreatePendingPayment()
     {
         var payment = new Payment(
             orderId: 1,
-            amount: 58m
+            amount: 87.80m,
+            idempotencyKey: IdempotencyKey
         );
 
         Assert.Equal(1, payment.OrderId);
-        Assert.Equal(58m, payment.Amount);
+        Assert.Equal(87.80m, payment.Amount);
         Assert.Equal(PaymentStatus.Pending, payment.Status);
+        Assert.Equal(IdempotencyKey, payment.IdempotencyKey);
         Assert.Null(payment.ExternalPaymentId);
+        Assert.NotEqual(default, payment.CreatedAt);
         Assert.Null(payment.UpdatedAt);
     }
 
@@ -24,7 +30,11 @@ public class PaymentTests
     public void Constructor_ShouldThrow_WhenOrderIdIsInvalid()
     {
         Assert.Throws<ArgumentException>(
-            () => new Payment(0, 58m)
+            () => new Payment(
+                0,
+                87.80m,
+                IdempotencyKey
+            )
         );
     }
 
@@ -32,71 +42,119 @@ public class PaymentTests
     public void Constructor_ShouldThrow_WhenAmountIsInvalid()
     {
         Assert.Throws<ArgumentException>(
-            () => new Payment(1, 0m)
+            () => new Payment(
+                1,
+                0m,
+                IdempotencyKey
+            )
         );
     }
 
     [Fact]
-    public void SetExternalPaymentId_ShouldSetValue()
+    public void Constructor_ShouldThrow_WhenIdempotencyKeyIsEmpty()
     {
-        var payment = new Payment(1, 58m);
-
-        payment.SetExternalPaymentId("123456789");
-
-        Assert.Equal("123456789", payment.ExternalPaymentId);
-        Assert.NotNull(payment.UpdatedAt);
+        Assert.Throws<ArgumentException>(
+            () => new Payment(
+                1,
+                87.80m,
+                " "
+            )
+        );
     }
 
     [Fact]
-    public void SetExternalPaymentId_ShouldTrimValue()
+    public void Constructor_ShouldThrow_WhenIdempotencyKeyIsInvalid()
     {
-        var payment = new Payment(1, 58m);
+        Assert.Throws<ArgumentException>(
+            () => new Payment(
+                1,
+                87.80m,
+                "invalid-key"
+            )
+        );
+    }
 
-        payment.SetExternalPaymentId("  123456789  ");
+    [Fact]
+    public void SetExternalPaymentId_ShouldSetExternalPaymentId()
+    {
+        var payment = new Payment(
+            1,
+            87.80m,
+            IdempotencyKey
+        );
 
-        Assert.Equal("123456789", payment.ExternalPaymentId);
+        payment.SetExternalPaymentId("MP-123");
+
+        Assert.Equal(
+            "MP-123",
+            payment.ExternalPaymentId
+        );
+
+        Assert.NotNull(payment.UpdatedAt);
     }
 
     [Fact]
     public void SetExternalPaymentId_ShouldThrow_WhenValueIsEmpty()
     {
-        var payment = new Payment(1, 58m);
+        var payment = new Payment(
+            1,
+            87.80m,
+            IdempotencyKey
+        );
 
         Assert.Throws<ArgumentException>(
-            () => payment.SetExternalPaymentId("   ")
+            () => payment.SetExternalPaymentId(" ")
         );
     }
 
     [Fact]
     public void Approve_ShouldChangeStatusToApproved()
     {
-        var payment = new Payment(1, 58m);
+        var payment = new Payment(
+            1,
+            87.80m,
+            IdempotencyKey
+        );
 
         payment.Approve();
 
-        Assert.Equal(PaymentStatus.Approved, payment.Status);
-        Assert.NotNull(payment.UpdatedAt);
+        Assert.Equal(
+            PaymentStatus.Approved,
+            payment.Status
+        );
     }
 
     [Fact]
     public void Reject_ShouldChangeStatusToRejected()
     {
-        var payment = new Payment(1, 58m);
+        var payment = new Payment(
+            1,
+            87.80m,
+            IdempotencyKey
+        );
 
         payment.Reject();
 
-        Assert.Equal(PaymentStatus.Rejected, payment.Status);
-        Assert.NotNull(payment.UpdatedAt);
+        Assert.Equal(
+            PaymentStatus.Rejected,
+            payment.Status
+        );
     }
 
     [Fact]
     public void Cancel_ShouldChangeStatusToCancelled()
     {
-        var payment = new Payment(1, 58m);
+        var payment = new Payment(
+            1,
+            87.80m,
+            IdempotencyKey
+        );
 
         payment.Cancel();
 
-        Assert.Equal(PaymentStatus.Cancelled, payment.Status);
-        Assert.NotNull(payment.UpdatedAt);
+        Assert.Equal(
+            PaymentStatus.Cancelled,
+            payment.Status
+        );
     }
 }

@@ -9,7 +9,12 @@ public interface IPaymentRepository
         CancellationToken cancellationToken = default
     );
 
-    Task<Payment?> GetByOrderIdAsync(
+    Task<Payment?> GetByIdempotencyKeyAsync(
+        string idempotencyKey,
+        CancellationToken cancellationToken = default
+    );
+
+    Task<Payment?> GetActiveByOrderIdAsync(
         int orderId,
         CancellationToken cancellationToken = default
     );
