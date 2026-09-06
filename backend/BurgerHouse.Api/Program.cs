@@ -1,5 +1,6 @@
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Orders.CreateOrder;
+using BurgerHouse.Application.Payments.CreatePayment;
 using BurgerHouse.Infrastructure.Persistence;
 using BurgerHouse.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -18,7 +19,10 @@ builder.Services.AddDbContext<BurgerHouseDbContext>(options =>
 
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
+
 builder.Services.AddScoped<CreateOrderHandler>();
+builder.Services.AddScoped<CreatePaymentHandler>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
