@@ -9,6 +9,7 @@ public class Payment
     public decimal Amount { get; private set; }
     public PaymentStatus Status { get; private set; }
     public string IdempotencyKey { get; private set; }
+    public string? ExternalOrderId { get; private set; }
     public string? ExternalPaymentId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
@@ -50,6 +51,31 @@ public class Payment
         IdempotencyKey = parsedKey.ToString("D");
         Status = PaymentStatus.Pending;
         CreatedAt = DateTime.UtcNow;
+    }
+
+    public void SetExternalOrderId(string externalOrderId)
+    {
+        EnsurePending();
+
+        if (string.IsNullOrWhiteSpace(externalOrderId))
+            throw new ArgumentException(
+                "External order id cannot be empty."
+            );
+
+        var normalizedId = externalOrderId.Trim();
+
+        if (ExternalOrderId is not null)
+        {
+            if (ExternalOrderId == normalizedId)
+                return;
+
+            throw new InvalidOperationException(
+                "External order id has already been assigned."
+            );
+        }
+
+        ExternalOrderId = normalizedId;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     public void SetExternalPaymentId(string externalPaymentId)

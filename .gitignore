@@ -1,32 +1,77 @@
-﻿# Node / Front-end
+﻿# =========================
+# Node / Front-end
+# =========================
 node_modules/
 dist/
 .vercel/
 
-# Environment
+# =========================
+# Environment / Secrets
+# =========================
 .env
-.env.local
+.env.*
+!.env.example
 
-# Arquivo gerado pelo Tailwind durante dev/build
+secrets.json
+*.secret
+*.secrets
+
+# Chaves, certificados e credenciais privadas
+*.pfx
+*.p12
+*.key
+*.pem
+
+# Configurações locais que nunca devem conter segredos versionados
+appsettings.Local.json
+appsettings.*.Local.json
+
+# =========================
+# Tailwind / Build
+# =========================
 output.css
 
+# =========================
 # Testes e cobertura
+# =========================
 coverage/
 playwright-report/
 test-results/
+TestResults/
 
-# Editor
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# Editores / IDEs
+# =========================
 .vscode/
+.vs/
+.idea/
+*.user
+*.suo
 
+# =========================
 # Sistema operacional
+# =========================
 .DS_Store
 Thumbs.db
 
+# =========================
 # .NET
+# =========================
 bin/
 obj/
+artifacts/
 
-# SQLite
+# =========================
+# SQLite / bancos locais
+# =========================
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+*.sqlite3

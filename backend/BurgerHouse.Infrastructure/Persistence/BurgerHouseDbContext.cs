@@ -214,6 +214,12 @@ public class BurgerHouseDbContext : DbContext
             entity.HasIndex(payment => payment.IdempotencyKey)
                 .IsUnique();
 
+            entity.Property(payment => payment.ExternalOrderId)
+                .HasMaxLength(100);
+
+            entity.HasIndex(payment => payment.ExternalOrderId)
+                .IsUnique();
+
             entity.Property(payment => payment.ExternalPaymentId)
                 .HasMaxLength(100);
 
