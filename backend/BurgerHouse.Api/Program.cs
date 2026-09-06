@@ -1,4 +1,7 @@
+using BurgerHouse.Application.Abstractions.Persistence;
+using BurgerHouse.Application.Orders.CreateOrder;
 using BurgerHouse.Infrastructure.Persistence;
+using BurgerHouse.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,6 +15,10 @@ var connectionString = builder.Configuration
 builder.Services.AddDbContext<BurgerHouseDbContext>(options =>
     options.UseSqlite(connectionString)
 );
+
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<CreateOrderHandler>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

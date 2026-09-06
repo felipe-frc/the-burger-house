@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BurgerHouse.Api", "BurgerHo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BurgerHouse.Domain.Tests", "BurgerHouse.Domain.Tests\BurgerHouse.Domain.Tests.csproj", "{551D532F-C9E4-48DC-AFC1-1D952A02927B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BurgerHouse.Application.Tests", "BurgerHouse.Application.Tests\BurgerHouse.Application.Tests.csproj", "{C79C3C41-60C2-426C-929A-544F95ED4A90}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,18 @@ Global
 		{551D532F-C9E4-48DC-AFC1-1D952A02927B}.Release|x64.Build.0 = Release|Any CPU
 		{551D532F-C9E4-48DC-AFC1-1D952A02927B}.Release|x86.ActiveCfg = Release|Any CPU
 		{551D532F-C9E4-48DC-AFC1-1D952A02927B}.Release|x86.Build.0 = Release|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Debug|x64.Build.0 = Debug|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Debug|x86.Build.0 = Debug|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Release|x64.ActiveCfg = Release|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Release|x64.Build.0 = Release|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Release|x86.ActiveCfg = Release|Any CPU
+		{C79C3C41-60C2-426C-929A-544F95ED4A90}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
