@@ -1,21 +1,32 @@
-﻿node_modules/
+﻿# Node / Front-end
+node_modules/
 dist/
 .vercel/
+
+# Environment
 .env
 .env.local
 
 # Arquivo gerado pelo Tailwind durante dev/build
 output.css
 
-.DS_Store
-Thumbs.db
-
+# Testes e cobertura
 coverage/
 playwright-report/
 test-results/
 
+# Editor
 .vscode/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
 
 # .NET
 bin/
 obj/
+
+# SQLite
+*.db
+*.db-shm
+*.db-wal
