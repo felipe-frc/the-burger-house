@@ -3,6 +3,7 @@ using System;
 using BurgerHouse.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace BurgerHouse.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(BurgerHouseDbContext))]
-    partial class BurgerHouseDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260906172459_AddProducts")]
+    partial class AddProducts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.19");
@@ -132,96 +135,6 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Products", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = 1,
-                            Code = "burger-praiano",
-                            IsActive = true,
-                            Name = "O Praiano",
-                            Price = 43.90m
-                        },
-                        new
-                        {
-                            Id = 2,
-                            Code = "burger-onion-rings",
-                            IsActive = true,
-                            Name = "O Famoso Onion Ring",
-                            Price = 43.90m
-                        },
-                        new
-                        {
-                            Id = 3,
-                            Code = "burger-crispy-chicken-cheddar",
-                            IsActive = true,
-                            Name = "Crispy Chicken Cheddar",
-                            Price = 35.90m
-                        },
-                        new
-                        {
-                            Id = 4,
-                            Code = "burger-outback-king",
-                            IsActive = true,
-                            Name = "O Outback King",
-                            Price = 43.90m
-                        },
-                        new
-                        {
-                            Id = 5,
-                            Code = "burger-chicken-grill-supreme",
-                            IsActive = true,
-                            Name = "Chicken Grill Supreme",
-                            Price = 35.90m
-                        },
-                        new
-                        {
-                            Id = 6,
-                            Code = "burger-joia-da-coroa",
-                            IsActive = true,
-                            Name = "A Joia da Coroa",
-                            Price = 58.90m
-                        },
-                        new
-                        {
-                            Id = 7,
-                            Code = "side-fritas-cheddar",
-                            IsActive = true,
-                            Name = "Fritas Cheddar & Bacon",
-                            Price = 24.90m
-                        },
-                        new
-                        {
-                            Id = 8,
-                            Code = "side-batata-rustica",
-                            IsActive = true,
-                            Name = "Batatas Rústicas da Casa",
-                            Price = 18.90m
-                        },
-                        new
-                        {
-                            Id = 9,
-                            Code = "side-aneis-cebola",
-                            IsActive = true,
-                            Name = "Anéis de Cebola Crocantes",
-                            Price = 22.90m
-                        },
-                        new
-                        {
-                            Id = 10,
-                            Code = "drink-coca-lata",
-                            IsActive = true,
-                            Name = "Coca-Cola Lata",
-                            Price = 5.90m
-                        },
-                        new
-                        {
-                            Id = 11,
-                            Code = "drink-guarana-antarctica",
-                            IsActive = true,
-                            Name = "Guaraná Antarctica",
-                            Price = 5.90m
-                        });
                 });
 
             modelBuilder.Entity("BurgerHouse.Domain.Entities.OrderItem", b =>

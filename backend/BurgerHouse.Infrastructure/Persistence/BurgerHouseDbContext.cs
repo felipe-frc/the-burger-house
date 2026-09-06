@@ -10,6 +10,7 @@ public class BurgerHouseDbContext : DbContext
     {
     }
 
+    public DbSet<Product> Products => Set<Product>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Payment> Payments => Set<Payment>();
@@ -17,6 +18,121 @@ public class BurgerHouseDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.ToTable("Products");
+
+            entity.HasKey(product => product.Id);
+
+            entity.Property(product => product.Code)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.HasIndex(product => product.Code)
+                .IsUnique();
+
+            entity.Property(product => product.Name)
+                .IsRequired()
+                .HasMaxLength(150);
+
+            entity.Property(product => product.Price)
+                .HasPrecision(10, 2);
+
+            entity.Property(product => product.IsActive)
+                .IsRequired();
+
+            entity.HasData(
+                new
+                {
+                    Id = 1,
+                    Code = "burger-praiano",
+                    Name = "O Praiano",
+                    Price = 43.90m,
+                    IsActive = true
+                },
+                new
+                {
+                    Id = 2,
+                    Code = "burger-onion-rings",
+                    Name = "O Famoso Onion Ring",
+                    Price = 43.90m,
+                    IsActive = true
+                },
+                new
+                {
+                    Id = 3,
+                    Code = "burger-crispy-chicken-cheddar",
+                    Name = "Crispy Chicken Cheddar",
+                    Price = 35.90m,
+                    IsActive = true
+                },
+                new
+                {
+                    Id = 4,
+                    Code = "burger-outback-king",
+                    Name = "O Outback King",
+                    Price = 43.90m,
+                    IsActive = true
+                },
+                new
+                {
+                    Id = 5,
+                    Code = "burger-chicken-grill-supreme",
+                    Name = "Chicken Grill Supreme",
+                    Price = 35.90m,
+                    IsActive = true
+                },
+                new
+                {
+                    Id = 6,
+                    Code = "burger-joia-da-coroa",
+                    Name = "A Joia da Coroa",
+                    Price = 58.90m,
+                    IsActive = true
+                },
+                new
+                {
+                    Id = 7,
+                    Code = "side-fritas-cheddar",
+                    Name = "Fritas Cheddar & Bacon",
+                    Price = 24.90m,
+                    IsActive = true
+                },
+                new
+                {
+                    Id = 8,
+                    Code = "side-batata-rustica",
+                    Name = "Batatas Rústicas da Casa",
+                    Price = 18.90m,
+                    IsActive = true
+                },
+                new
+                {
+                    Id = 9,
+                    Code = "side-aneis-cebola",
+                    Name = "Anéis de Cebola Crocantes",
+                    Price = 22.90m,
+                    IsActive = true
+                },
+                new
+                {
+                    Id = 10,
+                    Code = "drink-coca-lata",
+                    Name = "Coca-Cola Lata",
+                    Price = 5.90m,
+                    IsActive = true
+                },
+                new
+                {
+                    Id = 11,
+                    Code = "drink-guarana-antarctica",
+                    Name = "Guaraná Antarctica",
+                    Price = 5.90m,
+                    IsActive = true
+                }
+            );
+        });
 
         modelBuilder.Entity<Order>(entity =>
         {
@@ -65,6 +181,11 @@ public class BurgerHouseDbContext : DbContext
                 .HasMaxLength(500);
 
             entity.Ignore(item => item.Total);
+
+            entity.HasOne<Product>()
+                .WithMany()
+                .HasForeignKey(item => item.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Payment>(entity =>
