@@ -18,7 +18,10 @@ public class MercadoPagoWebhooksControllerTests
     [Fact]
     public void Receive_ShouldReturnUnauthorized_WhenSignatureIsInvalid()
     {
-        var controller = CreateController();
+        var controller = CreateController(
+            dataId: "order-456",
+            type: "order"
+        );
 
         controller.Request.Headers["x-signature"] =
             "ts=1700000000,v1=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -26,15 +29,10 @@ public class MercadoPagoWebhooksControllerTests
         controller.Request.Headers["x-request-id"] =
             "request-123";
 
-        var request = new MercadoPagoWebhookRequest
-        {
-            Type = "order",
-            Action = "updated",
-            Data = new MercadoPagoWebhookData
-            {
-                Id = "order-456"
-            }
-        };
+        var request = CreateWebhookRequest(
+            type: "order",
+            dataId: "order-456"
+        );
 
         var result = controller.Receive(request);
 
@@ -52,7 +50,10 @@ public class MercadoPagoWebhooksControllerTests
         const string dataId =
             "order-456";
 
-        var controller = CreateController();
+        var controller = CreateController(
+            dataId,
+            type: "order"
+        );
 
         controller.Request.Headers["x-signature"] =
             CreateValidSignature(
@@ -63,20 +64,17 @@ public class MercadoPagoWebhooksControllerTests
         controller.Request.Headers["x-request-id"] =
             requestId;
 
-        var request = new MercadoPagoWebhookRequest
-        {
-            Type = "order",
-            Action = "updated",
-            Data = new MercadoPagoWebhookData
-            {
-                Id = dataId
-            }
-        };
+        var request = CreateWebhookRequest(
+            type: "order",
+            dataId: dataId
+        );
 
         var result = controller.Receive(request);
 
         var okResult =
-            Assert.IsType<OkObjectResult>(result);
+            Assert.IsType<OkObjectResult>(
+                result
+            );
 
         var json =
             JsonSerializer.SerializeToElement(
@@ -101,7 +99,10 @@ public class MercadoPagoWebhooksControllerTests
         const string dataId =
             "payment-456";
 
-        var controller = CreateController();
+        var controller = CreateController(
+            dataId,
+            type: "payment"
+        );
 
         controller.Request.Headers["x-signature"] =
             CreateValidSignature(
@@ -112,20 +113,17 @@ public class MercadoPagoWebhooksControllerTests
         controller.Request.Headers["x-request-id"] =
             requestId;
 
-        var request = new MercadoPagoWebhookRequest
-        {
-            Type = "payment",
-            Action = "updated",
-            Data = new MercadoPagoWebhookData
-            {
-                Id = dataId
-            }
-        };
+        var request = CreateWebhookRequest(
+            type: "payment",
+            dataId: dataId
+        );
 
         var result = controller.Receive(request);
 
         var okResult =
-            Assert.IsType<OkObjectResult>(result);
+            Assert.IsType<OkObjectResult>(
+                result
+            );
 
         var json =
             JsonSerializer.SerializeToElement(
@@ -141,8 +139,45 @@ public class MercadoPagoWebhooksControllerTests
         );
     }
 
+    [Fact]
+    public void Receive_ShouldReturnBadRequest_WhenQueryAndBodyDataIdsDiffer()
+    {
+        const string requestId =
+            "request-123";
+
+        const string signedDataId =
+            "order-456";
+
+        var controller = CreateController(
+            signedDataId,
+            type: "order"
+        );
+
+        controller.Request.Headers["x-signature"] =
+            CreateValidSignature(
+                requestId,
+                signedDataId
+            );
+
+        controller.Request.Headers["x-request-id"] =
+            requestId;
+
+        var request = CreateWebhookRequest(
+            type: "order",
+            dataId: "different-order-999"
+        );
+
+        var result = controller.Receive(request);
+
+        Assert.IsType<BadRequestObjectResult>(
+            result
+        );
+    }
+
     private static MercadoPagoWebhooksController
-        CreateController()
+        CreateController(
+            string dataId,
+            string type)
     {
         var options = Options.Create(
             new MercadoPagoOptions
@@ -161,14 +196,38 @@ public class MercadoPagoWebhooksControllerTests
                 validator
             );
 
+        var httpContext =
+            new DefaultHttpContext();
+
+        httpContext.Request.QueryString =
+            new QueryString(
+                $"?data.id={Uri.EscapeDataString(dataId)}" +
+                $"&type={Uri.EscapeDataString(type)}"
+            );
+
         controller.ControllerContext =
             new ControllerContext
             {
-                HttpContext =
-                    new DefaultHttpContext()
+                HttpContext = httpContext
             };
 
         return controller;
+    }
+
+    private static MercadoPagoWebhookRequest
+        CreateWebhookRequest(
+            string type,
+            string dataId)
+    {
+        return new MercadoPagoWebhookRequest
+        {
+            Type = type,
+            Action = "updated",
+            Data = new MercadoPagoWebhookData
+            {
+                Id = dataId
+            }
+        };
     }
 
     private static string CreateValidSignature(

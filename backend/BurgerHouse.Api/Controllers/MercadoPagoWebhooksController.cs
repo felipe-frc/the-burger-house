@@ -31,12 +31,20 @@ public sealed class MercadoPagoWebhooksController : ControllerBase
             Request.Headers["x-request-id"]
                 .FirstOrDefault();
 
-        var dataId = request.Data?.Id;
+        // O Mercado Pago assina o data.id recebido
+        // na QUERY STRING, não o valor do body.
+        var signedDataId =
+            Request.Query["data.id"]
+                .FirstOrDefault();
+
+        var notificationType =
+            Request.Query["type"]
+                .FirstOrDefault();
 
         var isValid = _signatureValidator.IsValid(
             xSignature,
             xRequestId,
-            dataId
+            signedDataId
         );
 
         if (!isValid)
@@ -47,8 +55,23 @@ public sealed class MercadoPagoWebhooksController : ControllerBase
             });
         }
 
+        // Só depois da assinatura validada,
+        // verificamos se body e query se referem
+        // ao mesmo recurso.
+        if (!string.IsNullOrWhiteSpace(request.Data?.Id) &&
+            !string.Equals(
+                request.Data.Id,
+                signedDataId,
+                StringComparison.Ordinal))
+        {
+            return BadRequest(new
+            {
+                error = "Webhook data id mismatch."
+            });
+        }
+
         if (!string.Equals(
-                request.Type,
+                notificationType,
                 "order",
                 StringComparison.OrdinalIgnoreCase))
         {
