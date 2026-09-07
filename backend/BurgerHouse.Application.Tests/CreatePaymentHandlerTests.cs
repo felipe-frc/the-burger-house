@@ -404,6 +404,17 @@ public class CreatePaymentHandlerTests
             return Task.CompletedTask;
         }
 
+        public Task<Payment?> GetByIdAsync(
+            int paymentId,
+            CancellationToken cancellationToken = default)
+        {
+            var payment = _payments.FirstOrDefault(
+                item => item.Id == paymentId
+            );
+
+            return Task.FromResult(payment);
+        }
+
         public Task<Payment?> GetByIdempotencyKeyAsync(
             string idempotencyKey,
             CancellationToken cancellationToken = default)

@@ -27,6 +27,20 @@ public class PaymentRepository : IPaymentRepository
         );
     }
 
+    public async Task<Payment?> GetByIdAsync(
+        int paymentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (paymentId <= 0)
+            return null;
+
+        return await _dbContext.Payments
+            .FirstOrDefaultAsync(
+                payment => payment.Id == paymentId,
+                cancellationToken
+            );
+    }
+
     public async Task<Payment?> GetByIdempotencyKeyAsync(
         string idempotencyKey,
         CancellationToken cancellationToken = default)
@@ -66,6 +80,8 @@ public class PaymentRepository : IPaymentRepository
     public async Task SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(
+            cancellationToken
+        );
     }
 }
