@@ -53,6 +53,8 @@ builder.Services.AddScoped<CreateOrderHandler>();
 builder.Services.AddScoped<CreatePaymentHandler>();
 builder.Services.AddScoped<ProcessCardPaymentHandler>();
 
+builder.Services.AddScoped<MercadoPagoWebhookSignatureValidator>();
+
 builder.Services.AddHttpClient<IPaymentGateway, MercadoPagoPaymentGateway>(
     (serviceProvider, httpClient) =>
     {
