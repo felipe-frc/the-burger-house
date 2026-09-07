@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BurgerHouse.Application.Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BurgerHouse.Infrastructure.Tests", "BurgerHouse.Infrastructure.Tests\BurgerHouse.Infrastructure.Tests.csproj", "{895FB989-0FDA-4D6F-BA3A-DA45469EFF4A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BurgerHouse.Api.Tests", "BurgerHouse.Api.Tests\BurgerHouse.Api.Tests.csproj", "{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -111,6 +113,18 @@ Global
 		{895FB989-0FDA-4D6F-BA3A-DA45469EFF4A}.Release|x64.Build.0 = Release|Any CPU
 		{895FB989-0FDA-4D6F-BA3A-DA45469EFF4A}.Release|x86.ActiveCfg = Release|Any CPU
 		{895FB989-0FDA-4D6F-BA3A-DA45469EFF4A}.Release|x86.Build.0 = Release|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Debug|x64.Build.0 = Debug|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Debug|x86.Build.0 = Debug|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Release|x64.ActiveCfg = Release|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Release|x64.Build.0 = Release|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Release|x86.ActiveCfg = Release|Any CPU
+		{9B1A3171-2358-4EC4-B957-7EA6CF4CE2BC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -3,6 +3,7 @@ using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Orders.CreateOrder;
 using BurgerHouse.Application.Payments.CreatePayment;
+using BurgerHouse.Application.Payments.ProcessCardPayment;
 using BurgerHouse.Infrastructure.Payments.MercadoPago;
 using BurgerHouse.Infrastructure.Persistence;
 using BurgerHouse.Infrastructure.Repositories;
@@ -50,6 +51,7 @@ builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 
 builder.Services.AddScoped<CreateOrderHandler>();
 builder.Services.AddScoped<CreatePaymentHandler>();
+builder.Services.AddScoped<ProcessCardPaymentHandler>();
 
 builder.Services.AddHttpClient<IPaymentGateway, MercadoPagoPaymentGateway>(
     (serviceProvider, httpClient) =>
