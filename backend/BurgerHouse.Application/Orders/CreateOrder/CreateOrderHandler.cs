@@ -5,6 +5,8 @@ namespace BurgerHouse.Application.Orders.CreateOrder;
 
 public class CreateOrderHandler
 {
+    private const decimal DeliveryFee = 5m;
+
     private readonly IProductRepository _productRepository;
     private readonly IOrderRepository _orderRepository;
 
@@ -23,23 +25,45 @@ public class CreateOrderHandler
         ArgumentNullException.ThrowIfNull(request);
 
         if (request.Items is null || request.Items.Count == 0)
+        {
             throw new ArgumentException(
                 "The order must contain at least one item."
             );
+        }
 
-        var order = new Order(deliveryFee: 0m);
+        var normalizedOrderType =
+            request.OrderType
+                .Trim()
+                .ToLowerInvariant();
+
+        var deliveryFee = normalizedOrderType switch
+        {
+            OrderTypes.Delivery => DeliveryFee,
+            OrderTypes.Pickup => 0m,
+
+            _ => throw new ArgumentException(
+                "Order type must be 'delivery' or 'pickup'."
+            )
+        };
+
+        var order = new Order(
+            deliveryFee: deliveryFee
+        );
 
         foreach (var requestedItem in request.Items)
         {
-            var product = await _productRepository.GetByCodeAsync(
-                requestedItem.ProductCode,
-                cancellationToken
-            );
+            var product =
+                await _productRepository.GetByCodeAsync(
+                    requestedItem.ProductCode,
+                    cancellationToken
+                );
 
             if (product is null)
+            {
                 throw new KeyNotFoundException(
                     $"Product '{requestedItem.ProductCode}' was not found."
                 );
+            }
 
             var orderItem = new OrderItem(
                 product.Id,
@@ -51,8 +75,14 @@ public class CreateOrderHandler
             order.AddItem(orderItem);
         }
 
-        await _orderRepository.AddAsync(order, cancellationToken);
-        await _orderRepository.SaveChangesAsync(cancellationToken);
+        await _orderRepository.AddAsync(
+            order,
+            cancellationToken
+        );
+
+        await _orderRepository.SaveChangesAsync(
+            cancellationToken
+        );
 
         return new CreateOrderResponse
         {

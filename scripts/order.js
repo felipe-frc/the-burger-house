@@ -1,3 +1,4 @@
+import { createOrder } from "./api.js";
 import { WHATSAPP_PHONE_NUMBER } from "./config.js";
 import { getCartSubtotal, getCartTotalWithDelivery, getDeliveryFee, updateCart } from "./cart.js";
 import {
@@ -67,8 +68,11 @@ function loadReview() {
     elements.reviewItems.innerHTML = `<p class="text-zinc-500 italic">${escapeHTML(
       translate("review.empty"),
     )}</p>`;
+
     elements.reviewAddress.textContent = translate("review.addressMissing");
+
     elements.reviewTotal.textContent = formatPrice(0);
+
     return;
   }
 
@@ -78,7 +82,9 @@ function loadReview() {
 
   cart.forEach((item) => {
     const localizedItem = getLocalizedCartItem(item);
+
     const itemSubtotal = item.price * item.quantity;
+
     const itemRow = document.createElement("div");
 
     itemRow.className = "flex items-center justify-between gap-3 border-b border-zinc-200 pb-2";
@@ -99,6 +105,7 @@ function loadReview() {
   });
 
   const summaryDiv = document.createElement("div");
+
   summaryDiv.className = "pt-3 mt-2 space-y-2";
 
   summaryDiv.innerHTML = `
@@ -121,6 +128,7 @@ function loadReview() {
   elements.reviewItems.appendChild(summaryDiv);
 
   elements.reviewAddress.textContent = getAddressText();
+
   elements.reviewTotal.textContent = formatPrice(totalWithDelivery);
 }
 
@@ -134,11 +142,20 @@ function resetOrderAfterFinish() {
   setFinishButtonLoading(false);
 }
 
-function finishOrder() {
+function mapCartToApiItems(cart) {
+  return cart.map((item) => ({
+    productCode: item.id,
+    quantity: item.quantity,
+    observation: null,
+  }));
+}
+
+async function finishOrder() {
   const cart = getCart();
 
   if (cart.length === 0) {
     showToast(translate("cart.emptyToast"));
+
     return;
   }
 
@@ -154,44 +171,67 @@ function finishOrder() {
 
   setFinishButtonLoading(true);
 
-  const addressText = getAddressText();
-  const orderNotes = getOrderNotes();
-  const subtotal = getCartSubtotal();
-  const deliveryFee = getDeliveryFee();
-  const totalWithDelivery = getCartTotalWithDelivery();
+  try {
+    const orderType = getOrderType();
 
-  let message = `🍔 *${translate("whatsapp.newOrder")}*\n\n`;
-  message += `*${translate("whatsapp.orderType")}:* ${getOrderTypeLabel()}\n\n`;
-  message += `*${translate("whatsapp.items")}:*\n`;
+    const createdOrder = await createOrder(orderType, mapCartToApiItems(cart));
 
-  cart.forEach((item) => {
-    const localizedItem = getLocalizedCartItem(item);
-    const itemSubtotal = item.price * item.quantity;
+    const addressText = getAddressText();
 
-    message += `- ${item.quantity}x ${localizedItem.name} (${formatPrice(itemSubtotal)})\n`;
-  });
+    const orderNotes = getOrderNotes();
 
-  message += `\n*${translate("whatsapp.summary")}:*\n`;
-  message += `${translate("whatsapp.subtotal")}: ${formatPrice(subtotal)}\n`;
-  message += `${translate("whatsapp.deliveryFee")}: ${formatPrice(deliveryFee)}\n`;
-  message += `${translate("whatsapp.total")}: ${formatPrice(totalWithDelivery)}\n`;
+    const subtotal = createdOrder.subtotal;
 
-  message += isPickupOrder()
-    ? `\n*${translate("whatsapp.pickupAddress")}:*\n${addressText}\n`
-    : `\n*${translate("whatsapp.deliveryAddress")}:*\n${addressText}\n`;
+    const deliveryFee = createdOrder.deliveryFee;
 
-  if (orderNotes) {
-    message += `\n*${translate("whatsapp.notes")}:*\n${orderNotes}\n`;
+    const total = createdOrder.total;
+
+    let message = `\u{1F354} *${translate("whatsapp.newOrder")}*\n\n`;
+
+    message += `*${translate("whatsapp.orderType")}:* ${getOrderTypeLabel()}\n\n`;
+
+    message += `*${translate("whatsapp.items")}:*\n`;
+
+    cart.forEach((item) => {
+      const localizedItem = getLocalizedCartItem(item);
+
+      const itemSubtotal = item.price * item.quantity;
+
+      message += `- ${item.quantity}x ${localizedItem.name} (${formatPrice(itemSubtotal)})\n`;
+    });
+
+    message += `\n*${translate("whatsapp.summary")}:*\n`;
+
+    message += `${translate("whatsapp.subtotal")}: ${formatPrice(subtotal)}\n`;
+
+    message += `${translate("whatsapp.deliveryFee")}: ${formatPrice(deliveryFee)}\n`;
+
+    message += `${translate("whatsapp.total")}: ${formatPrice(total)}\n`;
+
+    message += isPickupOrder()
+      ? `\n*${translate("whatsapp.pickupAddress")}:*\n${addressText}\n`
+      : `\n*${translate("whatsapp.deliveryAddress")}:*\n${addressText}\n`;
+
+    if (orderNotes) {
+      message += `\n*${translate("whatsapp.notes")}:*\n${orderNotes}\n`;
+    }
+
+    const url = `https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent(message)}`;
+
+    window.open(url, "_blank");
+
+    setTimeout(() => {
+      resetOrderAfterFinish();
+
+      showToast(translate("order.sentToast"), "#16a34a");
+    }, 900);
+  } catch (error) {
+    console.error("Não foi possível criar o pedido:", error);
+
+    setFinishButtonLoading(false);
+
+    showToast("Não foi possível criar o pedido. Tente novamente.");
   }
-
-  const url = `https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent(message)}`;
-
-  window.open(url, "_blank");
-
-  setTimeout(() => {
-    resetOrderAfterFinish();
-    showToast(translate("order.sentToast"), "#16a34a");
-  }, 900);
 }
 
 export function bindOrderEvents() {
@@ -207,6 +247,7 @@ export function bindOrderEvents() {
     elements.goToAddressBtn.onclick = () => {
       if (getCart().length === 0) {
         showToast(translate("cart.needItemToast"));
+
         return;
       }
 
@@ -232,12 +273,16 @@ export function bindOrderEvents() {
 
       if (!isPickupOrder() && getIsFetchingCep()) {
         showAddressWarning(translate("address.waitCep"));
+
         return;
       }
 
-      if (!validateAddressFields()) return;
+      if (!validateAddressFields()) {
+        return;
+      }
 
       loadReview();
+
       openModal(elements.reviewModal);
     };
   }

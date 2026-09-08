@@ -1,14 +1,15 @@
+using System.Reflection;
+
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Orders.CreateOrder;
 using BurgerHouse.Domain.Entities;
-using System.Reflection;
 
 namespace BurgerHouse.Application.Tests;
 
 public class CreateOrderHandlerTests
 {
     [Fact]
-    public async Task HandleAsync_ShouldCreateOrderUsingOfficialProductPrice()
+    public async Task HandleAsync_ShouldCreatePickupOrderUsingOfficialProductPrice()
     {
         var product = CreateProduct(
             id: 1,
@@ -17,8 +18,12 @@ public class CreateOrderHandlerTests
             price: 43.90m
         );
 
-        var productRepository = new FakeProductRepository(product);
-        var orderRepository = new FakeOrderRepository();
+        var productRepository =
+            new FakeProductRepository(product);
+
+        var orderRepository =
+            new FakeOrderRepository();
+
         var handler = new CreateOrderHandler(
             productRepository,
             orderRepository
@@ -26,6 +31,8 @@ public class CreateOrderHandlerTests
 
         var request = new CreateOrderRequest
         {
+            OrderType = OrderTypes.Pickup,
+
             Items =
             [
                 new CreateOrderItemRequest
@@ -37,29 +44,51 @@ public class CreateOrderHandlerTests
             ]
         };
 
-        var response = await handler.HandleAsync(request);
+        var response =
+            await handler.HandleAsync(request);
 
         Assert.Equal(100, response.OrderId);
         Assert.Equal(87.80m, response.Subtotal);
         Assert.Equal(0m, response.DeliveryFee);
         Assert.Equal(87.80m, response.Total);
 
-        Assert.NotNull(orderRepository.AddedOrder);
-        Assert.Single(orderRepository.AddedOrder.Items);
+        Assert.NotNull(
+            orderRepository.AddedOrder
+        );
 
-        var item = orderRepository.AddedOrder.Items.Single();
+        Assert.Single(
+            orderRepository.AddedOrder.Items
+        );
+
+        var item =
+            orderRepository.AddedOrder.Items.Single();
 
         Assert.Equal(1, item.ProductId);
         Assert.Equal(2, item.Quantity);
         Assert.Equal(43.90m, item.UnitPrice);
-        Assert.Equal("Sem bacon", item.Observation);
+
+        Assert.Equal(
+            "Sem bacon",
+            item.Observation
+        );
     }
 
     [Fact]
-    public async Task HandleAsync_ShouldThrow_WhenOrderHasNoItems()
+    public async Task HandleAsync_ShouldApplyDeliveryFee_WhenOrderIsDelivery()
     {
-        var productRepository = new FakeProductRepository();
-        var orderRepository = new FakeOrderRepository();
+        var product = CreateProduct(
+            id: 1,
+            code: "burger-praiano",
+            name: "O Praiano",
+            price: 43.90m
+        );
+
+        var productRepository =
+            new FakeProductRepository(product);
+
+        var orderRepository =
+            new FakeOrderRepository();
+
         var handler = new CreateOrderHandler(
             productRepository,
             orderRepository
@@ -67,6 +96,89 @@ public class CreateOrderHandlerTests
 
         var request = new CreateOrderRequest
         {
+            OrderType = OrderTypes.Delivery,
+
+            Items =
+            [
+                new CreateOrderItemRequest
+                {
+                    ProductCode = "burger-praiano",
+                    Quantity = 1
+                }
+            ]
+        };
+
+        var response =
+            await handler.HandleAsync(request);
+
+        Assert.Equal(43.90m, response.Subtotal);
+        Assert.Equal(5m, response.DeliveryFee);
+        Assert.Equal(48.90m, response.Total);
+
+        Assert.NotNull(
+            orderRepository.AddedOrder
+        );
+
+        Assert.Equal(
+            5m,
+            orderRepository.AddedOrder.DeliveryFee
+        );
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldThrow_WhenOrderTypeIsInvalid()
+    {
+        var productRepository =
+            new FakeProductRepository();
+
+        var orderRepository =
+            new FakeOrderRepository();
+
+        var handler = new CreateOrderHandler(
+            productRepository,
+            orderRepository
+        );
+
+        var request = new CreateOrderRequest
+        {
+            OrderType = "invalid",
+
+            Items =
+            [
+                new CreateOrderItemRequest
+                {
+                    ProductCode = "burger-praiano",
+                    Quantity = 1
+                }
+            ]
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => handler.HandleAsync(request)
+        );
+
+        Assert.Null(
+            orderRepository.AddedOrder
+        );
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldThrow_WhenOrderHasNoItems()
+    {
+        var productRepository =
+            new FakeProductRepository();
+
+        var orderRepository =
+            new FakeOrderRepository();
+
+        var handler = new CreateOrderHandler(
+            productRepository,
+            orderRepository
+        );
+
+        var request = new CreateOrderRequest
+        {
+            OrderType = OrderTypes.Pickup,
             Items = []
         };
 
@@ -78,8 +190,12 @@ public class CreateOrderHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldThrow_WhenProductDoesNotExist()
     {
-        var productRepository = new FakeProductRepository();
-        var orderRepository = new FakeOrderRepository();
+        var productRepository =
+            new FakeProductRepository();
+
+        var orderRepository =
+            new FakeOrderRepository();
+
         var handler = new CreateOrderHandler(
             productRepository,
             orderRepository
@@ -87,11 +203,15 @@ public class CreateOrderHandlerTests
 
         var request = new CreateOrderRequest
         {
+            OrderType = OrderTypes.Pickup,
+
             Items =
             [
                 new CreateOrderItemRequest
                 {
-                    ProductCode = "burger-inexistente",
+                    ProductCode =
+                        "burger-inexistente",
+
                     Quantity = 1
                 }
             ]
@@ -101,7 +221,9 @@ public class CreateOrderHandlerTests
             () => handler.HandleAsync(request)
         );
 
-        Assert.Null(orderRepository.AddedOrder);
+        Assert.Null(
+            orderRepository.AddedOrder
+        );
     }
 
     [Fact]
@@ -114,8 +236,12 @@ public class CreateOrderHandlerTests
             price: 43.90m
         );
 
-        var productRepository = new FakeProductRepository(product);
-        var orderRepository = new FakeOrderRepository();
+        var productRepository =
+            new FakeProductRepository(product);
+
+        var orderRepository =
+            new FakeOrderRepository();
+
         var handler = new CreateOrderHandler(
             productRepository,
             orderRepository
@@ -123,11 +249,15 @@ public class CreateOrderHandlerTests
 
         var request = new CreateOrderRequest
         {
+            OrderType = OrderTypes.Pickup,
+
             Items =
             [
                 new CreateOrderItemRequest
                 {
-                    ProductCode = "burger-praiano",
+                    ProductCode =
+                        "burger-praiano",
+
                     Quantity = 0
                 }
             ]
@@ -137,7 +267,9 @@ public class CreateOrderHandlerTests
             () => handler.HandleAsync(request)
         );
 
-        Assert.Null(orderRepository.AddedOrder);
+        Assert.Null(
+            orderRepository.AddedOrder
+        );
     }
 
     private static Product CreateProduct(
@@ -146,9 +278,18 @@ public class CreateOrderHandlerTests
         string name,
         decimal price)
     {
-        var product = new Product(code, name, price);
+        var product =
+            new Product(
+                code,
+                name,
+                price
+            );
 
-        SetPrivateProperty(product, nameof(Product.Id), id);
+        SetPrivateProperty(
+            product,
+            nameof(Product.Id),
+            id
+        );
 
         return product;
     }
@@ -158,19 +299,26 @@ public class CreateOrderHandlerTests
         string propertyName,
         object value)
     {
-        var property = typeof(T).GetProperty(
-            propertyName,
-            BindingFlags.Instance | BindingFlags.Public
-        );
+        var property =
+            typeof(T).GetProperty(
+                propertyName,
+                BindingFlags.Instance |
+                BindingFlags.Public
+            );
 
-        property?.SetValue(instance, value);
+        property?.SetValue(
+            instance,
+            value
+        );
     }
 
-    private sealed class FakeProductRepository : IProductRepository
+    private sealed class FakeProductRepository
+        : IProductRepository
     {
         private readonly Product? _product;
 
-        public FakeProductRepository(Product? product = null)
+        public FakeProductRepository(
+            Product? product = null)
         {
             _product = product;
         }
@@ -180,13 +328,20 @@ public class CreateOrderHandlerTests
             CancellationToken cancellationToken = default)
         {
             if (_product?.Code == code)
-                return Task.FromResult<Product?>(_product);
+            {
+                return Task.FromResult<Product?>(
+                    _product
+                );
+            }
 
-            return Task.FromResult<Product?>(null);
+            return Task.FromResult<Product?>(
+                null
+            );
         }
     }
 
-    private sealed class FakeOrderRepository : IOrderRepository
+    private sealed class FakeOrderRepository
+        : IOrderRepository
     {
         public Order? AddedOrder { get; private set; }
 
@@ -204,7 +359,9 @@ public class CreateOrderHandlerTests
             CancellationToken cancellationToken = default)
         {
             return Task.FromResult(
-                AddedOrder?.Id == id ? AddedOrder : null
+                AddedOrder?.Id == id
+                    ? AddedOrder
+                    : null
             );
         }
 

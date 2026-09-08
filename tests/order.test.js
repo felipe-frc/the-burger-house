@@ -2,6 +2,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { createOrderMock } = vi.hoisted(() => ({
+  createOrderMock: vi.fn(),
+}));
+
+vi.mock("../scripts/api.js", () => ({
+  createOrder: createOrderMock,
+}));
+
 const localStorageMock = (() => {
   let store = {};
 
@@ -9,12 +17,15 @@ const localStorageMock = (() => {
     getItem(key) {
       return store[key] || null;
     },
+
     setItem(key, value) {
       store[key] = String(value);
     },
+
     removeItem(key) {
       delete store[key];
     },
+
     clear() {
       store = {};
     },
@@ -39,7 +50,9 @@ function setupOrderDom() {
     <button id="back-to-cart-btn"></button>
     <button id="go-to-review-btn"></button>
     <button id="back-to-address-btn"></button>
-    <button id="finish-order-btn"><span>Finalizar</span></button>
+    <button id="finish-order-btn">
+      <span>Finalizar</span>
+    </button>
 
     <div id="cart-items"></div>
     <div id="cart-total"></div>
@@ -61,32 +74,59 @@ function setupOrderDom() {
     <input id="city" />
     <input id="house-number" />
     <input id="complement" />
+
     <textarea id="order-notes"></textarea>
 
-    <input type="radio" id="order-type-delivery" name="order-type" value="delivery" checked />
-    <input type="radio" id="order-type-pickup" name="order-type" value="pickup" />
+    <input
+      type="radio"
+      id="order-type-delivery"
+      name="order-type"
+      value="delivery"
+      checked
+    />
+
+    <input
+      type="radio"
+      id="order-type-pickup"
+      name="order-type"
+      value="pickup"
+    />
   `;
 }
 
 async function loadOrderModules() {
   vi.resetModules();
+
   const order = await import("../scripts/order.js");
+
   const state = await import("../scripts/state.js");
-  return { order, state };
+
+  return {
+    order,
+    state,
+  };
 }
 
 beforeEach(() => {
   vi.useFakeTimers();
+
   vi.setSystemTime(new Date("2026-01-01T20:00:00"));
+
   vi.restoreAllMocks();
+
+  createOrderMock.mockReset();
+
   localStorage.clear();
+
   setupOrderDom();
+
   vi.stubGlobal(
     "Toastify",
     vi.fn(() => ({
       showToast: vi.fn(),
     })),
   );
+
   window.open = vi.fn();
 });
 
@@ -95,7 +135,14 @@ afterEach(() => {
 });
 
 describe("order", () => {
-  it("builds the WhatsApp message with delivery total and notes", async () => {
+  it("creates a delivery order in the API before opening WhatsApp", async () => {
+    createOrderMock.mockResolvedValue({
+      orderId: 100,
+      subtotal: 43.9,
+      deliveryFee: 5,
+      total: 48.9,
+    });
+
     const { order, state } = await loadOrderModules();
 
     state.setCart([
@@ -106,41 +153,79 @@ describe("order", () => {
         quantity: 1,
       },
     ]);
+
     state.setOrderType(state.ORDER_TYPES.DELIVERY);
 
     document.getElementById("cep").value = "38400-000";
+
     document.getElementById("street").value = "Rua dos Testes";
+
     document.getElementById("neighborhood").value = "Centro";
+
     document.getElementById("city").value = "Uberlândia";
+
     document.getElementById("house-number").value = "123";
+
     document.getElementById("complement").value = "Apto 101";
+
     document.getElementById("order-notes").value = "Sem cebola.";
 
     order.bindOrderEvents();
+
     document.getElementById("finish-order-btn").click();
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(createOrderMock).toHaveBeenCalledOnce();
+
+    expect(createOrderMock).toHaveBeenCalledWith("delivery", [
+      {
+        productCode: "burger-praiano",
+
+        quantity: 1,
+        observation: null,
+      },
+    ]);
 
     expect(window.open).toHaveBeenCalledOnce();
 
     const [url, target] = window.open.mock.calls[0];
+
     const decoded = normalizeCurrency(decodeURIComponent(url));
 
     expect(target).toBe("_blank");
+
     expect(decoded).toContain("Novo Pedido - The Burger House");
+
     expect(decoded).toContain("O Praiano");
+
     expect(decoded).toContain("Subtotal: R$ 43,90");
+
     expect(decoded).toContain("Taxa de entrega: R$ 5,00");
+
     expect(decoded).toContain("Total: R$ 48,90");
+
     expect(decoded).toContain("Rua dos Testes, 123 - Centro, Uberlândia");
+
     expect(decoded).toContain("Complemento: Apto 101");
+
     expect(decoded).toContain("Sem cebola.");
 
     await vi.advanceTimersByTimeAsync(900);
 
     expect(state.getCart()).toEqual([]);
+
     expect(document.getElementById("order-notes").value).toBe("");
   });
 
-  it("builds the WhatsApp message for pickup without delivery fee", async () => {
+  it("creates a pickup order without delivery fee", async () => {
+    createOrderMock.mockResolvedValue({
+      orderId: 101,
+      subtotal: 43.9,
+      deliveryFee: 0,
+      total: 43.9,
+    });
+
     const { order, state } = await loadOrderModules();
 
     state.setCart([
@@ -151,21 +236,73 @@ describe("order", () => {
         quantity: 1,
       },
     ]);
+
     state.setOrderType(state.ORDER_TYPES.PICKUP);
 
     order.bindOrderEvents();
+
     document.getElementById("finish-order-btn").click();
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(createOrderMock).toHaveBeenCalledWith("pickup", [
+      {
+        productCode: "burger-praiano",
+
+        quantity: 1,
+        observation: null,
+      },
+    ]);
 
     expect(window.open).toHaveBeenCalledOnce();
 
     const [url] = window.open.mock.calls[0];
+
     const decoded = normalizeCurrency(decodeURIComponent(url));
 
     expect(decoded).toContain("Tipo de pedido");
+
     expect(decoded).toContain("Retirada no local");
+
     expect(decoded).toContain("Taxa de entrega: R$ 0,00");
+
     expect(decoded).toContain("Total: R$ 43,90");
+
     expect(decoded).toContain("Rua Dev 25");
+
     expect(decoded).not.toContain("Observações do pedido");
+  });
+
+  it("does not open WhatsApp when the API cannot create the order", async () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    createOrderMock.mockRejectedValue(new Error("API unavailable"));
+
+    const { order, state } = await loadOrderModules();
+
+    state.setCart([
+      {
+        id: "burger-praiano",
+        name: "O Praiano",
+        price: 43.9,
+        quantity: 1,
+      },
+    ]);
+
+    state.setOrderType(state.ORDER_TYPES.PICKUP);
+
+    order.bindOrderEvents();
+
+    document.getElementById("finish-order-btn").click();
+
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(createOrderMock).toHaveBeenCalledOnce();
+
+    expect(window.open).not.toHaveBeenCalled();
+
+    expect(state.getCart()).toHaveLength(1);
+
+    expect(consoleErrorSpy).toHaveBeenCalled();
   });
 });

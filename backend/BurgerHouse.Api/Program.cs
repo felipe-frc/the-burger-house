@@ -15,6 +15,8 @@ using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
+const string FrontendCorsPolicy = "Frontend";
+
 var connectionString = builder.Configuration
     .GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException(
@@ -24,6 +26,23 @@ var connectionString = builder.Configuration
 builder.Services.AddDbContext<BurgerHouseDbContext>(options =>
     options.UseSqlite(connectionString)
 );
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(
+        FrontendCorsPolicy,
+        policy =>
+        {
+            policy
+                .WithOrigins(
+                    "http://localhost:5173",
+                    "http://127.0.0.1:5173"
+                )
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+    );
+});
 
 builder.Services
     .AddOptions<MercadoPagoOptions>()
@@ -114,6 +133,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors(FrontendCorsPolicy);
+
 app.MapControllers();
 
 app.MapGet("/", () => Results.Ok(new
