@@ -1,11 +1,17 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+
 using BurgerHouse.Api.Controllers;
 using BurgerHouse.Api.Webhooks.MercadoPago;
 using BurgerHouse.Infrastructure.Payments.MercadoPago;
+
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace BurgerHouse.Api.Tests;
@@ -15,8 +21,11 @@ public class MercadoPagoWebhooksControllerTests
     private const string Secret =
         "local-controller-test-secret";
 
+    private const string AccessToken =
+        "local-controller-test-access-token";
+
     [Fact]
-    public void Receive_ShouldReturnUnauthorized_WhenSignatureIsInvalid()
+    public async Task Receive_ShouldReturnUnauthorized_WhenSignatureIsInvalid()
     {
         var controller = CreateController(
             dataId: "order-456",
@@ -34,7 +43,10 @@ public class MercadoPagoWebhooksControllerTests
             dataId: "order-456"
         );
 
-        var result = controller.Receive(request);
+        var result = await controller.Receive(
+            request,
+            CancellationToken.None
+        );
 
         Assert.IsType<UnauthorizedObjectResult>(
             result
@@ -42,7 +54,7 @@ public class MercadoPagoWebhooksControllerTests
     }
 
     [Fact]
-    public void Receive_ShouldReturnOk_WhenOrderSignatureIsValid()
+    public async Task Receive_ShouldReturnOk_WhenOrderSignatureIsValid()
     {
         const string requestId =
             "request-123";
@@ -69,7 +81,10 @@ public class MercadoPagoWebhooksControllerTests
             dataId: dataId
         );
 
-        var result = controller.Receive(request);
+        var result = await controller.Receive(
+            request,
+            CancellationToken.None
+        );
 
         var okResult =
             Assert.IsType<OkObjectResult>(
@@ -91,7 +106,7 @@ public class MercadoPagoWebhooksControllerTests
     }
 
     [Fact]
-    public void Receive_ShouldIgnoreValidWebhook_WhenTypeIsNotOrder()
+    public async Task Receive_ShouldIgnoreValidWebhook_WhenTypeIsNotOrder()
     {
         const string requestId =
             "request-123";
@@ -118,7 +133,10 @@ public class MercadoPagoWebhooksControllerTests
             dataId: dataId
         );
 
-        var result = controller.Receive(request);
+        var result = await controller.Receive(
+            request,
+            CancellationToken.None
+        );
 
         var okResult =
             Assert.IsType<OkObjectResult>(
@@ -140,7 +158,7 @@ public class MercadoPagoWebhooksControllerTests
     }
 
     [Fact]
-    public void Receive_ShouldReturnBadRequest_WhenQueryAndBodyDataIdsDiffer()
+    public async Task Receive_ShouldReturnBadRequest_WhenQueryAndBodyDataIdsDiffer()
     {
         const string requestId =
             "request-123";
@@ -167,22 +185,25 @@ public class MercadoPagoWebhooksControllerTests
             dataId: "different-order-999"
         );
 
-        var result = controller.Receive(request);
+        var result = await controller.Receive(
+            request,
+            CancellationToken.None
+        );
 
         Assert.IsType<BadRequestObjectResult>(
             result
         );
     }
 
-    private static MercadoPagoWebhooksController
-        CreateController(
-            string dataId,
-            string type)
+    private static MercadoPagoWebhooksController CreateController(
+        string dataId,
+        string type)
     {
         var options = Options.Create(
             new MercadoPagoOptions
             {
-                WebhookSecret = Secret
+                WebhookSecret = Secret,
+                AccessToken = AccessToken
             }
         );
 
@@ -191,9 +212,28 @@ public class MercadoPagoWebhooksControllerTests
                 options
             );
 
+        var orderLookup =
+            new MercadoPagoOrderLookup(
+                new HttpClient(),
+                options
+            );
+
+        var environment =
+            new TestWebHostEnvironment
+            {
+                EnvironmentName =
+                    Environments.Production
+            };
+
+        var logger =
+            NullLogger<MercadoPagoWebhooksController>.Instance;
+
         var controller =
             new MercadoPagoWebhooksController(
-                validator
+                validator,
+                orderLookup,
+                environment,
+                logger
             );
 
         var httpContext =
@@ -214,10 +254,9 @@ public class MercadoPagoWebhooksControllerTests
         return controller;
     }
 
-    private static MercadoPagoWebhookRequest
-        CreateWebhookRequest(
-            string type,
-            string dataId)
+    private static MercadoPagoWebhookRequest CreateWebhookRequest(
+        string type,
+        string dataId)
     {
         return new MercadoPagoWebhookRequest
         {
@@ -254,5 +293,27 @@ public class MercadoPagoWebhooksControllerTests
                 .ToLowerInvariant();
 
         return $"ts={timestamp},v1={signature}";
+    }
+
+    private sealed class TestWebHostEnvironment
+        : IWebHostEnvironment
+    {
+        public string ApplicationName { get; set; } =
+            "BurgerHouse.Api.Tests";
+
+        public IFileProvider WebRootFileProvider { get; set; } =
+            new NullFileProvider();
+
+        public string WebRootPath { get; set; } =
+            string.Empty;
+
+        public string EnvironmentName { get; set; } =
+            Environments.Production;
+
+        public string ContentRootPath { get; set; } =
+            string.Empty;
+
+        public IFileProvider ContentRootFileProvider { get; set; } =
+            new NullFileProvider();
     }
 }

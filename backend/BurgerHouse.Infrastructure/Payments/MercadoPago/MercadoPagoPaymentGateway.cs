@@ -1,15 +1,21 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using BurgerHouse.Application.Abstractions.Payments;
+using Microsoft.Extensions.Logging;
 
 namespace BurgerHouse.Infrastructure.Payments.MercadoPago;
 
 public sealed class MercadoPagoPaymentGateway : IPaymentGateway
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<MercadoPagoPaymentGateway>? _logger;
 
-    public MercadoPagoPaymentGateway(HttpClient httpClient)
+    public MercadoPagoPaymentGateway(
+        HttpClient httpClient,
+        ILogger<MercadoPagoPaymentGateway>? logger = null)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public async Task<PaymentGatewayResult> ProcessAsync(
@@ -19,9 +25,11 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
         ArgumentNullException.ThrowIfNull(request);
 
         if (string.IsNullOrWhiteSpace(request.IdempotencyKey))
+        {
             throw new ArgumentException(
                 "Idempotency key cannot be empty."
             );
+        }
 
         var normalizedIdempotencyKey =
             request.IdempotencyKey.Trim();
@@ -49,18 +57,34 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
             parsedIdempotencyKey.ToString("D")
         );
 
-        httpRequest.Content = JsonContent.Create(
-            mercadoPagoRequest
-        );
+        httpRequest.Content =
+            JsonContent.Create(mercadoPagoRequest);
 
-        using var httpResponse = await _httpClient.SendAsync(
-            httpRequest,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken
-        );
+        using var httpResponse =
+            await _httpClient.SendAsync(
+                httpRequest,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken
+            );
 
         if (!httpResponse.IsSuccessStatusCode)
         {
+            var errorBody =
+                await httpResponse.Content.ReadAsStringAsync(
+                    cancellationToken
+                );
+
+            var safeProviderError =
+                ExtractSafeProviderError(errorBody);
+
+            _logger?.LogWarning(
+                "Mercado Pago rejected payment request. " +
+                "StatusCode: {StatusCode}. " +
+                "ProviderError: {ProviderError}.",
+                (int)httpResponse.StatusCode,
+                safeProviderError
+            );
+
             throw new HttpRequestException(
                 "Mercado Pago rejected the payment request.",
                 inner: null,
@@ -104,10 +128,11 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
                 ? payment.StatusDetail
                 : mercadoPagoResponse.StatusDetail;
 
-        var status = MercadoPagoStatusMapper.Map(
-            paymentStatus,
-            paymentStatusDetail
-        );
+        var status =
+            MercadoPagoStatusMapper.Map(
+                paymentStatus,
+                paymentStatusDetail
+            );
 
         return new PaymentGatewayResult
         {
@@ -122,5 +147,160 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
             StatusDetail =
                 paymentStatusDetail?.Trim()
         };
+    }
+
+    private static string ExtractSafeProviderError(
+        string? errorBody)
+    {
+        if (string.IsNullOrWhiteSpace(errorBody))
+        {
+            return "Empty response body";
+        }
+
+        try
+        {
+            using var document =
+                JsonDocument.Parse(errorBody);
+
+            var root = document.RootElement;
+            var details = new List<string>();
+
+            AddPropertyIfSafe(
+                root,
+                "message",
+                details
+            );
+
+            AddPropertyIfSafe(
+                root,
+                "error",
+                details
+            );
+
+            AddPropertyIfSafe(
+                root,
+                "status",
+                details
+            );
+
+            if (root.TryGetProperty(
+                    "errors",
+                    out var errorsElement) &&
+                errorsElement.ValueKind ==
+                JsonValueKind.Array)
+            {
+                foreach (var error in
+                         errorsElement.EnumerateArray())
+                {
+                    AddPropertyIfSafe(
+                        error,
+                        "code",
+                        details
+                    );
+
+                    AddPropertyIfSafe(
+                        error,
+                        "message",
+                        details
+                    );
+
+                    if (error.TryGetProperty(
+                            "details",
+                            out var errorDetails) &&
+                        errorDetails.ValueKind ==
+                        JsonValueKind.Array)
+                    {
+                        foreach (var detail in
+                                 errorDetails.EnumerateArray())
+                        {
+                            if (detail.ValueKind ==
+                                JsonValueKind.String)
+                            {
+                                var value =
+                                    detail.GetString();
+
+                                if (!string.IsNullOrWhiteSpace(
+                                        value))
+                                {
+                                    details.Add(
+                                        $"detail: {value}"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (root.TryGetProperty(
+                    "cause",
+                    out var causeElement) &&
+                causeElement.ValueKind ==
+                JsonValueKind.Array)
+            {
+                foreach (var cause in
+                         causeElement.EnumerateArray())
+                {
+                    AddPropertyIfSafe(
+                        cause,
+                        "code",
+                        details
+                    );
+
+                    AddPropertyIfSafe(
+                        cause,
+                        "description",
+                        details
+                    );
+                }
+            }
+
+            if (details.Count == 0)
+            {
+                return "Unrecognized provider error payload";
+            }
+
+            var result =
+                string.Join(" | ", details);
+
+            return result.Length <= 1000
+                ? result
+                : result[..1000];
+        }
+        catch (JsonException)
+        {
+            return "Non-JSON provider error payload";
+        }
+    }
+
+    private static void AddPropertyIfSafe(
+        JsonElement element,
+        string propertyName,
+        ICollection<string> details)
+    {
+        if (!element.TryGetProperty(
+                propertyName,
+                out var property))
+        {
+            return;
+        }
+
+        if (property.ValueKind is not (
+            JsonValueKind.String or
+            JsonValueKind.Number))
+        {
+            return;
+        }
+
+        var value = property.ToString();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        details.Add(
+            $"{propertyName}: {value}"
+        );
     }
 }

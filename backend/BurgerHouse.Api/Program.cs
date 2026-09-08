@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+
 using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Orders.CreateOrder;
@@ -7,6 +8,7 @@ using BurgerHouse.Application.Payments.ProcessCardPayment;
 using BurgerHouse.Infrastructure.Payments.MercadoPago;
 using BurgerHouse.Infrastructure.Persistence;
 using BurgerHouse.Infrastructure.Repositories;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -54,6 +56,23 @@ builder.Services.AddScoped<CreatePaymentHandler>();
 builder.Services.AddScoped<ProcessCardPaymentHandler>();
 
 builder.Services.AddScoped<MercadoPagoWebhookSignatureValidator>();
+
+builder.Services.AddHttpClient<MercadoPagoOrderLookup>(
+    httpClient =>
+    {
+        httpClient.BaseAddress = new Uri(
+            "https://api.mercadopago.com/"
+        );
+
+        httpClient.Timeout = TimeSpan.FromSeconds(15);
+
+        httpClient.DefaultRequestHeaders.Accept.Add(
+            new MediaTypeWithQualityHeaderValue(
+                "application/json"
+            )
+        );
+    }
+);
 
 builder.Services.AddHttpClient<IPaymentGateway, MercadoPagoPaymentGateway>(
     (serviceProvider, httpClient) =>
