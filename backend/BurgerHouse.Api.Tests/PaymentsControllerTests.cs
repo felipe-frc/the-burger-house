@@ -151,6 +151,62 @@ public class PaymentsControllerTests
         Assert.Equal(0, gateway.CallCount);
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.Conflict)]
+    public async Task ProcessCardAsync_ShouldReturnUnprocessableEntity_WhenProviderRejectsRequest(
+        HttpStatusCode statusCode)
+    {
+        var payment = CreatePayment();
+
+        var repository =
+            new FakePaymentRepository(payment);
+
+        var gateway = new FakePaymentGateway(
+            new HttpRequestException(
+                "Provider rejected the request.",
+                inner: null,
+                statusCode: statusCode
+            )
+        );
+
+        var controller = CreateController(
+            repository,
+            gateway
+        );
+
+        var result = await controller.ProcessCardAsync(
+            paymentId: 10,
+            request: CreateValidRequest(),
+            cancellationToken: CancellationToken.None
+        );
+
+        var objectResult =
+            Assert.IsType<UnprocessableEntityObjectResult>(
+                result.Result
+            );
+
+        Assert.Equal(
+            422,
+            objectResult.StatusCode
+        );
+
+        Assert.Equal(
+            "payment_provider_rejected",
+            GetResponseCode(objectResult.Value)
+        );
+
+        Assert.Equal(
+            PaymentStatus.Rejected,
+            payment.Status
+        );
+
+        Assert.Equal(
+            1,
+            gateway.CallCount
+        );
+    }
+
     [Fact]
     public async Task ProcessCardAsync_ShouldReturnBadGateway_WhenProviderFails()
     {
@@ -187,6 +243,40 @@ public class PaymentsControllerTests
             502,
             objectResult.StatusCode
         );
+
+        Assert.Equal(
+            "payment_provider_unavailable",
+            GetResponseCode(objectResult.Value)
+        );
+
+        Assert.Equal(
+            PaymentStatus.Pending,
+            payment.Status
+        );
+
+        Assert.Equal(
+            1,
+            gateway.CallCount
+        );
+    }
+
+    private static string? GetResponseCode(
+        object? response)
+    {
+        if (response is null)
+        {
+            return null;
+        }
+
+        var property = response
+            .GetType()
+            .GetProperty(
+                "code",
+                BindingFlags.Instance |
+                BindingFlags.Public
+            );
+
+        return property?.GetValue(response)?.ToString();
     }
 
     private static PaymentsController CreateController(
@@ -292,7 +382,9 @@ public class PaymentsControllerTests
             ReceivedRequest = request;
 
             if (_exception is not null)
+            {
                 throw _exception;
+            }
 
             return Task.FromResult(
                 _result!

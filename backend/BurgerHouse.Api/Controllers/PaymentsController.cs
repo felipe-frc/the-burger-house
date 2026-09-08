@@ -98,6 +98,17 @@ public class PaymentsController : ControllerBase
                 error = exception.Message
             });
         }
+        catch (HttpRequestException exception)
+            when (IsDefinitiveProviderRejection(exception))
+        {
+            return UnprocessableEntity(new
+            {
+                error =
+                    "The payment provider rejected the request.",
+                code =
+                    "payment_provider_rejected"
+            });
+        }
         catch (HttpRequestException)
         {
             return StatusCode(
@@ -105,7 +116,9 @@ public class PaymentsController : ControllerBase
                 new
                 {
                     error =
-                        "The payment provider could not process the request."
+                        "The payment provider could not process the request.",
+                    code =
+                        "payment_provider_unavailable"
                 }
             );
         }
@@ -116,5 +129,20 @@ public class PaymentsController : ControllerBase
                 error = exception.Message
             });
         }
+    }
+
+    private static bool IsDefinitiveProviderRejection(
+        HttpRequestException exception)
+    {
+        if (exception.StatusCode is null)
+        {
+            return false;
+        }
+
+        var statusCode =
+            (int)exception.StatusCode.Value;
+
+        return statusCode >= 400 &&
+               statusCode < 500;
     }
 }

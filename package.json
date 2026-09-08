@@ -29,6 +29,7 @@
     "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.57.0",
+    "@types/mercadopago-sdk-js": "^2.0.17",
     "@vitest/coverage-v8": "^4.1.6",
     "concurrently": "^9.2.1",
     "eslint": "^10.10.0",
@@ -39,5 +40,8 @@
     "typescript": "^7.0.2",
     "vite": "^7.2.4",
     "vitest": "^4.1.6"
+  },
+  "dependencies": {
+    "@mercadopago/sdk-js": "^0.0.3"
   }
 }

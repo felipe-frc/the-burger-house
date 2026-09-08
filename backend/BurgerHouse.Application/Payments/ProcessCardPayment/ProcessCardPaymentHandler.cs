@@ -77,11 +77,29 @@ public sealed class ProcessCardPaymentHandler
             PayerEmail = request.PayerEmail.Trim()
         };
 
-        var gatewayResult =
-            await _paymentGateway.ProcessAsync(
-                gatewayRequest,
-                cancellationToken
-            );
+        PaymentGatewayResult gatewayResult;
+
+        try
+        {
+            gatewayResult =
+                await _paymentGateway.ProcessAsync(
+                    gatewayRequest,
+                    cancellationToken
+                );
+        }
+        catch (HttpRequestException exception)
+        {
+            if (IsDefinitiveProviderRejection(exception))
+            {
+                payment.Reject();
+
+                await _paymentRepository.SaveChangesAsync(
+                    cancellationToken
+                );
+            }
+
+            throw;
+        }
 
         if (string.IsNullOrWhiteSpace(
                 gatewayResult.ExternalOrderId))
@@ -148,5 +166,19 @@ public sealed class ProcessCardPaymentHandler
             ExternalOrderId = payment.ExternalOrderId,
             ExternalPaymentId = payment.ExternalPaymentId
         };
+    }
+
+    private static bool IsDefinitiveProviderRejection(
+        HttpRequestException exception)
+    {
+        if (exception.StatusCode is null)
+        {
+            return false;
+        }
+
+        var statusCode = (int)exception.StatusCode.Value;
+
+        return statusCode >= 400 &&
+               statusCode < 500;
     }
 }

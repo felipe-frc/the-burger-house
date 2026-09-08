@@ -620,9 +620,240 @@
               <i class="fa fa-arrow-left" aria-hidden="true"></i>
               <span data-i18n="cart.back">Voltar</span>
             </button>
-            <button type="button" id="finish-order-btn" class="cart-btn-primary cart-btn-success">
-              <i class="fab fa-whatsapp" aria-hidden="true"></i>
-              <span data-i18n="review.finish">Finalizar</span>
+            <button type="button" id="go-to-payment-btn" class="cart-btn-primary">
+              <i class="fa fa-credit-card" aria-hidden="true"></i>
+              <span>Ir para pagamento</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal-overlay bg-black/60 w-full h-full fixed top-0 left-0 z-[102] flex items-center justify-center hidden"
+      id="payment-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="payment-modal-title"
+    >
+      <div class="cart-modal-content cart-modal-content-lg relative">
+        <div class="cart-modal-header">
+          <div class="cart-modal-header-left">
+            <div class="cart-modal-icon-wrap">
+              <i class="fa fa-credit-card" aria-hidden="true"></i>
+            </div>
+
+            <div>
+              <h2 id="payment-modal-title" class="cart-modal-title">Pagamento</h2>
+              <p class="cart-modal-subtitle">Preencha os dados do cartão para concluir o pedido</p>
+            </div>
+          </div>
+
+          <button type="button" class="close-modal-x cart-modal-close" aria-label="Fechar">
+            <i class="fa fa-times" aria-hidden="true"></i>
+          </button>
+        </div>
+
+        <div class="cart-modal-items overflow-y-auto flex-grow">
+          <div class="space-y-5">
+            <div
+              class="flex items-center justify-between gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4"
+            >
+              <div>
+                <p class="text-sm font-semibold text-zinc-600">Total do pedido</p>
+                <p class="mt-1 text-xs text-zinc-500">O valor final é calculado pelo backend.</p>
+              </div>
+
+              <span id="payment-total" class="text-2xl font-black text-amber-600">R$ 0,00</span>
+            </div>
+
+            <div
+              class="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"
+            >
+              <i class="fa fa-lock mt-0.5 text-emerald-600" aria-hidden="true"></i>
+
+              <div>
+                <p class="font-bold">Pagamento seguro</p>
+                <p class="mt-1 text-xs leading-relaxed text-emerald-800">
+                  Os dados sensíveis do cartão serão processados diretamente pelo Mercado Pago e
+                  transformados em um token seguro antes de serem enviados para nossa API.
+                </p>
+              </div>
+            </div>
+
+            <form id="form-checkout" class="space-y-4" novalidate>
+              <div>
+                <label
+                  for="form-checkout__cardNumber"
+                  class="mb-1 block text-sm font-bold text-zinc-700"
+                >
+                  Número do cartão*
+                </label>
+
+                <div
+                  id="form-checkout__cardNumber"
+                  class="min-h-[44px] w-full rounded-lg border-2 border-zinc-200 bg-white px-3 py-2 transition-colors focus-within:border-amber-600"
+                ></div>
+              </div>
+
+              <div>
+                <label
+                  for="form-checkout__cardholderName"
+                  class="mb-1 block text-sm font-bold text-zinc-700"
+                >
+                  Nome do titular*
+                </label>
+
+                <input
+                  type="text"
+                  id="form-checkout__cardholderName"
+                  autocomplete="cc-name"
+                  maxlength="100"
+                  placeholder="Nome como aparece no cartão"
+                  class="w-full rounded-lg border-2 border-zinc-200 bg-white p-3 outline-none transition-colors focus:border-amber-600"
+                />
+              </div>
+
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label
+                    for="form-checkout__expirationDate"
+                    class="mb-1 block text-sm font-bold text-zinc-700"
+                  >
+                    Validade*
+                  </label>
+
+                  <div
+                    id="form-checkout__expirationDate"
+                    class="min-h-[44px] w-full rounded-lg border-2 border-zinc-200 bg-white px-3 py-2 transition-colors focus-within:border-amber-600"
+                  ></div>
+                </div>
+
+                <div>
+                  <label
+                    for="form-checkout__securityCode"
+                    class="mb-1 block text-sm font-bold text-zinc-700"
+                  >
+                    Código de segurança*
+                  </label>
+
+                  <div
+                    id="form-checkout__securityCode"
+                    class="min-h-[44px] w-full rounded-lg border-2 border-zinc-200 bg-white px-3 py-2 transition-colors focus-within:border-amber-600"
+                  ></div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label
+                    for="form-checkout__identificationType"
+                    class="mb-1 block text-sm font-bold text-zinc-700"
+                  >
+                    Tipo de documento*
+                  </label>
+
+                  <select
+                    id="form-checkout__identificationType"
+                    class="w-full rounded-lg border-2 border-zinc-200 bg-white p-3 outline-none transition-colors focus:border-amber-600"
+                  >
+                    <option value="">Carregando...</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    for="form-checkout__identificationNumber"
+                    class="mb-1 block text-sm font-bold text-zinc-700"
+                  >
+                    Número do documento*
+                  </label>
+
+                  <input
+                    type="text"
+                    id="form-checkout__identificationNumber"
+                    inputmode="numeric"
+                    autocomplete="off"
+                    placeholder="Somente números"
+                    class="w-full rounded-lg border-2 border-zinc-200 bg-white p-3 outline-none transition-colors focus:border-amber-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  for="form-checkout__cardholderEmail"
+                  class="mb-1 block text-sm font-bold text-zinc-700"
+                >
+                  E-mail do pagador*
+                </label>
+
+                <input
+                  type="email"
+                  id="form-checkout__cardholderEmail"
+                  autocomplete="email"
+                  placeholder="email@exemplo.com"
+                  class="w-full rounded-lg border-2 border-zinc-200 bg-white p-3 outline-none transition-colors focus:border-amber-600"
+                />
+              </div>
+
+              <div>
+                <label
+                  for="form-checkout__installments"
+                  class="mb-1 block text-sm font-bold text-zinc-700"
+                >
+                  Parcelas*
+                </label>
+
+                <select
+                  id="form-checkout__installments"
+                  class="w-full rounded-lg border-2 border-zinc-200 bg-white p-3 outline-none transition-colors focus:border-amber-600"
+                >
+                  <option value="">Informe o cartão primeiro</option>
+                </select>
+              </div>
+
+              <select
+                id="form-checkout__issuer"
+                class="hidden"
+                aria-hidden="true"
+                tabindex="-1"
+              ></select>
+
+              <p
+                id="payment-error"
+                class="hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700"
+                role="alert"
+                aria-live="assertive"
+              ></p>
+
+              <progress
+                id="payment-progress"
+                class="hidden h-1 w-full overflow-hidden rounded-full"
+                value="0"
+                max="100"
+              >
+                Processando pagamento...
+              </progress>
+            </form>
+          </div>
+        </div>
+
+        <div class="cart-modal-footer">
+          <div class="cart-modal-actions">
+            <button type="button" id="back-to-review-btn" class="cart-btn-secondary">
+              <i class="fa fa-arrow-left" aria-hidden="true"></i>
+              <span>Voltar</span>
+            </button>
+
+            <button
+              type="submit"
+              id="form-checkout__submit"
+              form="form-checkout"
+              class="cart-btn-primary"
+            >
+              <i class="fa fa-lock" aria-hidden="true"></i>
+              <span>Pagar agora</span>
             </button>
           </div>
         </div>

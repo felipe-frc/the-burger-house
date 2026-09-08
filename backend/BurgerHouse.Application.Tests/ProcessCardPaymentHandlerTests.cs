@@ -1,9 +1,10 @@
+using System.Net;
+using System.Reflection;
 using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Payments.ProcessCardPayment;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
-using System.Reflection;
 
 namespace BurgerHouse.Application.Tests;
 
@@ -186,6 +187,95 @@ public class ProcessCardPaymentHandlerTests
         Assert.Equal(1, repository.SaveChangesCount);
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.BadRequest)]
+    [InlineData(HttpStatusCode.Conflict)]
+    public async Task HandleAsync_ShouldRejectPayment_WhenProviderReturnsDefinitive4xx(
+        HttpStatusCode statusCode)
+    {
+        var payment = CreatePayment();
+
+        var repository =
+            new FakePaymentRepository(payment);
+
+        var gateway = new FakePaymentGateway(
+            new HttpRequestException(
+                "Provider rejected the request.",
+                inner: null,
+                statusCode: statusCode
+            )
+        );
+
+        var handler = new ProcessCardPaymentHandler(
+            repository,
+            gateway
+        );
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => handler.HandleAsync(
+                CreateValidRequest()
+            )
+        );
+
+        Assert.Equal(
+            PaymentStatus.Rejected,
+            payment.Status
+        );
+
+        Assert.Equal(
+            1,
+            repository.SaveChangesCount
+        );
+
+        Assert.Equal(
+            1,
+            gateway.CallCount
+        );
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldKeepPaymentPending_WhenProviderFailureIsAmbiguous()
+    {
+        var payment = CreatePayment();
+
+        var repository =
+            new FakePaymentRepository(payment);
+
+        var gateway = new FakePaymentGateway(
+            new HttpRequestException(
+                "Provider unavailable.",
+                inner: null,
+                statusCode: HttpStatusCode.BadGateway
+            )
+        );
+
+        var handler = new ProcessCardPaymentHandler(
+            repository,
+            gateway
+        );
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => handler.HandleAsync(
+                CreateValidRequest()
+            )
+        );
+
+        Assert.Equal(
+            PaymentStatus.Pending,
+            payment.Status
+        );
+
+        Assert.Equal(
+            0,
+            repository.SaveChangesCount
+        );
+
+        Assert.Equal(
+            1,
+            gateway.CallCount
+        );
+    }
+
     [Fact]
     public async Task HandleAsync_ShouldThrow_WhenPaymentDoesNotExist()
     {
@@ -358,7 +448,8 @@ public class ProcessCardPaymentHandlerTests
 
     private sealed class FakePaymentGateway : IPaymentGateway
     {
-        private readonly PaymentGatewayResult _result;
+        private readonly PaymentGatewayResult? _result;
+        private readonly HttpRequestException? _exception;
 
         public int CallCount { get; private set; }
 
@@ -374,6 +465,12 @@ public class ProcessCardPaymentHandlerTests
             _result = result;
         }
 
+        public FakePaymentGateway(
+            HttpRequestException exception)
+        {
+            _exception = exception;
+        }
+
         public Task<PaymentGatewayResult> ProcessAsync(
             PaymentGatewayRequest request,
             CancellationToken cancellationToken = default)
@@ -381,7 +478,17 @@ public class ProcessCardPaymentHandlerTests
             CallCount++;
             ReceivedRequest = request;
 
-            return Task.FromResult(_result);
+            if (_exception is not null)
+            {
+                throw _exception;
+            }
+
+            return Task.FromResult(
+                _result ??
+                throw new InvalidOperationException(
+                    "Fake gateway result was not configured."
+                )
+            );
         }
     }
 

@@ -8,8 +8,9 @@
     "checkJs": true,
     "noEmit": true,
     "strict": false,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["vite/client", "mercadopago-sdk-js"]
   },
-  "include": ["scripts/**/*.js"],
+  "include": ["scripts/**/*.js", "vite-env.d.ts"],
   "exclude": ["node_modules", "dist", "coverage", "tests"]
 }

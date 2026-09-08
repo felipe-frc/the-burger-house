@@ -1,4 +1,4 @@
-import { createOrder } from "./api.js";
+import { createOrder, createPayment, processCardPayment } from "./api.js";
 import { WHATSAPP_PHONE_NUMBER } from "./config.js";
 import { getCartSubtotal, getCartTotalWithDelivery, getDeliveryFee, updateCart } from "./cart.js";
 import {
@@ -12,24 +12,47 @@ import { getLocalizedEntity, translate } from "./i18n.js";
 import { MENU_PRODUCT_BY_ID } from "./data.js";
 import { clearCart, getCart, getOrderType, ORDER_TYPES, resetOrderType } from "./state.js";
 import { escapeHTML, formatPrice, isStoreOpenNow } from "./utils.js";
+import { initializePaymentForm, unmountPaymentForm } from "./payment.js";
 import {
   closeAllModals,
   elements,
+  hidePaymentError,
   openModal,
-  setFinishButtonLoading,
+  setPaymentProcessing,
+  setPaymentTotal,
   showAddressWarning,
   showClosedStoreMessage,
+  showPaymentError,
   showToast,
 } from "./ui.js";
 
+/**
+ * @typedef {{
+ *   fingerprint: string,
+ *   orderId: number,
+ *   subtotal: number,
+ *   deliveryFee: number,
+ *   total: number,
+ *   paymentId: number | null,
+ *   idempotencyKey: string | null
+ * }} CheckoutSession
+ */
+
+/** @type {CheckoutSession | null} */
+let checkoutSession = null;
+
 function getOrderNotes() {
-  if (!elements.orderNotesInput) return "";
+  if (!elements.orderNotesInput) {
+    return "";
+  }
 
   return elements.orderNotesInput.value.trim();
 }
 
 function clearOrderNotes() {
-  if (!elements.orderNotesInput) return;
+  if (!elements.orderNotesInput) {
+    return;
+  }
 
   elements.orderNotesInput.value = "";
 }
@@ -55,6 +78,127 @@ function getOrderTypeLabel() {
     : translate("orderType.delivery");
 }
 
+function mapCartToApiItems(cart) {
+  return cart.map((item) => ({
+    productCode: item.id,
+    quantity: item.quantity,
+    observation: null,
+  }));
+}
+
+function getCheckoutFingerprint(cart) {
+  return JSON.stringify({
+    orderType: getOrderType(),
+    items: mapCartToApiItems(cart),
+  });
+}
+
+function createIdempotencyKey() {
+  if (!globalThis.crypto || typeof globalThis.crypto.randomUUID !== "function") {
+    throw new Error("O navegador não oferece suporte à geração segura de UUID.");
+  }
+
+  return globalThis.crypto.randomUUID();
+}
+
+function isApprovedStatus(status) {
+  return status === 2 || String(status).toLowerCase() === "approved";
+}
+
+function isRejectedStatus(status) {
+  return status === 3 || String(status).toLowerCase() === "rejected";
+}
+
+function isCancelledStatus(status) {
+  return status === 4 || String(status).toLowerCase() === "cancelled";
+}
+
+function isPendingStatus(status) {
+  return status === 1 || String(status).toLowerCase() === "pending";
+}
+
+/**
+ * @param {unknown} error
+ * @returns {number | null}
+ */
+function getApiErrorStatus(error) {
+  if (typeof error !== "object" || error === null || !("status" in error)) {
+    return null;
+  }
+
+  const status = Number(error.status);
+
+  return Number.isInteger(status) ? status : null;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {string}
+ */
+function getApiErrorCode(error) {
+  if (typeof error !== "object" || error === null || !("data" in error)) {
+    return "";
+  }
+
+  const data = error.data;
+
+  if (typeof data !== "object" || data === null || !("code" in data)) {
+    return "";
+  }
+
+  return String(data.code ?? "");
+}
+
+function resetCheckoutSession() {
+  checkoutSession = null;
+
+  unmountPaymentForm();
+}
+
+function resetPaymentAttempt() {
+  if (!checkoutSession) {
+    return;
+  }
+
+  checkoutSession.paymentId = null;
+  checkoutSession.idempotencyKey = null;
+}
+
+function setGoToPaymentLoading(isLoading) {
+  const button = elements.goToPaymentBtn;
+
+  if (!button) {
+    return;
+  }
+
+  if (isLoading) {
+    button.disabled = true;
+
+    if (!button.dataset.originalHtml) {
+      button.dataset.originalHtml = button.innerHTML;
+    }
+
+    button.classList.add("opacity-80", "cursor-not-allowed");
+
+    button.innerHTML = `
+      <span class="inline-flex items-center gap-2">
+        <span class="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+        Preparando...
+      </span>
+    `;
+
+    return;
+  }
+
+  button.disabled = false;
+
+  button.classList.remove("opacity-80", "cursor-not-allowed");
+
+  if (button.dataset.originalHtml) {
+    button.innerHTML = button.dataset.originalHtml;
+  }
+}
+
 function loadReview() {
   if (!elements.reviewItems || !elements.reviewAddress || !elements.reviewTotal) {
     return;
@@ -77,7 +221,9 @@ function loadReview() {
   }
 
   const subtotal = getCartSubtotal();
+
   const deliveryFee = getDeliveryFee();
+
   const totalWithDelivery = getCartTotalWithDelivery();
 
   cart.forEach((item) => {
@@ -111,16 +257,19 @@ function loadReview() {
   summaryDiv.innerHTML = `
     <div class="flex items-center justify-between text-sm text-zinc-600">
       <span>${escapeHTML(translate("review.orderType"))}</span>
+
       <span>${escapeHTML(getOrderTypeLabel())}</span>
     </div>
 
     <div class="flex items-center justify-between text-sm text-zinc-600">
       <span>${escapeHTML(translate("review.subtotal"))}</span>
+
       <span>${formatPrice(subtotal)}</span>
     </div>
 
     <div class="flex items-center justify-between text-sm text-zinc-600">
       <span>${escapeHTML(translate("review.deliveryFee"))}</span>
+
       <span>${formatPrice(deliveryFee)}</span>
     </div>
   `;
@@ -132,25 +281,255 @@ function loadReview() {
   elements.reviewTotal.textContent = formatPrice(totalWithDelivery);
 }
 
-function resetOrderAfterFinish() {
+async function prepareOrderForPayment() {
+  const cart = getCart();
+
+  const fingerprint = getCheckoutFingerprint(cart);
+
+  if (checkoutSession && checkoutSession.fingerprint === fingerprint) {
+    return checkoutSession;
+  }
+
+  resetCheckoutSession();
+
+  const createdOrder = await createOrder(getOrderType(), mapCartToApiItems(cart));
+
+  checkoutSession = {
+    fingerprint,
+    orderId: createdOrder.orderId,
+    subtotal: createdOrder.subtotal,
+    deliveryFee: createdOrder.deliveryFee,
+    total: createdOrder.total,
+    paymentId: null,
+    idempotencyKey: null,
+  };
+
+  return checkoutSession;
+}
+
+async function ensurePaymentCreated() {
+  if (!checkoutSession) {
+    throw new Error("O pedido ainda não foi preparado para pagamento.");
+  }
+
+  if (checkoutSession.paymentId && checkoutSession.idempotencyKey) {
+    return checkoutSession.paymentId;
+  }
+
+  const idempotencyKey = createIdempotencyKey();
+
+  const payment = await createPayment(checkoutSession.orderId, idempotencyKey);
+
+  checkoutSession.paymentId = payment.paymentId;
+
+  checkoutSession.idempotencyKey = idempotencyKey;
+
+  if (Number.isFinite(Number(payment.amount))) {
+    checkoutSession.total = Number(payment.amount);
+
+    setPaymentTotal(checkoutSession.total);
+  }
+
+  return payment.paymentId;
+}
+
+function buildWhatsAppMessage() {
+  if (!checkoutSession) {
+    throw new Error("Não existe pedido confirmado.");
+  }
+
+  const cart = getCart();
+
+  const addressText = getAddressText();
+
+  const orderNotes = getOrderNotes();
+
+  let message = `\u{1F354} *${translate("whatsapp.newOrder")}*\n\n`;
+
+  message += `*${translate("whatsapp.orderType")}:* ${getOrderTypeLabel()}\n\n`;
+
+  message += `*${translate("whatsapp.items")}:*\n`;
+
+  cart.forEach((item) => {
+    const localizedItem = getLocalizedCartItem(item);
+
+    const itemSubtotal = item.price * item.quantity;
+
+    message += `- ${item.quantity}x ${localizedItem.name} (${formatPrice(itemSubtotal)})\n`;
+  });
+
+  message += `\n*${translate("whatsapp.summary")}:*\n`;
+
+  message += `${translate("whatsapp.subtotal")}: ${formatPrice(checkoutSession.subtotal)}\n`;
+
+  message += `${translate("whatsapp.deliveryFee")}: ${formatPrice(checkoutSession.deliveryFee)}\n`;
+
+  message += `${translate("whatsapp.total")}: ${formatPrice(checkoutSession.total)}\n`;
+
+  message += isPickupOrder()
+    ? `\n*${translate("whatsapp.pickupAddress")}:*\n${addressText}\n`
+    : `\n*${translate("whatsapp.deliveryAddress")}:*\n${addressText}\n`;
+
+  if (orderNotes) {
+    message += `\n*${translate("whatsapp.notes")}:*\n${orderNotes}\n`;
+  }
+
+  return message;
+}
+
+function resetOrderAfterPayment() {
   clearCart();
   updateCart();
   resetOrderType();
   resetAddressForm();
   clearOrderNotes();
+
+  setPaymentProcessing(false);
+
   closeAllModals();
-  setFinishButtonLoading(false);
+
+  resetCheckoutSession();
 }
 
-function mapCartToApiItems(cart) {
-  return cart.map((item) => ({
-    productCode: item.id,
-    quantity: item.quantity,
-    observation: null,
-  }));
+function sendConfirmationToWhatsApp() {
+  const message = buildWhatsAppMessage();
+
+  const url = `https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent(message)}`;
+
+  const whatsappWindow = window.open(url, "_blank");
+
+  resetOrderAfterPayment();
+
+  showToast("Pagamento aprovado! Pedido confirmado.", "#16a34a");
+
+  if (!whatsappWindow) {
+    window.location.href = url;
+  }
 }
 
-async function finishOrder() {
+/**
+ * @param {any} cardData
+ */
+async function handlePaymentSubmit(cardData) {
+  if (!checkoutSession) {
+    showPaymentError("O pedido não está preparado para pagamento.");
+
+    return;
+  }
+
+  const paymentToken = String(cardData?.token ?? "").trim();
+
+  const paymentMethodId = String(cardData?.paymentMethodId ?? "").trim();
+
+  const installments = Number(cardData?.installments);
+
+  const payerEmail = String(cardData?.cardholderEmail ?? elements.paymentEmail?.value ?? "").trim();
+
+  if (!paymentToken) {
+    showPaymentError("Não foi possível gerar o token do cartão. Confira os dados.");
+
+    return;
+  }
+
+  if (!paymentMethodId) {
+    showPaymentError("Não foi possível identificar a bandeira do cartão.");
+
+    return;
+  }
+
+  if (!Number.isInteger(installments) || installments <= 0) {
+    showPaymentError("Selecione uma quantidade válida de parcelas.");
+
+    return;
+  }
+
+  if (!payerEmail) {
+    showPaymentError("Informe o e-mail do pagador.");
+
+    return;
+  }
+
+  hidePaymentError();
+
+  setPaymentProcessing(true);
+
+  try {
+    const paymentId = await ensurePaymentCreated();
+
+    const result = await processCardPayment(paymentId, {
+      paymentToken,
+      paymentMethodId,
+      installments,
+      payerEmail,
+    });
+
+    if (Number.isFinite(Number(result.amount))) {
+      checkoutSession.total = Number(result.amount);
+    }
+
+    if (isApprovedStatus(result.status)) {
+      sendConfirmationToWhatsApp();
+
+      return;
+    }
+
+    if (isRejectedStatus(result.status)) {
+      resetPaymentAttempt();
+
+      showPaymentError("O pagamento foi recusado. Confira os dados do cartão e tente novamente.");
+
+      return;
+    }
+
+    if (isCancelledStatus(result.status)) {
+      resetPaymentAttempt();
+
+      showPaymentError("O pagamento foi cancelado. Você pode tentar novamente.");
+
+      return;
+    }
+
+    if (isPendingStatus(result.status)) {
+      showPaymentError(
+        "O pagamento está em análise. Aguarde a confirmação antes de tentar novamente.",
+      );
+
+      return;
+    }
+
+    showPaymentError("O Mercado Pago retornou um status de pagamento inesperado.");
+  } catch (error) {
+    console.error("Não foi possível processar o pagamento:", error);
+
+    const status = getApiErrorStatus(error);
+
+    const code = getApiErrorCode(error);
+
+    if (status === 422 || code === "payment_provider_rejected") {
+      resetPaymentAttempt();
+
+      showPaymentError(
+        "O Mercado Pago recusou esta tentativa. Confira os dados e tente novamente.",
+      );
+
+      return;
+    }
+
+    if (status === 502 || code === "payment_provider_unavailable") {
+      showPaymentError(
+        "Não foi possível confirmar o resultado do pagamento. Aguarde antes de tentar novamente.",
+      );
+
+      return;
+    }
+
+    showPaymentError("Não foi possível processar o pagamento. Tente novamente.");
+  } finally {
+    setPaymentProcessing(false);
+  }
+}
+
+async function openPaymentStep() {
   const cart = getCart();
 
   if (cart.length === 0) {
@@ -161,76 +540,36 @@ async function finishOrder() {
 
   if (!isStoreOpenNow()) {
     showClosedStoreMessage();
+
     return;
   }
 
   if (!validateAddressFields()) {
     openModal(elements.addressModal);
+
     return;
   }
 
-  setFinishButtonLoading(true);
+  hidePaymentError();
+
+  setGoToPaymentLoading(true);
 
   try {
-    const orderType = getOrderType();
+    const session = await prepareOrderForPayment();
 
-    const createdOrder = await createOrder(orderType, mapCartToApiItems(cart));
+    setPaymentTotal(session.total);
 
-    const addressText = getAddressText();
+    openModal(elements.paymentModal);
 
-    const orderNotes = getOrderNotes();
-
-    const subtotal = createdOrder.subtotal;
-
-    const deliveryFee = createdOrder.deliveryFee;
-
-    const total = createdOrder.total;
-
-    let message = `\u{1F354} *${translate("whatsapp.newOrder")}*\n\n`;
-
-    message += `*${translate("whatsapp.orderType")}:* ${getOrderTypeLabel()}\n\n`;
-
-    message += `*${translate("whatsapp.items")}:*\n`;
-
-    cart.forEach((item) => {
-      const localizedItem = getLocalizedCartItem(item);
-
-      const itemSubtotal = item.price * item.quantity;
-
-      message += `- ${item.quantity}x ${localizedItem.name} (${formatPrice(itemSubtotal)})\n`;
-    });
-
-    message += `\n*${translate("whatsapp.summary")}:*\n`;
-
-    message += `${translate("whatsapp.subtotal")}: ${formatPrice(subtotal)}\n`;
-
-    message += `${translate("whatsapp.deliveryFee")}: ${formatPrice(deliveryFee)}\n`;
-
-    message += `${translate("whatsapp.total")}: ${formatPrice(total)}\n`;
-
-    message += isPickupOrder()
-      ? `\n*${translate("whatsapp.pickupAddress")}:*\n${addressText}\n`
-      : `\n*${translate("whatsapp.deliveryAddress")}:*\n${addressText}\n`;
-
-    if (orderNotes) {
-      message += `\n*${translate("whatsapp.notes")}:*\n${orderNotes}\n`;
-    }
-
-    const url = `https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent(message)}`;
-
-    window.open(url, "_blank");
-
-    setTimeout(() => {
-      resetOrderAfterFinish();
-
-      showToast(translate("order.sentToast"), "#16a34a");
-    }, 900);
+    await initializePaymentForm(session.total, handlePaymentSubmit);
   } catch (error) {
-    console.error("Não foi possível criar o pedido:", error);
+    console.error("Não foi possível preparar o pagamento:", error);
 
-    setFinishButtonLoading(false);
+    showPaymentError("Não foi possível carregar o pagamento.");
 
-    showToast("Não foi possível criar o pedido. Tente novamente.");
+    showToast("Não foi possível preparar o pagamento. Tente novamente.");
+  } finally {
+    setGoToPaymentLoading(false);
   }
 }
 
@@ -253,6 +592,7 @@ export function bindOrderEvents() {
 
       if (!isStoreOpenNow()) {
         showClosedStoreMessage();
+
         return;
       }
 
@@ -268,6 +608,7 @@ export function bindOrderEvents() {
     elements.goToReviewBtn.onclick = () => {
       if (!isStoreOpenNow()) {
         showClosedStoreMessage();
+
         return;
       }
 
@@ -291,7 +632,15 @@ export function bindOrderEvents() {
     elements.backToAddressBtn.onclick = () => openModal(elements.addressModal);
   }
 
-  if (elements.finishOrderBtn) {
-    elements.finishOrderBtn.onclick = finishOrder;
+  if (elements.goToPaymentBtn) {
+    elements.goToPaymentBtn.onclick = openPaymentStep;
+  }
+
+  if (elements.backToReviewBtn) {
+    elements.backToReviewBtn.onclick = () => {
+      loadReview();
+
+      openModal(elements.reviewModal);
+    };
   }
 }

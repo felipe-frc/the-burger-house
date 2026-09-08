@@ -1228,3 +1228,27 @@
     height: 75px;
   }
 }
+
+/* Mercado Pago - campos seguros do cartão */
+#form-checkout__cardNumber,
+#form-checkout__expirationDate,
+#form-checkout__securityCode {
+  width: 100%;
+  height: 52px;
+  min-height: 52px;
+  padding: 0 0.75rem;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+#form-checkout__cardNumber iframe,
+#form-checkout__expirationDate iframe,
+#form-checkout__securityCode iframe {
+  display: block;
+  width: 100% !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  border: 0 !important;
+}

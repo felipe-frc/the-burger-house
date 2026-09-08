@@ -52,6 +52,8 @@ export const elements = {
 
   reviewModal: /** @type {HTMLElement | null} */ (document.getElementById("review-modal")),
 
+  paymentModal: /** @type {HTMLElement | null} */ (document.getElementById("payment-modal")),
+
   cartBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById("cart-btn")),
 
   cartFooter: /** @type {HTMLElement | null} */ (document.querySelector(".cart-footer")),
@@ -76,8 +78,54 @@ export const elements = {
     document.getElementById("back-to-address-btn")
   ),
 
+  goToPaymentBtn: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById("go-to-payment-btn")
+  ),
+
+  backToReviewBtn: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById("back-to-review-btn")
+  ),
+
   finishOrderBtn: /** @type {HTMLButtonElement | null} */ (
     document.getElementById("finish-order-btn")
+  ),
+
+  paymentForm: /** @type {HTMLFormElement | null} */ (document.getElementById("form-checkout")),
+
+  paymentSubmitBtn: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById("form-checkout__submit")
+  ),
+
+  paymentTotal: /** @type {HTMLElement | null} */ (document.getElementById("payment-total")),
+
+  paymentError: /** @type {HTMLElement | null} */ (document.getElementById("payment-error")),
+
+  paymentProgress: /** @type {HTMLProgressElement | null} */ (
+    document.getElementById("payment-progress")
+  ),
+
+  paymentCardholderName: /** @type {HTMLInputElement | null} */ (
+    document.getElementById("form-checkout__cardholderName")
+  ),
+
+  paymentIdentificationType: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById("form-checkout__identificationType")
+  ),
+
+  paymentIdentificationNumber: /** @type {HTMLInputElement | null} */ (
+    document.getElementById("form-checkout__identificationNumber")
+  ),
+
+  paymentEmail: /** @type {HTMLInputElement | null} */ (
+    document.getElementById("form-checkout__cardholderEmail")
+  ),
+
+  paymentInstallments: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById("form-checkout__installments")
+  ),
+
+  paymentIssuer: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById("form-checkout__issuer")
   ),
 
   cartItemsContainer: /** @type {HTMLElement | null} */ (document.getElementById("cart-items")),
@@ -246,6 +294,10 @@ export function closeAllModals(restoreFocus = true) {
     elements.reviewModal.classList.add("hidden");
   }
 
+  if (elements.paymentModal) {
+    elements.paymentModal.classList.add("hidden");
+  }
+
   document.body.style.overflow = "";
 
   activeModal = null;
@@ -275,15 +327,17 @@ export function bindModalCloseEvents() {
     trapFocus(event);
   });
 
-  [elements.cartModal, elements.addressModal, elements.reviewModal].forEach((modal) => {
-    if (!modal) return;
+  [elements.cartModal, elements.addressModal, elements.reviewModal, elements.paymentModal].forEach(
+    (modal) => {
+      if (!modal) return;
 
-    modal.addEventListener("click", (event) => {
-      if (event.target === modal) {
-        closeAllModals();
-      }
-    });
-  });
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          closeAllModals();
+        }
+      });
+    },
+  );
 }
 
 /**
@@ -332,6 +386,74 @@ export function hideAddressWarning() {
   if (!elements.addressWarn) return;
 
   elements.addressWarn.classList.add("hidden");
+}
+
+/**
+ * @param {string} message
+ */
+export function showPaymentError(message) {
+  if (!elements.paymentError) return;
+
+  elements.paymentError.textContent = message;
+
+  elements.paymentError.classList.remove("hidden");
+}
+
+export function hidePaymentError() {
+  if (!elements.paymentError) return;
+
+  elements.paymentError.textContent = "";
+
+  elements.paymentError.classList.add("hidden");
+}
+
+/**
+ * @param {number} total
+ */
+export function setPaymentTotal(total) {
+  if (!elements.paymentTotal) return;
+
+  elements.paymentTotal.textContent = formatPrice(total);
+}
+
+/**
+ * @param {boolean} isProcessing
+ */
+export function setPaymentProcessing(isProcessing) {
+  const button = elements.paymentSubmitBtn;
+
+  const progress = elements.paymentProgress;
+
+  if (button) {
+    if (isProcessing) {
+      button.disabled = true;
+
+      button.dataset.originalHtml = button.innerHTML;
+
+      button.classList.add("opacity-80", "cursor-not-allowed");
+
+      button.innerHTML = `
+        <span class="inline-flex items-center gap-2">
+          <span class="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+          Processando...
+        </span>
+      `;
+    } else {
+      button.disabled = false;
+
+      button.classList.remove("opacity-80", "cursor-not-allowed");
+
+      if (button.dataset.originalHtml) {
+        button.innerHTML = button.dataset.originalHtml;
+      }
+    }
+  }
+
+  if (progress) {
+    progress.classList.toggle("hidden", !isProcessing);
+
+    progress.value = isProcessing ? 50 : 0;
+  }
 }
 
 /**
