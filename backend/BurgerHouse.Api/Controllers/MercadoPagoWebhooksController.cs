@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using BurgerHouse.Api.Webhooks.MercadoPago;
+using BurgerHouse.Application.Payments.SynchronizePaymentStatus;
 using BurgerHouse.Infrastructure.Payments.MercadoPago;
 
 using Microsoft.AspNetCore.Mvc;
@@ -13,17 +14,21 @@ public sealed class MercadoPagoWebhooksController : ControllerBase
 {
     private readonly MercadoPagoWebhookSignatureValidator _signatureValidator;
     private readonly MercadoPagoOrderLookup _orderLookup;
+    private readonly SynchronizePaymentStatusHandler _synchronizePaymentStatusHandler;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<MercadoPagoWebhooksController> _logger;
 
     public MercadoPagoWebhooksController(
         MercadoPagoWebhookSignatureValidator signatureValidator,
         MercadoPagoOrderLookup orderLookup,
+        SynchronizePaymentStatusHandler synchronizePaymentStatusHandler,
         IWebHostEnvironment environment,
         ILogger<MercadoPagoWebhooksController> logger)
     {
         _signatureValidator = signatureValidator;
         _orderLookup = orderLookup;
+        _synchronizePaymentStatusHandler =
+            synchronizePaymentStatusHandler;
         _environment = environment;
         _logger = logger;
     }
@@ -82,6 +87,8 @@ public sealed class MercadoPagoWebhooksController : ControllerBase
             notificationId
         );
 
+        var sandboxFallback = false;
+
         if (!isValid)
         {
             if (!_environment.IsDevelopment() ||
@@ -97,62 +104,7 @@ public sealed class MercadoPagoWebhooksController : ControllerBase
                 });
             }
 
-            MercadoPagoOrderSnapshot? order;
-
-            try
-            {
-                order = await _orderLookup.GetAsync(
-                    signedDataId,
-                    cancellationToken
-                );
-            }
-            catch (HttpRequestException exception)
-            {
-                _logger.LogWarning(
-                    exception,
-                    "Mercado Pago Sandbox order verification failed."
-                );
-
-                return StatusCode(
-                    StatusCodes.Status502BadGateway,
-                    new
-                    {
-                        error = "Could not verify Mercado Pago order."
-                    }
-                );
-            }
-
-            if (order is null ||
-                !string.Equals(
-                    order.Id,
-                    signedDataId,
-                    StringComparison.Ordinal))
-            {
-                _logger.LogWarning(
-                    "Mercado Pago Sandbox webhook could not be verified " +
-                    "through the Orders API."
-                );
-
-                return Unauthorized(new
-                {
-                    error = "Invalid webhook signature."
-                });
-            }
-
-            _logger.LogWarning(
-                "Mercado Pago Sandbox webhook signature failed, but " +
-                "Order {OrderId} was verified directly through the " +
-                "Mercado Pago API. Status: {Status}.",
-                order.Id,
-                order.Status ?? "(missing)"
-            );
-
-            return Ok(new
-            {
-                received = true,
-                sandboxFallback = true,
-                verifiedBy = "mercado-pago-orders-api"
-            });
+            sandboxFallback = true;
         }
 
         if (!string.Equals(
@@ -167,9 +119,140 @@ public sealed class MercadoPagoWebhooksController : ControllerBase
             });
         }
 
+        if (string.IsNullOrWhiteSpace(signedDataId))
+        {
+            return BadRequest(new
+            {
+                error = "Webhook order id is required."
+            });
+        }
+
+        MercadoPagoOrderSnapshot? order;
+
+        try
+        {
+            order = await _orderLookup.GetAsync(
+                signedDataId,
+                cancellationToken
+            );
+        }
+        catch (HttpRequestException exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Mercado Pago order verification failed."
+            );
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "Could not verify Mercado Pago order."
+                }
+            );
+        }
+
+        if (order is null ||
+            !string.Equals(
+                order.Id,
+                signedDataId,
+                StringComparison.Ordinal))
+        {
+            if (sandboxFallback)
+            {
+                _logger.LogWarning(
+                    "Mercado Pago Sandbox webhook could not be verified " +
+                    "through the Orders API."
+                );
+
+                return Unauthorized(new
+                {
+                    error = "Invalid webhook signature."
+                });
+            }
+
+            _logger.LogWarning(
+                "Mercado Pago webhook Order {OrderId} " +
+                "could not be verified through the Orders API.",
+                signedDataId
+            );
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "Could not verify Mercado Pago order."
+                }
+            );
+        }
+
+        if (sandboxFallback)
+        {
+            _logger.LogWarning(
+                "Mercado Pago Sandbox webhook signature failed, but " +
+                "Order {OrderId} was verified directly through the " +
+                "Mercado Pago API. Status: {Status}. Detail: {StatusDetail}.",
+                order.Id,
+                order.ProviderStatus,
+                order.ProviderStatusDetail ?? "(missing)"
+            );
+        }
+
+        bool changed;
+
+        try
+        {
+            changed =
+                await _synchronizePaymentStatusHandler.HandleAsync(
+                    order.Id,
+                    order.PaymentStatus,
+                    cancellationToken
+                );
+        }
+        catch (KeyNotFoundException exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Local payment for Mercado Pago Order {OrderId} " +
+                "was not found.",
+                order.Id
+            );
+
+            return Conflict(new
+            {
+                error = "Local payment was not found."
+            });
+        }
+        catch (InvalidOperationException exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Mercado Pago Order {OrderId} could not be " +
+                "synchronized with the local payment.",
+                order.Id
+            );
+
+            return Conflict(new
+            {
+                error = "Payment status could not be synchronized."
+            });
+        }
+
+        if (sandboxFallback)
+        {
+            return Ok(new
+            {
+                received = true,
+                synchronized = changed,
+                sandboxFallback = true,
+                verifiedBy = "mercado-pago-orders-api"
+            });
+        }
+
         return Ok(new
         {
-            received = true
+            received = true,
+            synchronized = changed
         });
     }
 }

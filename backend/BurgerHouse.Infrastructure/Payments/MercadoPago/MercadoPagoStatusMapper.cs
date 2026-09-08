@@ -2,7 +2,7 @@ using BurgerHouse.Application.Abstractions.Payments;
 
 namespace BurgerHouse.Infrastructure.Payments.MercadoPago;
 
-internal static class MercadoPagoStatusMapper
+public static class MercadoPagoStatusMapper
 {
     public static PaymentGatewayStatus Map(
         string status,

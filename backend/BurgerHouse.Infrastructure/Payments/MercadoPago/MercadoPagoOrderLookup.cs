@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 
+using BurgerHouse.Application.Abstractions.Payments;
+
 using Microsoft.Extensions.Options;
 
 namespace BurgerHouse.Infrastructure.Payments.MercadoPago;
@@ -70,7 +72,9 @@ public sealed class MercadoPagoOrderLookup
         }
 
         await using var stream =
-            await response.Content.ReadAsStreamAsync(cancellationToken);
+            await response.Content.ReadAsStreamAsync(
+                cancellationToken
+            );
 
         using var document =
             await JsonDocument.ParseAsync(
@@ -81,14 +85,60 @@ public sealed class MercadoPagoOrderLookup
         var root = document.RootElement;
 
         var id =
-            root.TryGetProperty("id", out var idElement)
-                ? idElement.GetString()
-                : null;
+            GetValueAsString(
+                root,
+                "id"
+            );
 
-        var status =
-            root.TryGetProperty("status", out var statusElement)
-                ? statusElement.GetString()
-                : null;
+        var orderStatus =
+            GetValueAsString(
+                root,
+                "status"
+            );
+
+        var orderStatusDetail =
+            GetValueAsString(
+                root,
+                "status_detail"
+            );
+
+        string? externalPaymentId = null;
+        string? paymentStatus = null;
+        string? paymentStatusDetail = null;
+
+        if (root.TryGetProperty(
+                "transactions",
+                out var transactionsElement) &&
+            transactionsElement.ValueKind ==
+                JsonValueKind.Object &&
+            transactionsElement.TryGetProperty(
+                "payments",
+                out var paymentsElement) &&
+            paymentsElement.ValueKind ==
+                JsonValueKind.Array &&
+            paymentsElement.GetArrayLength() > 0)
+        {
+            var paymentElement =
+                paymentsElement[0];
+
+            externalPaymentId =
+                GetValueAsString(
+                    paymentElement,
+                    "id"
+                );
+
+            paymentStatus =
+                GetValueAsString(
+                    paymentElement,
+                    "status"
+                );
+
+            paymentStatusDetail =
+                GetValueAsString(
+                    paymentElement,
+                    "status_detail"
+                );
+        }
 
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -97,14 +147,66 @@ public sealed class MercadoPagoOrderLookup
             );
         }
 
+        var effectiveStatus =
+            !string.IsNullOrWhiteSpace(paymentStatus)
+                ? paymentStatus
+                : orderStatus;
+
+        var effectiveStatusDetail =
+            !string.IsNullOrWhiteSpace(paymentStatusDetail)
+                ? paymentStatusDetail
+                : orderStatusDetail;
+
+        if (string.IsNullOrWhiteSpace(effectiveStatus))
+        {
+            throw new InvalidOperationException(
+                "Mercado Pago returned an order without a payment status."
+            );
+        }
+
+        var mappedStatus =
+            MercadoPagoStatusMapper.Map(
+                effectiveStatus,
+                effectiveStatusDetail
+            );
+
         return new MercadoPagoOrderSnapshot(
-            id,
-            status
+            id.Trim(),
+            externalPaymentId?.Trim(),
+            mappedStatus,
+            effectiveStatus.Trim(),
+            effectiveStatusDetail?.Trim()
         );
+    }
+
+    private static string? GetValueAsString(
+        JsonElement element,
+        string propertyName)
+    {
+        if (!element.TryGetProperty(
+                propertyName,
+                out var property))
+        {
+            return null;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.String =>
+                property.GetString(),
+
+            JsonValueKind.Number =>
+                property.GetRawText(),
+
+            _ => null
+        };
     }
 }
 
 public sealed record MercadoPagoOrderSnapshot(
     string Id,
-    string? Status
+    string? ExternalPaymentId,
+    PaymentGatewayStatus PaymentStatus,
+    string ProviderStatus,
+    string? ProviderStatusDetail
 );

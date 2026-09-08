@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection;
+
 using BurgerHouse.Api.Controllers;
 using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
@@ -7,7 +8,9 @@ using BurgerHouse.Application.Payments.CreatePayment;
 using BurgerHouse.Application.Payments.ProcessCardPayment;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
+
 using Microsoft.AspNetCore.Mvc;
+
 using Xunit;
 
 namespace BurgerHouse.Api.Tests;
@@ -323,6 +326,19 @@ public class PaymentsControllerTests
         {
             var payment = _payments.FirstOrDefault(
                 item => item.Id == paymentId
+            );
+
+            return Task.FromResult(payment);
+        }
+
+        public Task<Payment?> GetByExternalOrderIdAsync(
+            string externalOrderId,
+            CancellationToken cancellationToken = default)
+        {
+            var payment = _payments.FirstOrDefault(
+                item =>
+                    item.ExternalOrderId ==
+                    externalOrderId
             );
 
             return Task.FromResult(payment);

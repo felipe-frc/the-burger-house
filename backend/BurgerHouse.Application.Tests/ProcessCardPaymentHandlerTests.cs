@@ -257,6 +257,7 @@ public class ProcessCardPaymentHandlerTests
         );
 
         var request = CreateValidRequest();
+
         request = new ProcessCardPaymentRequest
         {
             PaymentId = request.PaymentId,
@@ -412,6 +413,19 @@ public class ProcessCardPaymentHandlerTests
         {
             var payment = _payments.FirstOrDefault(
                 item => item.Id == paymentId
+            );
+
+            return Task.FromResult(payment);
+        }
+
+        public Task<Payment?> GetByExternalOrderIdAsync(
+            string externalOrderId,
+            CancellationToken cancellationToken = default)
+        {
+            var payment = _payments.FirstOrDefault(
+                item =>
+                    item.ExternalOrderId ==
+                    externalOrderId
             );
 
             return Task.FromResult(payment);

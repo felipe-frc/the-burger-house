@@ -2,6 +2,7 @@ using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
 using BurgerHouse.Infrastructure.Persistence;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace BurgerHouse.Infrastructure.Repositories;
@@ -37,6 +38,25 @@ public class PaymentRepository : IPaymentRepository
         return await _dbContext.Payments
             .FirstOrDefaultAsync(
                 payment => payment.Id == paymentId,
+                cancellationToken
+            );
+    }
+
+    public async Task<Payment?> GetByExternalOrderIdAsync(
+        string externalOrderId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(externalOrderId))
+            return null;
+
+        var normalizedExternalOrderId =
+            externalOrderId.Trim();
+
+        return await _dbContext.Payments
+            .FirstOrDefaultAsync(
+                payment =>
+                    payment.ExternalOrderId ==
+                    normalizedExternalOrderId,
                 cancellationToken
             );
     }
