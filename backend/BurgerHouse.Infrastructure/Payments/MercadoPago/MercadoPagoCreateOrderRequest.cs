@@ -5,56 +5,83 @@ namespace BurgerHouse.Infrastructure.Payments.MercadoPago;
 internal sealed class MercadoPagoCreateOrderRequest
 {
     [JsonPropertyName("type")]
-    public string Type { get; init; } = "online";
+    public string Type { get; init; } =
+        "online";
 
     [JsonPropertyName("processing_mode")]
-    public string ProcessingMode { get; init; } = "automatic";
+    public string ProcessingMode { get; init; } =
+        "automatic";
 
     [JsonPropertyName("total_amount")]
-    public string TotalAmount { get; init; } = string.Empty;
+    public string TotalAmount { get; init; } =
+        string.Empty;
 
     [JsonPropertyName("external_reference")]
-    public string ExternalReference { get; init; } = string.Empty;
+    public string ExternalReference { get; init; } =
+        string.Empty;
 
     [JsonPropertyName("payer")]
-    public MercadoPagoPayerRequest Payer { get; init; } = new();
+    public MercadoPagoPayerRequest Payer { get; init; } =
+        new();
 
     [JsonPropertyName("transactions")]
-    public MercadoPagoTransactionsRequest Transactions { get; init; } = new();
+    public MercadoPagoTransactionsRequest Transactions
+    {
+        get;
+        init;
+    } = new();
 }
 
 internal sealed class MercadoPagoPayerRequest
 {
     [JsonPropertyName("email")]
-    public string Email { get; init; } = string.Empty;
+    public string Email { get; init; } =
+        string.Empty;
 }
 
 internal sealed class MercadoPagoTransactionsRequest
 {
     [JsonPropertyName("payments")]
-    public List<MercadoPagoPaymentRequest> Payments { get; init; } = [];
+    public List<MercadoPagoPaymentRequest> Payments
+    {
+        get;
+        init;
+    } = [];
 }
 
 internal sealed class MercadoPagoPaymentRequest
 {
     [JsonPropertyName("amount")]
-    public string Amount { get; init; } = string.Empty;
+    public string Amount { get; init; } =
+        string.Empty;
 
     [JsonPropertyName("payment_method")]
-    public MercadoPagoPaymentMethodRequest PaymentMethod { get; init; } = new();
+    public MercadoPagoPaymentMethodRequest PaymentMethod
+    {
+        get;
+        init;
+    } = new();
 }
 
 internal sealed class MercadoPagoPaymentMethodRequest
 {
     [JsonPropertyName("id")]
-    public string Id { get; init; } = string.Empty;
+    public string Id { get; init; } =
+        string.Empty;
 
     [JsonPropertyName("type")]
-    public string Type { get; init; } = "credit_card";
+    public string Type { get; init; } =
+        string.Empty;
 
     [JsonPropertyName("token")]
-    public string Token { get; init; } = string.Empty;
+    [JsonIgnore(
+        Condition = JsonIgnoreCondition.WhenWritingNull
+    )]
+    public string? Token { get; init; }
 
     [JsonPropertyName("installments")]
-    public int Installments { get; init; }
+    [JsonIgnore(
+        Condition = JsonIgnoreCondition.WhenWritingNull
+    )]
+    public int? Installments { get; init; }
 }

@@ -1,5 +1,6 @@
 using BurgerHouse.Application.Payments.CreatePayment;
 using BurgerHouse.Application.Payments.ProcessCardPayment;
+using BurgerHouse.Application.Payments.ProcessPixPayment;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BurgerHouse.Api.Controllers;
@@ -8,28 +9,44 @@ namespace BurgerHouse.Api.Controllers;
 [Route("api/payments")]
 public class PaymentsController : ControllerBase
 {
-    private readonly CreatePaymentHandler _createPaymentHandler;
-    private readonly ProcessCardPaymentHandler _processCardPaymentHandler;
+    private readonly CreatePaymentHandler
+        _createPaymentHandler;
+
+    private readonly ProcessCardPaymentHandler
+        _processCardPaymentHandler;
+
+    private readonly ProcessPixPaymentHandler?
+        _processPixPaymentHandler;
 
     public PaymentsController(
         CreatePaymentHandler createPaymentHandler,
-        ProcessCardPaymentHandler processCardPaymentHandler)
+        ProcessCardPaymentHandler processCardPaymentHandler,
+        ProcessPixPaymentHandler? processPixPaymentHandler = null)
     {
-        _createPaymentHandler = createPaymentHandler;
-        _processCardPaymentHandler = processCardPaymentHandler;
+        _createPaymentHandler =
+            createPaymentHandler;
+
+        _processCardPaymentHandler =
+            processCardPaymentHandler;
+
+        _processPixPaymentHandler =
+            processPixPaymentHandler;
     }
 
     [HttpPost]
-    public async Task<ActionResult<CreatePaymentResponse>> CreateAsync(
-        [FromBody] CreatePaymentRequest request,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<CreatePaymentResponse>>
+        CreateAsync(
+            [FromBody] CreatePaymentRequest request,
+            CancellationToken cancellationToken)
     {
         try
         {
-            var response = await _createPaymentHandler.HandleAsync(
-                request,
-                cancellationToken
-            );
+            var response =
+                await _createPaymentHandler
+                    .HandleAsync(
+                        request,
+                        cancellationToken
+                    );
 
             return StatusCode(
                 StatusCodes.Status201Created,
@@ -60,27 +77,39 @@ public class PaymentsController : ControllerBase
     }
 
     [HttpPost("{paymentId:int}/card")]
-    public async Task<ActionResult<ProcessCardPaymentResponse>> ProcessCardAsync(
-        [FromRoute] int paymentId,
-        [FromBody] ProcessCardPaymentRequest request,
-        CancellationToken cancellationToken)
+    public async Task<
+        ActionResult<ProcessCardPaymentResponse>>
+        ProcessCardAsync(
+            [FromRoute] int paymentId,
+            [FromBody] ProcessCardPaymentRequest request,
+            CancellationToken cancellationToken)
     {
         try
         {
-            var command = new ProcessCardPaymentRequest
-            {
-                PaymentId = paymentId,
-                PaymentToken = request.PaymentToken,
-                PaymentMethodId = request.PaymentMethodId,
-                Installments = request.Installments,
-                PayerEmail = request.PayerEmail
-            };
+            var command =
+                new ProcessCardPaymentRequest
+                {
+                    PaymentId = paymentId,
+
+                    PaymentToken =
+                        request.PaymentToken,
+
+                    PaymentMethodId =
+                        request.PaymentMethodId,
+
+                    Installments =
+                        request.Installments,
+
+                    PayerEmail =
+                        request.PayerEmail
+                };
 
             var response =
-                await _processCardPaymentHandler.HandleAsync(
-                    command,
-                    cancellationToken
-                );
+                await _processCardPaymentHandler
+                    .HandleAsync(
+                        command,
+                        cancellationToken
+                    );
 
             return Ok(response);
         }
@@ -99,12 +128,16 @@ public class PaymentsController : ControllerBase
             });
         }
         catch (HttpRequestException exception)
-            when (IsDefinitiveProviderRejection(exception))
+            when (
+                IsDefinitiveProviderRejection(
+                    exception
+                ))
         {
             return UnprocessableEntity(new
             {
                 error =
                     "The payment provider rejected the request.",
+
                 code =
                     "payment_provider_rejected"
             });
@@ -117,6 +150,7 @@ public class PaymentsController : ControllerBase
                 {
                     error =
                         "The payment provider could not process the request.",
+
                     code =
                         "payment_provider_unavailable"
                 }
@@ -131,8 +165,103 @@ public class PaymentsController : ControllerBase
         }
     }
 
-    private static bool IsDefinitiveProviderRejection(
-        HttpRequestException exception)
+    [HttpPost("{paymentId:int}/pix")]
+    public async Task<
+        ActionResult<ProcessPixPaymentResponse>>
+        ProcessPixAsync(
+            [FromRoute] int paymentId,
+            [FromBody] ProcessPixPaymentRequest request,
+            CancellationToken cancellationToken)
+    {
+        if (_processPixPaymentHandler is null)
+        {
+            return StatusCode(
+                StatusCodes
+                    .Status500InternalServerError,
+                new
+                {
+                    error =
+                        "Pix payment handler is unavailable."
+                }
+            );
+        }
+
+        try
+        {
+            var command =
+                new ProcessPixPaymentRequest
+                {
+                    PaymentId =
+                        paymentId,
+
+                    PayerEmail =
+                        request.PayerEmail
+                };
+
+            var response =
+                await _processPixPaymentHandler
+                    .HandleAsync(
+                        command,
+                        cancellationToken
+                    );
+
+            return Ok(response);
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new
+            {
+                error = exception.Message
+            });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new
+            {
+                error = exception.Message
+            });
+        }
+        catch (HttpRequestException exception)
+            when (
+                IsDefinitiveProviderRejection(
+                    exception
+                ))
+        {
+            return UnprocessableEntity(new
+            {
+                error =
+                    "The payment provider rejected the request.",
+
+                code =
+                    "payment_provider_rejected"
+            });
+        }
+        catch (HttpRequestException)
+        {
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    error =
+                        "The payment provider could not process the request.",
+
+                    code =
+                        "payment_provider_unavailable"
+                }
+            );
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Conflict(new
+            {
+                error = exception.Message
+            });
+        }
+    }
+
+    private static bool
+        IsDefinitiveProviderRejection(
+            HttpRequestException exception)
     {
         if (exception.StatusCode is null)
         {

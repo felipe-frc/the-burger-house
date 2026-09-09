@@ -5,10 +5,13 @@ using Microsoft.Extensions.Logging;
 
 namespace BurgerHouse.Infrastructure.Payments.MercadoPago;
 
-public sealed class MercadoPagoPaymentGateway : IPaymentGateway
+public sealed class MercadoPagoPaymentGateway
+    : IPaymentGateway
 {
     private readonly HttpClient _httpClient;
-    private readonly ILogger<MercadoPagoPaymentGateway>? _logger;
+
+    private readonly
+        ILogger<MercadoPagoPaymentGateway>? _logger;
 
     public MercadoPagoPaymentGateway(
         HttpClient httpClient,
@@ -24,7 +27,8 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (string.IsNullOrWhiteSpace(request.IdempotencyKey))
+        if (string.IsNullOrWhiteSpace(
+                request.IdempotencyKey))
         {
             throw new ArgumentException(
                 "Idempotency key cannot be empty."
@@ -45,12 +49,15 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
         }
 
         var mercadoPagoRequest =
-            MercadoPagoRequestFactory.Create(request);
+            MercadoPagoRequestFactory.Create(
+                request
+            );
 
-        using var httpRequest = new HttpRequestMessage(
-            HttpMethod.Post,
-            "v1/orders"
-        );
+        using var httpRequest =
+            new HttpRequestMessage(
+                HttpMethod.Post,
+                "v1/orders"
+            );
 
         httpRequest.Headers.Add(
             "X-Idempotency-Key",
@@ -58,7 +65,9 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
         );
 
         httpRequest.Content =
-            JsonContent.Create(mercadoPagoRequest);
+            JsonContent.Create(
+                mercadoPagoRequest
+            );
 
         using var httpResponse =
             await _httpClient.SendAsync(
@@ -70,12 +79,15 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
         if (!httpResponse.IsSuccessStatusCode)
         {
             var errorBody =
-                await httpResponse.Content.ReadAsStringAsync(
-                    cancellationToken
-                );
+                await httpResponse.Content
+                    .ReadAsStringAsync(
+                        cancellationToken
+                    );
 
             var safeProviderError =
-                ExtractSafeProviderError(errorBody);
+                ExtractSafeProviderError(
+                    errorBody
+                );
 
             _logger?.LogWarning(
                 "Mercado Pago rejected payment request. " +
@@ -88,14 +100,17 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
             throw new HttpRequestException(
                 "Mercado Pago rejected the payment request.",
                 inner: null,
-                statusCode: httpResponse.StatusCode
+                statusCode:
+                    httpResponse.StatusCode
             );
         }
 
         var mercadoPagoResponse =
             await httpResponse.Content
-                .ReadFromJsonAsync<MercadoPagoCreateOrderResponse>(
-                    cancellationToken: cancellationToken
+                .ReadFromJsonAsync<
+                    MercadoPagoCreateOrderResponse>(
+                    cancellationToken:
+                        cancellationToken
                 );
 
         if (mercadoPagoResponse is null)
@@ -113,18 +128,21 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
             );
         }
 
-        var payment = mercadoPagoResponse
-            .Transactions
-            .Payments
-            .FirstOrDefault();
+        var payment =
+            mercadoPagoResponse
+                .Transactions
+                .Payments
+                .FirstOrDefault();
 
         var paymentStatus =
-            !string.IsNullOrWhiteSpace(payment?.Status)
+            !string.IsNullOrWhiteSpace(
+                payment?.Status)
                 ? payment.Status
                 : mercadoPagoResponse.Status;
 
         var paymentStatusDetail =
-            !string.IsNullOrWhiteSpace(payment?.StatusDetail)
+            !string.IsNullOrWhiteSpace(
+                payment?.StatusDetail)
                 ? payment.StatusDetail
                 : mercadoPagoResponse.StatusDetail;
 
@@ -140,19 +158,39 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
                 mercadoPagoResponse.Id.Trim(),
 
             ExternalPaymentId =
-                payment?.Id?.Trim() ?? string.Empty,
+                payment?.Id?.Trim()
+                ?? string.Empty,
 
             Status = status,
 
             StatusDetail =
-                paymentStatusDetail?.Trim()
+                paymentStatusDetail?.Trim(),
+
+            PixTicketUrl =
+                payment?
+                    .PaymentMethod?
+                    .TicketUrl?
+                    .Trim(),
+
+            PixQrCode =
+                payment?
+                    .PaymentMethod?
+                    .QrCode?
+                    .Trim(),
+
+            PixQrCodeBase64 =
+                payment?
+                    .PaymentMethod?
+                    .QrCodeBase64?
+                    .Trim()
         };
     }
 
     private static string ExtractSafeProviderError(
         string? errorBody)
     {
-        if (string.IsNullOrWhiteSpace(errorBody))
+        if (string.IsNullOrWhiteSpace(
+                errorBody))
         {
             return "Empty response body";
         }
@@ -160,10 +198,15 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
         try
         {
             using var document =
-                JsonDocument.Parse(errorBody);
+                JsonDocument.Parse(
+                    errorBody
+                );
 
-            var root = document.RootElement;
-            var details = new List<string>();
+            var root =
+                document.RootElement;
+
+            var details =
+                new List<string>();
 
             AddPropertyIfSafe(
                 root,
@@ -187,10 +230,11 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
                     "errors",
                     out var errorsElement) &&
                 errorsElement.ValueKind ==
-                JsonValueKind.Array)
+                    JsonValueKind.Array)
             {
                 foreach (var error in
-                         errorsElement.EnumerateArray())
+                         errorsElement
+                             .EnumerateArray())
                 {
                     AddPropertyIfSafe(
                         error,
@@ -208,18 +252,21 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
                             "details",
                             out var errorDetails) &&
                         errorDetails.ValueKind ==
-                        JsonValueKind.Array)
+                            JsonValueKind.Array)
                     {
                         foreach (var detail in
-                                 errorDetails.EnumerateArray())
+                                 errorDetails
+                                     .EnumerateArray())
                         {
                             if (detail.ValueKind ==
                                 JsonValueKind.String)
                             {
                                 var value =
-                                    detail.GetString();
+                                    detail
+                                        .GetString();
 
-                                if (!string.IsNullOrWhiteSpace(
+                                if (!string
+                                    .IsNullOrWhiteSpace(
                                         value))
                                 {
                                     details.Add(
@@ -236,10 +283,11 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
                     "cause",
                     out var causeElement) &&
                 causeElement.ValueKind ==
-                JsonValueKind.Array)
+                    JsonValueKind.Array)
             {
                 foreach (var cause in
-                         causeElement.EnumerateArray())
+                         causeElement
+                             .EnumerateArray())
                 {
                     AddPropertyIfSafe(
                         cause,
@@ -257,11 +305,15 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
 
             if (details.Count == 0)
             {
-                return "Unrecognized provider error payload";
+                return
+                    "Unrecognized provider error payload";
             }
 
             var result =
-                string.Join(" | ", details);
+                string.Join(
+                    " | ",
+                    details
+                );
 
             return result.Length <= 1000
                 ? result
@@ -269,7 +321,8 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
         }
         catch (JsonException)
         {
-            return "Non-JSON provider error payload";
+            return
+                "Non-JSON provider error payload";
         }
     }
 
@@ -292,9 +345,11 @@ public sealed class MercadoPagoPaymentGateway : IPaymentGateway
             return;
         }
 
-        var value = property.ToString();
+        var value =
+            property.ToString();
 
-        if (string.IsNullOrWhiteSpace(value))
+        if (string.IsNullOrWhiteSpace(
+                value))
         {
             return;
         }
