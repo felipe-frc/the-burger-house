@@ -46,13 +46,19 @@ export async function createOrder(orderType, items) {
   });
 }
 
-export async function createPayment(orderId, idempotencyKey) {
+export async function createPayment(orderId, idempotencyKey, method = null) {
+  const body = {
+    orderId,
+    idempotencyKey,
+  };
+
+  if (method !== null && method !== undefined) {
+    body.method = method;
+  }
+
   return request("/api/payments", {
     method: "POST",
-    body: JSON.stringify({
-      orderId,
-      idempotencyKey,
-    }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -66,6 +72,15 @@ export async function processCardPayment(
       paymentToken,
       paymentMethodId,
       installments,
+      payerEmail,
+    }),
+  });
+}
+
+export async function processPixPayment(paymentId, { payerEmail }) {
+  return request(`/api/payments/${paymentId}/pix`, {
+    method: "POST",
+    body: JSON.stringify({
       payerEmail,
     }),
   });

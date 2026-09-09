@@ -1,4 +1,4 @@
-import { createOrder, createPayment, processCardPayment } from "./api.js";
+﻿import { createOrder, createPayment, processCardPayment } from "./api.js";
 import { WHATSAPP_PHONE_NUMBER } from "./config.js";
 import { getCartSubtotal, getCartTotalWithDelivery, getDeliveryFee, updateCart } from "./cart.js";
 import {
@@ -95,7 +95,7 @@ function getCheckoutFingerprint(cart) {
 
 function createIdempotencyKey() {
   if (!globalThis.crypto || typeof globalThis.crypto.randomUUID !== "function") {
-    throw new Error("O navegador não oferece suporte à geração segura de UUID.");
+    throw new Error("O navegador nÃ£o oferece suporte Ã  geraÃ§Ã£o segura de UUID.");
   }
 
   return globalThis.crypto.randomUUID();
@@ -309,7 +309,7 @@ async function prepareOrderForPayment() {
 
 async function ensurePaymentCreated() {
   if (!checkoutSession) {
-    throw new Error("O pedido ainda não foi preparado para pagamento.");
+    throw new Error("O pedido ainda nÃ£o foi preparado para pagamento.");
   }
 
   if (checkoutSession.paymentId && checkoutSession.idempotencyKey) {
@@ -335,7 +335,7 @@ async function ensurePaymentCreated() {
 
 function buildWhatsAppMessage() {
   if (!checkoutSession) {
-    throw new Error("Não existe pedido confirmado.");
+    throw new Error("NÃ£o existe pedido confirmado.");
   }
 
   const cart = getCart();
@@ -412,7 +412,7 @@ function sendConfirmationToWhatsApp() {
  */
 async function handlePaymentSubmit(cardData) {
   if (!checkoutSession) {
-    showPaymentError("O pedido não está preparado para pagamento.");
+    showPaymentError("O pedido nÃ£o estÃ¡ preparado para pagamento.");
 
     return;
   }
@@ -426,19 +426,19 @@ async function handlePaymentSubmit(cardData) {
   const payerEmail = String(cardData?.cardholderEmail ?? elements.paymentEmail?.value ?? "").trim();
 
   if (!paymentToken) {
-    showPaymentError("Não foi possível gerar o token do cartão. Confira os dados.");
+    showPaymentError("NÃ£o foi possÃ­vel gerar o token do cartÃ£o. Confira os dados.");
 
     return;
   }
 
   if (!paymentMethodId) {
-    showPaymentError("Não foi possível identificar a bandeira do cartão.");
+    showPaymentError("NÃ£o foi possÃ­vel identificar a bandeira do cartÃ£o.");
 
     return;
   }
 
   if (!Number.isInteger(installments) || installments <= 0) {
-    showPaymentError("Selecione uma quantidade válida de parcelas.");
+    showPaymentError("Selecione uma quantidade vÃ¡lida de parcelas.");
 
     return;
   }
@@ -476,7 +476,7 @@ async function handlePaymentSubmit(cardData) {
     if (isRejectedStatus(result.status)) {
       resetPaymentAttempt();
 
-      showPaymentError("O pagamento foi recusado. Confira os dados do cartão e tente novamente.");
+      showPaymentError("O pagamento foi recusado. Confira os dados do cartÃ£o e tente novamente.");
 
       return;
     }
@@ -484,14 +484,14 @@ async function handlePaymentSubmit(cardData) {
     if (isCancelledStatus(result.status)) {
       resetPaymentAttempt();
 
-      showPaymentError("O pagamento foi cancelado. Você pode tentar novamente.");
+      showPaymentError("O pagamento foi cancelado. VocÃª pode tentar novamente.");
 
       return;
     }
 
     if (isPendingStatus(result.status)) {
       showPaymentError(
-        "O pagamento está em análise. Aguarde a confirmação antes de tentar novamente.",
+        "O pagamento estÃ¡ em anÃ¡lise. Aguarde a confirmaÃ§Ã£o antes de tentar novamente.",
       );
 
       return;
@@ -499,7 +499,7 @@ async function handlePaymentSubmit(cardData) {
 
     showPaymentError("O Mercado Pago retornou um status de pagamento inesperado.");
   } catch (error) {
-    console.error("Não foi possível processar o pagamento:", error);
+    console.error("NÃ£o foi possÃ­vel processar o pagamento:", error);
 
     const status = getApiErrorStatus(error);
 
@@ -517,13 +517,13 @@ async function handlePaymentSubmit(cardData) {
 
     if (status === 502 || code === "payment_provider_unavailable") {
       showPaymentError(
-        "Não foi possível confirmar o resultado do pagamento. Aguarde antes de tentar novamente.",
+        "NÃ£o foi possÃ­vel confirmar o resultado do pagamento. Aguarde antes de tentar novamente.",
       );
 
       return;
     }
 
-    showPaymentError("Não foi possível processar o pagamento. Tente novamente.");
+    showPaymentError("NÃ£o foi possÃ­vel processar o pagamento. Tente novamente.");
   } finally {
     setPaymentProcessing(false);
   }
@@ -563,11 +563,11 @@ async function openPaymentStep() {
 
     await initializePaymentForm(session.total, handlePaymentSubmit);
   } catch (error) {
-    console.error("Não foi possível preparar o pagamento:", error);
+    console.error("NÃ£o foi possÃ­vel preparar o pagamento:", error);
 
-    showPaymentError("Não foi possível carregar o pagamento.");
+    showPaymentError("NÃ£o foi possÃ­vel carregar o pagamento.");
 
-    showToast("Não foi possível preparar o pagamento. Tente novamente.");
+    showToast("NÃ£o foi possÃ­vel preparar o pagamento. Tente novamente.");
   } finally {
     setGoToPaymentLoading(false);
   }
