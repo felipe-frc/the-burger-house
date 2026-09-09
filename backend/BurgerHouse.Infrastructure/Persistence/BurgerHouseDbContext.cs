@@ -1,11 +1,13 @@
 using BurgerHouse.Domain.Entities;
+using BurgerHouse.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace BurgerHouse.Infrastructure.Persistence;
 
 public class BurgerHouseDbContext : DbContext
 {
-    public BurgerHouseDbContext(DbContextOptions<BurgerHouseDbContext> options)
+    public BurgerHouseDbContext(
+        DbContextOptions<BurgerHouseDbContext> options)
         : base(options)
     {
     }
@@ -15,7 +17,8 @@ public class BurgerHouseDbContext : DbContext
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<Payment> Payments => Set<Payment>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(
+        ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
@@ -159,7 +162,9 @@ public class BurgerHouseDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.Navigation(order => order.Items)
-                .UsePropertyAccessMode(PropertyAccessMode.Field);
+                .UsePropertyAccessMode(
+                    PropertyAccessMode.Field
+                );
         });
 
         modelBuilder.Entity<OrderItem>(entity =>
@@ -206,6 +211,12 @@ public class BurgerHouseDbContext : DbContext
 
             entity.Property(payment => payment.Status)
                 .IsRequired();
+
+            entity.Property(payment => payment.Method)
+                .IsRequired()
+                .HasDefaultValue(
+                    PaymentMethod.CreditCard
+                );
 
             entity.Property(payment => payment.IdempotencyKey)
                 .IsRequired()

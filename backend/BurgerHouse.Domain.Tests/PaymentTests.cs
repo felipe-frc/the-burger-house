@@ -9,7 +9,7 @@ public class PaymentTests
         "11111111-1111-4111-8111-111111111111";
 
     [Fact]
-    public void Constructor_ShouldCreatePendingPayment()
+    public void Constructor_ShouldCreatePendingCreditCardPaymentByDefault()
     {
         var payment = new Payment(
             orderId: 1,
@@ -19,11 +19,63 @@ public class PaymentTests
 
         Assert.Equal(1, payment.OrderId);
         Assert.Equal(87.80m, payment.Amount);
-        Assert.Equal(PaymentStatus.Pending, payment.Status);
-        Assert.Equal(IdempotencyKey, payment.IdempotencyKey);
+
+        Assert.Equal(
+            PaymentStatus.Pending,
+            payment.Status
+        );
+
+        Assert.Equal(
+            PaymentMethod.CreditCard,
+            payment.Method
+        );
+
+        Assert.Equal(
+            IdempotencyKey,
+            payment.IdempotencyKey
+        );
+
         Assert.Null(payment.ExternalPaymentId);
         Assert.NotEqual(default, payment.CreatedAt);
         Assert.Null(payment.UpdatedAt);
+    }
+
+    [Theory]
+    [InlineData(PaymentMethod.Pix)]
+    [InlineData(PaymentMethod.CreditCard)]
+    [InlineData(PaymentMethod.DebitCard)]
+    public void Constructor_ShouldCreatePaymentWithSelectedMethod(
+        PaymentMethod method)
+    {
+        var payment = new Payment(
+            orderId: 1,
+            amount: 87.80m,
+            idempotencyKey: IdempotencyKey,
+            method: method
+        );
+
+        Assert.Equal(
+            method,
+            payment.Method
+        );
+
+        Assert.Equal(
+            PaymentStatus.Pending,
+            payment.Status
+        );
+    }
+
+    [Fact]
+    public void Constructor_ShouldThrow_WhenPaymentMethodIsInvalid()
+    {
+        Assert.Throws<ArgumentException>(
+            () => new Payment(
+                orderId: 1,
+                amount: 87.80m,
+                idempotencyKey: IdempotencyKey,
+                method: (PaymentMethod)999
+            )
+        );
     }
 
     [Fact]

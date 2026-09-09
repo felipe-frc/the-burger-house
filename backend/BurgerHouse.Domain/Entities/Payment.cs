@@ -8,6 +8,7 @@ public class Payment
     public int OrderId { get; private set; }
     public decimal Amount { get; private set; }
     public PaymentStatus Status { get; private set; }
+    public PaymentMethod Method { get; private set; }
     public string IdempotencyKey { get; private set; }
     public string? ExternalOrderId { get; private set; }
     public string? ExternalPaymentId { get; private set; }
@@ -17,7 +18,8 @@ public class Payment
     public Payment(
         int orderId,
         decimal amount,
-        string idempotencyKey)
+        string idempotencyKey,
+        PaymentMethod method = PaymentMethod.CreditCard)
     {
         if (orderId <= 0)
             throw new ArgumentException(
@@ -34,6 +36,11 @@ public class Payment
                 "Idempotency key cannot be empty."
             );
 
+        if (!Enum.IsDefined(method))
+            throw new ArgumentException(
+                "Payment method is invalid."
+            );
+
         var normalizedKey = idempotencyKey.Trim();
 
         if (!Guid.TryParseExact(
@@ -48,6 +55,7 @@ public class Payment
 
         OrderId = orderId;
         Amount = amount;
+        Method = method;
         IdempotencyKey = parsedKey.ToString("D");
         Status = PaymentStatus.Pending;
         CreatedAt = DateTime.UtcNow;

@@ -28,12 +28,18 @@ public class CreatePaymentHandler
                 "Order id must be greater than zero."
             );
 
+        if (!Enum.IsDefined(request.Method))
+            throw new ArgumentException(
+                "Payment method is invalid."
+            );
+
         if (string.IsNullOrWhiteSpace(request.IdempotencyKey))
             throw new ArgumentException(
                 "Idempotency key cannot be empty."
             );
 
-        var normalizedKey = request.IdempotencyKey.Trim();
+        var normalizedKey =
+            request.IdempotencyKey.Trim();
 
         if (!Guid.TryParseExact(
                 normalizedKey,
@@ -45,66 +51,91 @@ public class CreatePaymentHandler
             );
         }
 
-        normalizedKey = parsedKey.ToString("D");
+        normalizedKey =
+            parsedKey.ToString("D");
 
         var paymentWithSameKey =
-            await _paymentRepository.GetByIdempotencyKeyAsync(
-                normalizedKey,
-                cancellationToken
-            );
+            await _paymentRepository
+                .GetByIdempotencyKeyAsync(
+                    normalizedKey,
+                    cancellationToken
+                );
 
         if (paymentWithSameKey is not null)
         {
-            if (paymentWithSameKey.OrderId != request.OrderId)
+            if (paymentWithSameKey.OrderId !=
+                request.OrderId)
             {
                 throw new InvalidOperationException(
                     "Idempotency key is already associated with another order."
                 );
             }
 
-            return ToResponse(paymentWithSameKey);
+            if (paymentWithSameKey.Method !=
+                request.Method)
+            {
+                throw new InvalidOperationException(
+                    "Idempotency key is already associated with another payment method."
+                );
+            }
+
+            return ToResponse(
+                paymentWithSameKey
+            );
         }
 
-        var order = await _orderRepository.GetByIdAsync(
-            request.OrderId,
-            cancellationToken
-        );
-
-        if (order is null)
-            throw new KeyNotFoundException(
-                $"Order '{request.OrderId}' was not found."
-            );
-
-        if (order.Status != OrderStatus.PendingPayment)
-            throw new InvalidOperationException(
-                "Only orders pending payment can create a payment."
-            );
-
-        var activePayment =
-            await _paymentRepository.GetActiveByOrderIdAsync(
-                order.Id,
+        var order =
+            await _orderRepository.GetByIdAsync(
+                request.OrderId,
                 cancellationToken
             );
 
+        if (order is null)
+        {
+            throw new KeyNotFoundException(
+                $"Order '{request.OrderId}' was not found."
+            );
+        }
+
+        if (order.Status !=
+            OrderStatus.PendingPayment)
+        {
+            throw new InvalidOperationException(
+                "Only orders pending payment can create a payment."
+            );
+        }
+
+        var activePayment =
+            await _paymentRepository
+                .GetActiveByOrderIdAsync(
+                    order.Id,
+                    cancellationToken
+                );
+
         if (activePayment is not null)
+        {
             throw new InvalidOperationException(
                 "An active payment already exists for this order."
             );
+        }
 
-        var payment = new Payment(
-            order.Id,
-            order.Total,
-            normalizedKey
-        );
+        var payment =
+            new Payment(
+                order.Id,
+                order.Total,
+                normalizedKey,
+                request.Method
+            );
 
         await _paymentRepository.AddAsync(
             payment,
             cancellationToken
         );
 
-        await _paymentRepository.SaveChangesAsync(
-            cancellationToken
-        );
+        await _paymentRepository
+            .SaveChangesAsync(
+                cancellationToken
+            );
 
         return ToResponse(payment);
     }
@@ -117,7 +148,8 @@ public class CreatePaymentHandler
             PaymentId = payment.Id,
             OrderId = payment.OrderId,
             Amount = payment.Amount,
-            Status = payment.Status
+            Status = payment.Status,
+            Method = payment.Method
         };
     }
 }

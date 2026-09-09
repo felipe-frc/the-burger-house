@@ -8,4 +8,5 @@ public class CreatePaymentResponse
     public int OrderId { get; init; }
     public decimal Amount { get; init; }
     public PaymentStatus Status { get; init; }
+    public PaymentMethod Method { get; init; }
 }
