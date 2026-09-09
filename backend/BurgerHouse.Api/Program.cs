@@ -10,6 +10,7 @@ using BurgerHouse.Application.Payments.SynchronizePaymentStatus;
 using BurgerHouse.Infrastructure.Payments.MercadoPago;
 using BurgerHouse.Infrastructure.Persistence;
 using BurgerHouse.Infrastructure.Repositories;
+using BurgerHouse.Application.Payments.GetPaymentStatus;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -103,6 +104,9 @@ builder.Services.AddScoped<
 
 builder.Services.AddScoped<
     ProcessPixPaymentHandler>();
+
+builder.Services.AddScoped<
+    GetPaymentStatusHandler>();
 
 builder.Services.AddScoped<
     SynchronizePaymentStatusHandler>();

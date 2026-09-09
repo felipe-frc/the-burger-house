@@ -1,6 +1,8 @@
 using BurgerHouse.Application.Payments.CreatePayment;
+using BurgerHouse.Application.Payments.GetPaymentStatus;
 using BurgerHouse.Application.Payments.ProcessCardPayment;
 using BurgerHouse.Application.Payments.ProcessPixPayment;
+
 using Microsoft.AspNetCore.Mvc;
 
 namespace BurgerHouse.Api.Controllers;
@@ -18,10 +20,14 @@ public class PaymentsController : ControllerBase
     private readonly ProcessPixPaymentHandler?
         _processPixPaymentHandler;
 
+    private readonly GetPaymentStatusHandler?
+        _getPaymentStatusHandler;
+
     public PaymentsController(
         CreatePaymentHandler createPaymentHandler,
         ProcessCardPaymentHandler processCardPaymentHandler,
-        ProcessPixPaymentHandler? processPixPaymentHandler = null)
+        ProcessPixPaymentHandler? processPixPaymentHandler = null,
+        GetPaymentStatusHandler? getPaymentStatusHandler = null)
     {
         _createPaymentHandler =
             createPaymentHandler;
@@ -31,6 +37,60 @@ public class PaymentsController : ControllerBase
 
         _processPixPaymentHandler =
             processPixPaymentHandler;
+
+        _getPaymentStatusHandler =
+            getPaymentStatusHandler;
+    }
+
+    [HttpGet("{paymentId:int}")]
+    public async Task<
+        ActionResult<GetPaymentStatusResponse>>
+        GetStatusAsync(
+            [FromRoute] int paymentId,
+            CancellationToken cancellationToken)
+    {
+        if (_getPaymentStatusHandler is null)
+        {
+            return StatusCode(
+                StatusCodes
+                    .Status500InternalServerError,
+                new
+                {
+                    error =
+                        "Payment status handler is unavailable."
+                }
+            );
+        }
+
+        try
+        {
+            var response =
+                await _getPaymentStatusHandler
+                    .HandleAsync(
+                        paymentId,
+                        cancellationToken
+                    );
+
+            return Ok(
+                response
+            );
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new
+            {
+                error =
+                    exception.Message
+            });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(new
+            {
+                error =
+                    exception.Message
+            });
+        }
     }
 
     [HttpPost]
