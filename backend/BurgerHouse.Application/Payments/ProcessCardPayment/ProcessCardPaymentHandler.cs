@@ -24,39 +24,64 @@ public sealed class ProcessCardPaymentHandler
         ArgumentNullException.ThrowIfNull(request);
 
         if (request.PaymentId <= 0)
+        {
             throw new ArgumentException(
                 "Payment id must be greater than zero."
             );
+        }
 
-        if (string.IsNullOrWhiteSpace(request.PaymentToken))
+        if (string.IsNullOrWhiteSpace(
+                request.PaymentToken))
+        {
             throw new ArgumentException(
                 "Payment token cannot be empty."
             );
+        }
 
-        if (string.IsNullOrWhiteSpace(request.PaymentMethodId))
+        if (string.IsNullOrWhiteSpace(
+                request.PaymentMethodId))
+        {
             throw new ArgumentException(
                 "Payment method id cannot be empty."
             );
+        }
 
         if (request.Installments <= 0)
+        {
             throw new ArgumentException(
                 "Installments must be greater than zero."
             );
+        }
 
-        if (string.IsNullOrWhiteSpace(request.PayerEmail))
+        if (string.IsNullOrWhiteSpace(
+                request.PayerEmail))
+        {
             throw new ArgumentException(
                 "Payer email cannot be empty."
             );
+        }
 
-        var payment = await _paymentRepository.GetByIdAsync(
-            request.PaymentId,
-            cancellationToken
-        );
+        var payment =
+            await _paymentRepository.GetByIdAsync(
+                request.PaymentId,
+                cancellationToken
+            );
 
         if (payment is null)
+        {
             throw new KeyNotFoundException(
                 $"Payment '{request.PaymentId}' was not found."
             );
+        }
+
+        if (payment.Method is not (
+            PaymentMethod.CreditCard or
+            PaymentMethod.DebitCard))
+        {
+            throw new InvalidOperationException(
+                "Only card payments can be processed by this operation."
+            );
+        }
 
         if (payment.Status != PaymentStatus.Pending)
         {
@@ -65,17 +90,39 @@ public sealed class ProcessCardPaymentHandler
             );
         }
 
-        var gatewayRequest = new PaymentGatewayRequest
+        if (payment.Method ==
+                PaymentMethod.DebitCard &&
+            request.Installments != 1)
         {
-            OrderId = payment.OrderId,
-            Amount = payment.Amount,
-            IdempotencyKey = payment.IdempotencyKey,
+            throw new ArgumentException(
+                "Debit card payments must use exactly one installment."
+            );
+        }
 
-            PaymentToken = request.PaymentToken.Trim(),
-            PaymentMethodId = request.PaymentMethodId.Trim(),
-            Installments = request.Installments,
-            PayerEmail = request.PayerEmail.Trim()
-        };
+        var gatewayRequest =
+            new PaymentGatewayRequest
+            {
+                OrderId = payment.OrderId,
+                Amount = payment.Amount,
+
+                IdempotencyKey =
+                    payment.IdempotencyKey,
+
+                Method =
+                    payment.Method,
+
+                PaymentToken =
+                    request.PaymentToken.Trim(),
+
+                PaymentMethodId =
+                    request.PaymentMethodId.Trim(),
+
+                Installments =
+                    request.Installments,
+
+                PayerEmail =
+                    request.PayerEmail.Trim()
+            };
 
         PaymentGatewayResult gatewayResult;
 
@@ -89,13 +136,15 @@ public sealed class ProcessCardPaymentHandler
         }
         catch (HttpRequestException exception)
         {
-            if (IsDefinitiveProviderRejection(exception))
+            if (IsDefinitiveProviderRejection(
+                    exception))
             {
                 payment.Reject();
 
-                await _paymentRepository.SaveChangesAsync(
-                    cancellationToken
-                );
+                await _paymentRepository
+                    .SaveChangesAsync(
+                        cancellationToken
+                    );
             }
 
             throw;
@@ -163,8 +212,12 @@ public sealed class ProcessCardPaymentHandler
             OrderId = payment.OrderId,
             Amount = payment.Amount,
             Status = payment.Status,
-            ExternalOrderId = payment.ExternalOrderId,
-            ExternalPaymentId = payment.ExternalPaymentId
+
+            ExternalOrderId =
+                payment.ExternalOrderId,
+
+            ExternalPaymentId =
+                payment.ExternalPaymentId
         };
     }
 
@@ -176,7 +229,8 @@ public sealed class ProcessCardPaymentHandler
             return false;
         }
 
-        var statusCode = (int)exception.StatusCode.Value;
+        var statusCode =
+            (int)exception.StatusCode.Value;
 
         return statusCode >= 400 &&
                statusCode < 500;

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection;
+
 using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Payments.ProcessCardPayment;
@@ -25,26 +26,37 @@ public class ProcessCardPaymentHandlerTests
         var repository =
             new FakePaymentRepository(payment);
 
-        var gateway = new FakePaymentGateway(
-            new PaymentGatewayResult
-            {
-                ExternalOrderId = "mp-order-123",
-                ExternalPaymentId = "mp-payment-456",
-                Status = PaymentGatewayStatus.Pending,
-                StatusDetail = "processing"
-            }
-        );
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult
+                {
+                    ExternalOrderId =
+                        "mp-order-123",
 
-        var handler = new ProcessCardPaymentHandler(
-            repository,
-            gateway
-        );
+                    ExternalPaymentId =
+                        "mp-payment-456",
+
+                    Status =
+                        PaymentGatewayStatus.Pending,
+
+                    StatusDetail =
+                        "processing"
+                }
+            );
+
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
 
         await handler.HandleAsync(
             CreateValidRequest()
         );
 
-        Assert.NotNull(gateway.ReceivedRequest);
+        Assert.NotNull(
+            gateway.ReceivedRequest
+        );
 
         Assert.Equal(
             25,
@@ -60,6 +72,143 @@ public class ProcessCardPaymentHandlerTests
             IdempotencyKey,
             gateway.ReceivedRequest.IdempotencyKey
         );
+
+        Assert.Equal(
+            PaymentMethod.CreditCard,
+            gateway.ReceivedRequest.Method
+        );
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldSendDebitCardMethodToGateway()
+    {
+        var payment =
+            CreatePayment(
+                method:
+                    PaymentMethod.DebitCard
+            );
+
+        var repository =
+            new FakePaymentRepository(
+                payment
+            );
+
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult
+                {
+                    ExternalOrderId =
+                        "mp-order-debit",
+
+                    ExternalPaymentId =
+                        "mp-payment-debit",
+
+                    Status =
+                        PaymentGatewayStatus
+                            .Approved,
+
+                    StatusDetail =
+                        "accredited"
+                }
+            );
+
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
+
+        await handler.HandleAsync(
+            CreateValidRequest(
+                installments: 1
+            )
+        );
+
+        Assert.NotNull(
+            gateway.ReceivedRequest
+        );
+
+        Assert.Equal(
+            PaymentMethod.DebitCard,
+            gateway.ReceivedRequest.Method
+        );
+
+        Assert.Equal(
+            1,
+            gateway.ReceivedRequest.Installments
+        );
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldRejectPixPayment()
+    {
+        var payment =
+            CreatePayment(
+                method:
+                    PaymentMethod.Pix
+            );
+
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult()
+            );
+
+        var handler =
+            new ProcessCardPaymentHandler(
+                new FakePaymentRepository(
+                    payment
+                ),
+                gateway
+            );
+
+        await Assert.ThrowsAsync<
+            InvalidOperationException>(
+            () => handler.HandleAsync(
+                CreateValidRequest()
+            )
+        );
+
+        Assert.Equal(
+            0,
+            gateway.CallCount
+        );
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldRejectDebitWithMoreThanOneInstallment()
+    {
+        var payment =
+            CreatePayment(
+                method:
+                    PaymentMethod.DebitCard
+            );
+
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult()
+            );
+
+        var handler =
+            new ProcessCardPaymentHandler(
+                new FakePaymentRepository(
+                    payment
+                ),
+                gateway
+            );
+
+        await Assert.ThrowsAsync<
+            ArgumentException>(
+            () => handler.HandleAsync(
+                CreateValidRequest(
+                    installments: 2
+                )
+            )
+        );
+
+        Assert.Equal(
+            0,
+            gateway.CallCount
+        );
     }
 
     [Fact]
@@ -70,24 +219,35 @@ public class ProcessCardPaymentHandlerTests
         var repository =
             new FakePaymentRepository(payment);
 
-        var gateway = new FakePaymentGateway(
-            new PaymentGatewayResult
-            {
-                ExternalOrderId = "mp-order-123",
-                ExternalPaymentId = "mp-payment-456",
-                Status = PaymentGatewayStatus.Approved,
-                StatusDetail = "accredited"
-            }
-        );
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult
+                {
+                    ExternalOrderId =
+                        "mp-order-123",
 
-        var handler = new ProcessCardPaymentHandler(
-            repository,
-            gateway
-        );
+                    ExternalPaymentId =
+                        "mp-payment-456",
 
-        var response = await handler.HandleAsync(
-            CreateValidRequest()
-        );
+                    Status =
+                        PaymentGatewayStatus
+                            .Approved,
+
+                    StatusDetail =
+                        "accredited"
+                }
+            );
+
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
+
+        var response =
+            await handler.HandleAsync(
+                CreateValidRequest()
+            );
 
         Assert.Equal(
             PaymentStatus.Approved,
@@ -104,7 +264,10 @@ public class ProcessCardPaymentHandlerTests
             payment.ExternalPaymentId
         );
 
-        Assert.Equal(1, repository.SaveChangesCount);
+        Assert.Equal(
+            1,
+            repository.SaveChangesCount
+        );
 
         Assert.Equal(
             PaymentStatus.Approved,
@@ -120,24 +283,35 @@ public class ProcessCardPaymentHandlerTests
         var repository =
             new FakePaymentRepository(payment);
 
-        var gateway = new FakePaymentGateway(
-            new PaymentGatewayResult
-            {
-                ExternalOrderId = "mp-order-123",
-                ExternalPaymentId = "mp-payment-456",
-                Status = PaymentGatewayStatus.Pending,
-                StatusDetail = "processing"
-            }
-        );
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult
+                {
+                    ExternalOrderId =
+                        "mp-order-123",
 
-        var handler = new ProcessCardPaymentHandler(
-            repository,
-            gateway
-        );
+                    ExternalPaymentId =
+                        "mp-payment-456",
 
-        var response = await handler.HandleAsync(
-            CreateValidRequest()
-        );
+                    Status =
+                        PaymentGatewayStatus
+                            .Pending,
+
+                    StatusDetail =
+                        "processing"
+                }
+            );
+
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
+
+        var response =
+            await handler.HandleAsync(
+                CreateValidRequest()
+            );
 
         Assert.Equal(
             PaymentStatus.Pending,
@@ -149,7 +323,10 @@ public class ProcessCardPaymentHandlerTests
             response.Status
         );
 
-        Assert.Equal(1, repository.SaveChangesCount);
+        Assert.Equal(
+            1,
+            repository.SaveChangesCount
+        );
     }
 
     [Fact]
@@ -160,20 +337,30 @@ public class ProcessCardPaymentHandlerTests
         var repository =
             new FakePaymentRepository(payment);
 
-        var gateway = new FakePaymentGateway(
-            new PaymentGatewayResult
-            {
-                ExternalOrderId = "mp-order-123",
-                ExternalPaymentId = "mp-payment-456",
-                Status = PaymentGatewayStatus.Rejected,
-                StatusDetail = "rejected_by_issuer"
-            }
-        );
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult
+                {
+                    ExternalOrderId =
+                        "mp-order-123",
 
-        var handler = new ProcessCardPaymentHandler(
-            repository,
-            gateway
-        );
+                    ExternalPaymentId =
+                        "mp-payment-456",
+
+                    Status =
+                        PaymentGatewayStatus
+                            .Rejected,
+
+                    StatusDetail =
+                        "rejected_by_issuer"
+                }
+            );
+
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
 
         await handler.HandleAsync(
             CreateValidRequest()
@@ -184,7 +371,10 @@ public class ProcessCardPaymentHandlerTests
             payment.Status
         );
 
-        Assert.Equal(1, repository.SaveChangesCount);
+        Assert.Equal(
+            1,
+            repository.SaveChangesCount
+        );
     }
 
     [Theory]
@@ -193,25 +383,32 @@ public class ProcessCardPaymentHandlerTests
     public async Task HandleAsync_ShouldRejectPayment_WhenProviderReturnsDefinitive4xx(
         HttpStatusCode statusCode)
     {
-        var payment = CreatePayment();
+        var payment =
+            CreatePayment();
 
         var repository =
-            new FakePaymentRepository(payment);
+            new FakePaymentRepository(
+                payment
+            );
 
-        var gateway = new FakePaymentGateway(
-            new HttpRequestException(
-                "Provider rejected the request.",
-                inner: null,
-                statusCode: statusCode
-            )
-        );
+        var gateway =
+            new FakePaymentGateway(
+                new HttpRequestException(
+                    "Provider rejected the request.",
+                    inner: null,
+                    statusCode:
+                        statusCode
+                )
+            );
 
-        var handler = new ProcessCardPaymentHandler(
-            repository,
-            gateway
-        );
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
 
-        await Assert.ThrowsAsync<HttpRequestException>(
+        await Assert.ThrowsAsync<
+            HttpRequestException>(
             () => handler.HandleAsync(
                 CreateValidRequest()
             )
@@ -236,25 +433,33 @@ public class ProcessCardPaymentHandlerTests
     [Fact]
     public async Task HandleAsync_ShouldKeepPaymentPending_WhenProviderFailureIsAmbiguous()
     {
-        var payment = CreatePayment();
+        var payment =
+            CreatePayment();
 
         var repository =
-            new FakePaymentRepository(payment);
+            new FakePaymentRepository(
+                payment
+            );
 
-        var gateway = new FakePaymentGateway(
-            new HttpRequestException(
-                "Provider unavailable.",
-                inner: null,
-                statusCode: HttpStatusCode.BadGateway
-            )
-        );
+        var gateway =
+            new FakePaymentGateway(
+                new HttpRequestException(
+                    "Provider unavailable.",
+                    inner: null,
+                    statusCode:
+                        HttpStatusCode
+                            .BadGateway
+                )
+            );
 
-        var handler = new ProcessCardPaymentHandler(
-            repository,
-            gateway
-        );
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
 
-        await Assert.ThrowsAsync<HttpRequestException>(
+        await Assert.ThrowsAsync<
+            HttpRequestException>(
             () => handler.HandleAsync(
                 CreateValidRequest()
             )
@@ -282,146 +487,217 @@ public class ProcessCardPaymentHandlerTests
         var repository =
             new FakePaymentRepository();
 
-        var gateway = new FakePaymentGateway(
-            new PaymentGatewayResult()
-        );
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult()
+            );
 
-        var handler = new ProcessCardPaymentHandler(
-            repository,
-            gateway
-        );
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
 
-        await Assert.ThrowsAsync<KeyNotFoundException>(
+        await Assert.ThrowsAsync<
+            KeyNotFoundException>(
             () => handler.HandleAsync(
                 CreateValidRequest()
             )
         );
 
-        Assert.Equal(0, gateway.CallCount);
-        Assert.Equal(0, repository.SaveChangesCount);
+        Assert.Equal(
+            0,
+            gateway.CallCount
+        );
+
+        Assert.Equal(
+            0,
+            repository.SaveChangesCount
+        );
     }
 
     [Fact]
     public async Task HandleAsync_ShouldNotCallGateway_WhenPaymentIsNotPending()
     {
-        var payment = CreatePayment();
+        var payment =
+            CreatePayment();
+
         payment.Approve();
 
         var repository =
-            new FakePaymentRepository(payment);
+            new FakePaymentRepository(
+                payment
+            );
 
-        var gateway = new FakePaymentGateway(
-            new PaymentGatewayResult()
-        );
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult()
+            );
 
-        var handler = new ProcessCardPaymentHandler(
-            repository,
-            gateway
-        );
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+        await Assert.ThrowsAsync<
+            InvalidOperationException>(
             () => handler.HandleAsync(
                 CreateValidRequest()
             )
         );
 
-        Assert.Equal(0, gateway.CallCount);
-        Assert.Equal(0, repository.SaveChangesCount);
+        Assert.Equal(
+            0,
+            gateway.CallCount
+        );
+
+        Assert.Equal(
+            0,
+            repository.SaveChangesCount
+        );
     }
 
     [Fact]
     public async Task HandleAsync_ShouldRejectInvalidRequestBeforeGatewayCall()
     {
-        var payment = CreatePayment();
+        var payment =
+            CreatePayment();
 
         var repository =
-            new FakePaymentRepository(payment);
+            new FakePaymentRepository(
+                payment
+            );
 
-        var gateway = new FakePaymentGateway(
-            new PaymentGatewayResult()
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult()
+            );
+
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
+
+        var request =
+            new ProcessCardPaymentRequest
+            {
+                PaymentId = 10,
+
+                PaymentToken =
+                    string.Empty,
+
+                PaymentMethodId =
+                    "master",
+
+                Installments = 2,
+
+                PayerEmail =
+                    "cliente@email.com"
+            };
+
+        await Assert.ThrowsAsync<
+            ArgumentException>(
+            () => handler.HandleAsync(
+                request
+            )
         );
 
-        var handler = new ProcessCardPaymentHandler(
-            repository,
-            gateway
+        Assert.Equal(
+            0,
+            gateway.CallCount
         );
-
-        var request = CreateValidRequest();
-
-        request = new ProcessCardPaymentRequest
-        {
-            PaymentId = request.PaymentId,
-            PaymentToken = "",
-            PaymentMethodId = request.PaymentMethodId,
-            Installments = request.Installments,
-            PayerEmail = request.PayerEmail
-        };
-
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => handler.HandleAsync(request)
-        );
-
-        Assert.Equal(0, gateway.CallCount);
     }
 
     [Theory]
     [InlineData(PaymentGatewayStatus.Expired)]
     [InlineData(PaymentGatewayStatus.Refunded)]
-    [InlineData(PaymentGatewayStatus.PartiallyRefunded)]
-    [InlineData(PaymentGatewayStatus.ChargedBack)]
+    [InlineData(
+        PaymentGatewayStatus.PartiallyRefunded)]
+    [InlineData(
+        PaymentGatewayStatus.ChargedBack)]
     public async Task HandleAsync_ShouldRejectPostPaymentStatusesDuringInitialProcessing(
         PaymentGatewayStatus gatewayStatus)
     {
-        var payment = CreatePayment();
+        var payment =
+            CreatePayment();
 
         var repository =
-            new FakePaymentRepository(payment);
+            new FakePaymentRepository(
+                payment
+            );
 
-        var gateway = new FakePaymentGateway(
-            new PaymentGatewayResult
-            {
-                ExternalOrderId = "mp-order-123",
-                ExternalPaymentId = "mp-payment-456",
-                Status = gatewayStatus
-            }
-        );
+        var gateway =
+            new FakePaymentGateway(
+                new PaymentGatewayResult
+                {
+                    ExternalOrderId =
+                        "mp-order-123",
 
-        var handler = new ProcessCardPaymentHandler(
-            repository,
-            gateway
-        );
+                    ExternalPaymentId =
+                        "mp-payment-456",
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
+                    Status =
+                        gatewayStatus
+                }
+            );
+
+        var handler =
+            new ProcessCardPaymentHandler(
+                repository,
+                gateway
+            );
+
+        await Assert.ThrowsAsync<
+            InvalidOperationException>(
             () => handler.HandleAsync(
                 CreateValidRequest()
             )
         );
 
-        Assert.Equal(0, repository.SaveChangesCount);
+        Assert.Equal(
+            0,
+            repository.SaveChangesCount
+        );
     }
 
-    private static ProcessCardPaymentRequest CreateValidRequest()
+    private static ProcessCardPaymentRequest
+        CreateValidRequest(
+            int installments = 2)
     {
         return new ProcessCardPaymentRequest
         {
             PaymentId = 10,
-            PaymentToken = "temporary-payment-token",
-            PaymentMethodId = "master",
-            Installments = 2,
-            PayerEmail = "cliente@email.com"
+
+            PaymentToken =
+                "temporary-payment-token",
+
+            PaymentMethodId =
+                "master",
+
+            Installments =
+                installments,
+
+            PayerEmail =
+                "cliente@email.com"
         };
     }
 
     private static Payment CreatePayment(
         int id = 10,
         int orderId = 25,
-        decimal amount = 87.80m)
+        decimal amount = 87.80m,
+        PaymentMethod method =
+            PaymentMethod.CreditCard)
     {
-        var payment = new Payment(
-            orderId,
-            amount,
-            IdempotencyKey
-        );
+        var payment =
+            new Payment(
+                orderId,
+                amount,
+                IdempotencyKey,
+                method
+            );
 
         SetPrivateProperty(
             payment,
@@ -437,23 +713,36 @@ public class ProcessCardPaymentHandlerTests
         string propertyName,
         object value)
     {
-        var property = typeof(T).GetProperty(
-            propertyName,
-            BindingFlags.Instance |
-            BindingFlags.Public
-        );
+        var property =
+            typeof(T).GetProperty(
+                propertyName,
+                BindingFlags.Instance |
+                BindingFlags.Public
+            );
 
-        property?.SetValue(instance, value);
+        property?.SetValue(
+            instance,
+            value
+        );
     }
 
-    private sealed class FakePaymentGateway : IPaymentGateway
+    private sealed class FakePaymentGateway
+        : IPaymentGateway
     {
-        private readonly PaymentGatewayResult? _result;
-        private readonly HttpRequestException? _exception;
+        private readonly
+            PaymentGatewayResult? _result;
 
-        public int CallCount { get; private set; }
+        private readonly
+            HttpRequestException? _exception;
 
-        public PaymentGatewayRequest? ReceivedRequest
+        public int CallCount
+        {
+            get;
+            private set;
+        }
+
+        public PaymentGatewayRequest?
+            ReceivedRequest
         {
             get;
             private set;
@@ -471,12 +760,16 @@ public class ProcessCardPaymentHandlerTests
             _exception = exception;
         }
 
-        public Task<PaymentGatewayResult> ProcessAsync(
-            PaymentGatewayRequest request,
-            CancellationToken cancellationToken = default)
+        public Task<PaymentGatewayResult>
+            ProcessAsync(
+                PaymentGatewayRequest request,
+                CancellationToken cancellationToken =
+                    default)
         {
             CallCount++;
-            ReceivedRequest = request;
+
+            ReceivedRequest =
+                request;
 
             if (_exception is not null)
             {
@@ -495,80 +788,114 @@ public class ProcessCardPaymentHandlerTests
     private sealed class FakePaymentRepository
         : IPaymentRepository
     {
-        private readonly List<Payment> _payments;
+        private readonly List<Payment>
+            _payments;
 
-        public int SaveChangesCount { get; private set; }
+        public int SaveChangesCount
+        {
+            get;
+            private set;
+        }
 
         public FakePaymentRepository(
             params Payment[] payments)
         {
-            _payments = [.. payments];
+            _payments =
+                [.. payments];
         }
 
         public Task AddAsync(
             Payment payment,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken =
+                default)
         {
-            _payments.Add(payment);
+            _payments.Add(
+                payment
+            );
 
             return Task.CompletedTask;
         }
 
         public Task<Payment?> GetByIdAsync(
             int paymentId,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken =
+                default)
         {
-            var payment = _payments.FirstOrDefault(
-                item => item.Id == paymentId
-            );
+            var payment =
+                _payments.FirstOrDefault(
+                    item =>
+                        item.Id ==
+                        paymentId
+                );
 
-            return Task.FromResult(payment);
+            return Task.FromResult(
+                payment
+            );
         }
 
-        public Task<Payment?> GetByExternalOrderIdAsync(
-            string externalOrderId,
-            CancellationToken cancellationToken = default)
+        public Task<Payment?>
+            GetByExternalOrderIdAsync(
+                string externalOrderId,
+                CancellationToken cancellationToken =
+                    default)
         {
-            var payment = _payments.FirstOrDefault(
-                item =>
-                    item.ExternalOrderId ==
-                    externalOrderId
-            );
+            var payment =
+                _payments.FirstOrDefault(
+                    item =>
+                        item.ExternalOrderId ==
+                        externalOrderId
+                );
 
-            return Task.FromResult(payment);
+            return Task.FromResult(
+                payment
+            );
         }
 
-        public Task<Payment?> GetByIdempotencyKeyAsync(
-            string idempotencyKey,
-            CancellationToken cancellationToken = default)
+        public Task<Payment?>
+            GetByIdempotencyKeyAsync(
+                string idempotencyKey,
+                CancellationToken cancellationToken =
+                    default)
         {
-            var payment = _payments.FirstOrDefault(
-                item =>
-                    item.IdempotencyKey ==
-                    idempotencyKey
-            );
+            var payment =
+                _payments.FirstOrDefault(
+                    item =>
+                        item.IdempotencyKey ==
+                        idempotencyKey
+                );
 
-            return Task.FromResult(payment);
+            return Task.FromResult(
+                payment
+            );
         }
 
-        public Task<Payment?> GetActiveByOrderIdAsync(
-            int orderId,
-            CancellationToken cancellationToken = default)
+        public Task<Payment?>
+            GetActiveByOrderIdAsync(
+                int orderId,
+                CancellationToken cancellationToken =
+                    default)
         {
-            var payment = _payments.FirstOrDefault(
-                item =>
-                    item.OrderId == orderId &&
-                    (
-                        item.Status == PaymentStatus.Pending ||
-                        item.Status == PaymentStatus.Approved
-                    )
-            );
+            var payment =
+                _payments.FirstOrDefault(
+                    item =>
+                        item.OrderId ==
+                            orderId &&
+                        (
+                            item.Status ==
+                                PaymentStatus.Pending ||
+                            item.Status ==
+                                PaymentStatus.Approved
+                        )
+                );
 
-            return Task.FromResult(payment);
+            return Task.FromResult(
+                payment
+            );
         }
 
         public Task SaveChangesAsync(
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken =
+                default)
         {
             SaveChangesCount++;
 
