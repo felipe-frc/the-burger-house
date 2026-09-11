@@ -1,3 +1,5 @@
+import QRCode from "qrcode";
+
 export const PAYMENT_METHODS = Object.freeze({
   PIX: 1,
   CREDIT_CARD: 2,
@@ -15,18 +17,22 @@ let paymentMethodChangeHandler = null;
 /** @type {(() => Promise<void> | void) | null} */
 let pixSubmitHandler = null;
 
+let pixQrRenderGeneration = 0;
+
 function getPaymentForm() {
   return /** @type {HTMLFormElement | null} */ (document.getElementById("form-checkout"));
 }
 
-function getSubmitButton() {
-  return /** @type {HTMLButtonElement | null} */ (document.getElementById("form-checkout__submit"));
+function getCardPaymentBrickContainer() {
+  return document.getElementById("card-payment-brick-container");
 }
 
-function getInstallmentsContainer() {
-  const installments = document.getElementById("form-checkout__installments");
+function getPixSubmitButton() {
+  return /** @type {HTMLButtonElement | null} */ (document.getElementById("generate-pix-btn"));
+}
 
-  return installments?.parentElement ?? null;
+function getLegacySubmitButton() {
+  return /** @type {HTMLButtonElement | null} */ (document.getElementById("form-checkout__submit"));
 }
 
 function getPaymentModalSubtitle() {
@@ -65,10 +71,30 @@ function findExistingSecurityMessage() {
   return candidate;
 }
 
+function bindPixSubmitButton() {
+  const button = getPixSubmitButton();
+
+  if (!button) {
+    return;
+  }
+
+  button.onclick = () => {
+    if (!pixSubmitHandler || button.disabled) {
+      return;
+    }
+
+    Promise.resolve(pixSubmitHandler()).catch((error) => {
+      console.error("Não foi possível gerar o PIX:", error);
+    });
+  };
+}
+
 function ensurePaymentMethodUI() {
   const existing = document.getElementById("payment-method-selector");
 
   if (existing) {
+    bindPixSubmitButton();
+
     return existing;
   }
 
@@ -109,7 +135,10 @@ function ensurePaymentMethodUI() {
             <span
               class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700"
             >
-              <i class="fa fa-qrcode" aria-hidden="true"></i>
+              <i
+                class="fa fa-qrcode"
+                aria-hidden="true"
+              ></i>
             </span>
 
             <span>
@@ -141,7 +170,10 @@ function ensurePaymentMethodUI() {
             <span
               class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
             >
-              <i class="fa fa-credit-card" aria-hidden="true"></i>
+              <i
+                class="fa fa-credit-card"
+                aria-hidden="true"
+              ></i>
             </span>
 
             <span>
@@ -172,7 +204,10 @@ function ensurePaymentMethodUI() {
             <span
               class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"
             >
-              <i class="fa fa-credit-card" aria-hidden="true"></i>
+              <i
+                class="fa fa-credit-card"
+                aria-hidden="true"
+              ></i>
             </span>
 
             <span>
@@ -195,7 +230,10 @@ function ensurePaymentMethodUI() {
       <span
         class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-sky-700 shadow-sm"
       >
-        <i class="fa fa-shield-halved" aria-hidden="true"></i>
+        <i
+          class="fa fa-shield-halved"
+          aria-hidden="true"
+        ></i>
       </span>
 
       <div>
@@ -235,17 +273,38 @@ function ensurePaymentMethodUI() {
         </p>
       </div>
 
+      <button
+        type="button"
+        id="generate-pix-btn"
+        class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 font-black text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <i
+          class="fa fa-qrcode"
+          aria-hidden="true"
+        ></i>
+
+        <span>
+          Gerar PIX
+        </span>
+      </button>
+
       <div
         id="pix-instructions"
         class="hidden rounded-xl border border-zinc-200 bg-white p-5"
       >
-        <div class="flex flex-col items-center gap-4">
+        <div
+          class="flex flex-col items-center gap-4"
+        >
           <div>
-            <p class="text-center text-base font-black text-zinc-900">
+            <p
+              class="text-center text-base font-black text-zinc-900"
+            >
               Escaneie o QR Code
             </p>
 
-            <p class="mt-1 text-center text-xs text-zinc-500">
+            <p
+              class="mt-1 text-center text-xs text-zinc-500"
+            >
               Abra o aplicativo do seu banco e escolha pagar com PIX.
             </p>
           </div>
@@ -276,8 +335,14 @@ function ensurePaymentMethodUI() {
               id="copy-pix-code-btn"
               class="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border-2 border-sky-500 bg-white px-4 py-3 text-sm font-bold text-sky-700 transition hover:bg-sky-50"
             >
-              <i class="fa fa-copy" aria-hidden="true"></i>
-              <span>Copiar código PIX</span>
+              <i
+                class="fa fa-copy"
+                aria-hidden="true"
+              ></i>
+
+              <span>
+                Copiar código PIX
+              </span>
             </button>
           </div>
 
@@ -314,7 +379,7 @@ function ensurePaymentMethodUI() {
 
       const method = Number(input.value);
 
-      if (!/** @type {number[]} */ (Object.values(PAYMENT_METHODS)).includes(method)) {
+      if (!(/** @type {number[]} */ (Object.values(PAYMENT_METHODS)).includes(method))) {
         return;
       }
 
@@ -329,6 +394,8 @@ function ensurePaymentMethodUI() {
       }
     });
   });
+
+  bindPixSubmitButton();
 
   return container;
 }
@@ -403,63 +470,14 @@ function updateModalSubtitle() {
   subtitle.textContent = "Preencha os dados do cartão de crédito para concluir o pedido.";
 }
 
-function updateSubmitButton() {
-  const button = getSubmitButton();
-
-  if (!button) {
-    return;
-  }
-
-  if (selectedPaymentMethod === PAYMENT_METHODS.PIX) {
-    button.type = "button";
-
-    button.removeAttribute("form");
-
-    button.innerHTML = `
-      <i class="fa fa-qrcode" aria-hidden="true"></i>
-      <span>Gerar PIX</span>
-    `;
-
-    button.onclick = () => {
-      if (!pixSubmitHandler || button.disabled) {
-        return;
-      }
-
-      Promise.resolve(pixSubmitHandler()).catch((error) => {
-        console.error("Não foi possível gerar o PIX:", error);
-      });
-    };
-
-    return;
-  }
-
-  button.onclick = null;
-
-  button.type = "submit";
-
-  button.setAttribute("form", "form-checkout");
-
-  if (selectedPaymentMethod === PAYMENT_METHODS.DEBIT_CARD) {
-    button.innerHTML = `
-      <i class="fa fa-lock" aria-hidden="true"></i>
-      <span>Pagar no débito</span>
-    `;
-
-    return;
-  }
-
-  button.innerHTML = `
-    <i class="fa fa-lock" aria-hidden="true"></i>
-    <span>Pagar no crédito</span>
-  `;
-}
-
 function applyPaymentMethodUI() {
   const form = getPaymentForm();
 
   const pixPanel = document.getElementById("pix-payment-panel");
 
-  const installmentsContainer = getInstallmentsContainer();
+  const cardContainer = getCardPaymentBrickContainer();
+
+  const legacySubmitButton = getLegacySubmitButton();
 
   if (!form || !pixPanel) {
     return;
@@ -467,19 +485,23 @@ function applyPaymentMethodUI() {
 
   const isPix = selectedPaymentMethod === PAYMENT_METHODS.PIX;
 
-  const isDebit = selectedPaymentMethod === PAYMENT_METHODS.DEBIT_CARD;
+  form.classList.add("hidden");
 
-  form.classList.toggle("hidden", isPix);
+  if (legacySubmitButton) {
+    legacySubmitButton.classList.add("hidden");
+
+    legacySubmitButton.disabled = true;
+  }
 
   pixPanel.classList.toggle("hidden", !isPix);
 
-  if (installmentsContainer) {
-    installmentsContainer.classList.toggle("hidden", isDebit);
+  if (cardContainer) {
+    cardContainer.classList.toggle("hidden", isPix);
   }
 
   updateModalSubtitle();
   updateSecurityMessage();
-  updateSubmitButton();
+  bindPixSubmitButton();
 }
 
 export function configurePaymentMethodUI({
@@ -535,10 +557,42 @@ export function setPaymentMethodLocked(locked) {
     }
   });
 
+  const pixEmail = /** @type {HTMLInputElement | null} */ (
+    document.getElementById("pix-payer-email")
+  );
+
+  const pixButton = getPixSubmitButton();
+
+  if (pixEmail) {
+    pixEmail.disabled = locked;
+  }
+
+  if (pixButton) {
+    pixButton.disabled = locked;
+  }
+
   container.classList.toggle("opacity-80", locked);
 }
 
+export function setPixRetryEnabled() {
+  const pixEmail = /** @type {HTMLInputElement | null} */ (
+    document.getElementById("pix-payer-email")
+  );
+
+  const pixButton = getPixSubmitButton();
+
+  if (pixEmail) {
+    pixEmail.disabled = false;
+  }
+
+  if (pixButton) {
+    pixButton.disabled = false;
+  }
+}
+
 export function clearPixInstructions() {
+  pixQrRenderGeneration += 1;
+
   const instructions = document.getElementById("pix-instructions");
 
   const image = /** @type {HTMLImageElement | null} */ (document.getElementById("pix-qr-image"));
@@ -555,6 +609,7 @@ export function clearPixInstructions() {
 
   if (image) {
     image.removeAttribute("src");
+
     image.classList.add("hidden");
   }
 
@@ -564,6 +619,7 @@ export function clearPixInstructions() {
 
   if (ticket) {
     ticket.removeAttribute("href");
+
     ticket.classList.add("hidden");
   }
 }
@@ -592,6 +648,60 @@ function normalizeQrImageSource(base64) {
   return `data:image/png;base64,${value}`;
 }
 
+async function renderPixQrImage({ image, qrCode, qrCodeBase64, generation }) {
+  if (!image) {
+    return;
+  }
+
+  const providerImageSource = normalizeQrImageSource(qrCodeBase64);
+
+  if (providerImageSource) {
+    if (generation !== pixQrRenderGeneration) {
+      return;
+    }
+
+    image.src = providerImageSource;
+
+    image.classList.remove("hidden");
+
+    return;
+  }
+
+  if (!qrCode) {
+    image.removeAttribute("src");
+
+    image.classList.add("hidden");
+
+    return;
+  }
+
+  try {
+    const generatedImageSource = await QRCode.toDataURL(qrCode, {
+      errorCorrectionLevel: "M",
+      margin: 2,
+      width: 320,
+    });
+
+    if (generation !== pixQrRenderGeneration) {
+      return;
+    }
+
+    image.src = generatedImageSource;
+
+    image.classList.remove("hidden");
+  } catch (error) {
+    console.error("Não foi possível gerar a imagem do QR Code PIX:", error);
+
+    if (generation !== pixQrRenderGeneration) {
+      return;
+    }
+
+    image.removeAttribute("src");
+
+    image.classList.add("hidden");
+  }
+}
+
 async function copyPixCode(value) {
   if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
     await navigator.clipboard.writeText(value);
@@ -604,6 +714,7 @@ async function copyPixCode(value) {
   textarea.value = value;
 
   textarea.style.position = "fixed";
+
   textarea.style.opacity = "0";
 
   document.body.appendChild(textarea);
@@ -638,14 +749,18 @@ export function setPixInstructions({ qrCode, qrCodeBase64, ticketUrl }) {
 
   const normalizedQrCode = String(qrCode ?? "").trim();
 
-  const imageSource = normalizeQrImageSource(qrCodeBase64);
+  pixQrRenderGeneration += 1;
+
+  const generation = pixQrRenderGeneration;
 
   instructions.classList.remove("hidden");
 
-  if (image && imageSource) {
-    image.src = imageSource;
-    image.classList.remove("hidden");
-  }
+  void renderPixQrImage({
+    image,
+    qrCode: normalizedQrCode,
+    qrCodeBase64,
+    generation,
+  });
 
   if (codeField) {
     codeField.value = normalizedQrCode;
@@ -691,6 +806,7 @@ export function setPixInstructions({ qrCode, qrCodeBase64, ticketUrl }) {
         }
       } catch {
         ticket.removeAttribute("href");
+
         ticket.classList.add("hidden");
       }
     }
@@ -719,6 +835,21 @@ export function resetPaymentMethodUI() {
 
     input.checked = Number(input.value) === selectedPaymentMethod;
   });
+
+  const pixEmail = /** @type {HTMLInputElement | null} */ (
+    document.getElementById("pix-payer-email")
+  );
+
+  const pixButton = getPixSubmitButton();
+
+  if (pixEmail) {
+    pixEmail.disabled = false;
+    pixEmail.value = "";
+  }
+
+  if (pixButton) {
+    pixButton.disabled = false;
+  }
 
   container.classList.remove("opacity-80");
 

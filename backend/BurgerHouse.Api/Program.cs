@@ -19,6 +19,33 @@ var builder = WebApplication.CreateBuilder(args);
 
 const string FrontendCorsPolicy = "Frontend";
 
+var frontendOrigins =
+    builder.Configuration
+        .GetSection("Cors:AllowedOrigins")
+        .Get<string[]>()?
+        .Select(origin =>
+            origin.Trim().TrimEnd('/')
+        )
+        .Where(origin =>
+            Uri.TryCreate(
+                origin,
+                UriKind.Absolute,
+                out var uri
+            ) &&
+            (uri.Scheme == Uri.UriSchemeHttp ||
+             uri.Scheme == Uri.UriSchemeHttps)
+        )
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray()
+    ?? [];
+
+if (frontendOrigins.Length == 0)
+{
+    throw new InvalidOperationException(
+        "At least one CORS allowed origin must be configured."
+    );
+}
+
 var connectionString =
     builder.Configuration
         .GetConnectionString(
@@ -43,10 +70,7 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy
-                .WithOrigins(
-                    "http://localhost:5173",
-                    "http://127.0.0.1:5173"
-                )
+                .WithOrigins(frontendOrigins)
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         }
@@ -76,8 +100,15 @@ builder.Services
                 "SEU_ACCESS_TOKEN",
                 StringComparison
                     .OrdinalIgnoreCase
-            ),
+        ),
         "Mercado Pago access token is still using the placeholder value."
+    )
+    .Validate(
+        options =>
+            !string.IsNullOrWhiteSpace(
+                options.WebhookSecret
+            ),
+        "Mercado Pago webhook secret was not configured."
     )
     .ValidateOnStart();
 

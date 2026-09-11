@@ -1,4 +1,9 @@
-export const API_BASE_URL = "http://localhost:5041";
+const configuredApiBaseUrl = String(import.meta.env?.VITE_API_BASE_URL ?? "")
+  .trim()
+  .replace(/\/+$/, "");
+
+export const API_BASE_URL =
+  configuredApiBaseUrl || (import.meta.env?.DEV ? "http://localhost:5041" : "");
 
 export const DELIVERY_FEE = 5;
 
@@ -12,7 +17,10 @@ export const WHATSAPP_PHONE_NUMBER = "5564999244855";
 
 export const TOAST_DURATION_MS = 3000;
 
-/*
-  Mudar apenas para fins de teste para true
-*/
-export const FORCE_STORE_OPEN = false;
+const configuredForceStoreOpen = String(import.meta.env?.VITE_FORCE_STORE_OPEN ?? "")
+  .trim()
+  .toLowerCase();
+
+export const FORCE_STORE_OPEN = configuredForceStoreOpen
+  ? configuredForceStoreOpen === "true"
+  : false;

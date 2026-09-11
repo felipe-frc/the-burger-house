@@ -80,6 +80,18 @@ public sealed class MercadoPagoWebhooksController : ControllerBase
             });
         }
 
+        if (!string.Equals(
+                notificationType,
+                "order",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(new
+            {
+                received = true,
+                ignored = true
+            });
+        }
+
         var isValid = _signatureValidator.IsValid(
             xSignature,
             xRequestId,
@@ -107,18 +119,6 @@ public sealed class MercadoPagoWebhooksController : ControllerBase
             sandboxFallback = true;
         }
 
-        if (!string.Equals(
-                notificationType,
-                "order",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return Ok(new
-            {
-                received = true,
-                ignored = true
-            });
-        }
-
         if (string.IsNullOrWhiteSpace(signedDataId))
         {
             return BadRequest(new
@@ -141,6 +141,52 @@ public sealed class MercadoPagoWebhooksController : ControllerBase
             _logger.LogWarning(
                 exception,
                 "Mercado Pago order verification failed."
+            );
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "Could not verify Mercado Pago order."
+                }
+            );
+        }
+        catch (TaskCanceledException exception)
+            when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning(
+                exception,
+                "Mercado Pago order verification timed out."
+            );
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "Could not verify Mercado Pago order."
+                }
+            );
+        }
+        catch (JsonException exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Mercado Pago returned an invalid order response."
+            );
+
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    error = "Could not verify Mercado Pago order."
+                }
+            );
+        }
+        catch (InvalidOperationException exception)
+        {
+            _logger.LogWarning(
+                exception,
+                "Mercado Pago returned an incomplete order response."
             );
 
             return StatusCode(
@@ -206,7 +252,8 @@ public sealed class MercadoPagoWebhooksController : ControllerBase
                 await _synchronizePaymentStatusHandler.HandleAsync(
                     order.Id,
                     order.PaymentStatus,
-                    cancellationToken
+                    cancellationToken,
+                    order.ExternalPaymentId
                 );
         }
         catch (KeyNotFoundException exception)

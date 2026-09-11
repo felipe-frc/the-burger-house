@@ -209,8 +209,11 @@ function getCardData(token = "test-card-token") {
   return {
     token,
     paymentMethodId: "visa",
+    paymentTypeId: "credit_card",
     installments: "1",
     cardholderEmail: "teste@testuser.com",
+    identificationType: "CPF",
+    identificationNumber: "12345678909",
   };
 }
 
@@ -331,8 +334,11 @@ describe("order", () => {
     expect(processCardPaymentMock).toHaveBeenCalledWith(200, {
       paymentToken: "test-card-token",
       paymentMethodId: "visa",
+      paymentTypeId: "credit_card",
       installments: 1,
       payerEmail: "teste@testuser.com",
+      payerIdentificationType: "CPF",
+      payerIdentificationNumber: "12345678909",
     });
 
     expect(window.open).toHaveBeenCalledOnce();
@@ -340,6 +346,10 @@ describe("order", () => {
     const [url, target] = window.open.mock.calls[0];
 
     const decoded = normalizeCurrency(decodeURIComponent(url));
+
+    const whatsappMessage = new URL(url).searchParams.get("text");
+
+    expect(whatsappMessage?.startsWith("🍔")).toBe(true);
 
     expect(target).toBe("_blank");
 
@@ -426,8 +436,11 @@ describe("order", () => {
     expect(processCardPaymentMock).toHaveBeenCalledWith(201, {
       paymentToken: "test-card-token",
       paymentMethodId: "visa",
+      paymentTypeId: "credit_card",
       installments: 1,
       payerEmail: "teste@testuser.com",
+      payerIdentificationType: "CPF",
+      payerIdentificationNumber: "12345678909",
     });
 
     expect(window.open).toHaveBeenCalledOnce();
@@ -573,8 +586,11 @@ describe("order", () => {
     expect(processCardPaymentMock).toHaveBeenNthCalledWith(1, 202, {
       paymentToken: "first-card-token",
       paymentMethodId: "visa",
+      paymentTypeId: "credit_card",
       installments: 1,
       payerEmail: "teste@testuser.com",
+      payerIdentificationType: "CPF",
+      payerIdentificationNumber: "12345678909",
     });
 
     expect(window.open).not.toHaveBeenCalled();
@@ -594,8 +610,11 @@ describe("order", () => {
     expect(processCardPaymentMock).toHaveBeenNthCalledWith(2, 203, {
       paymentToken: "second-card-token",
       paymentMethodId: "visa",
+      paymentTypeId: "credit_card",
       installments: 1,
       payerEmail: "teste@testuser.com",
+      payerIdentificationType: "CPF",
+      payerIdentificationNumber: "12345678909",
     });
 
     expect(randomUUIDMock).toHaveBeenCalledTimes(2);

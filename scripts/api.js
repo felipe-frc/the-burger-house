@@ -39,6 +39,7 @@ async function request(path, options = {}) {
 export async function createOrder(orderType, items) {
   return request("/api/orders", {
     method: "POST",
+
     body: JSON.stringify({
       orderType,
       items,
@@ -62,17 +63,35 @@ export async function createPayment(orderId, idempotencyKey, method = null) {
   });
 }
 
+export async function getPaymentStatus(paymentId) {
+  return request(`/api/payments/${paymentId}`, {
+    method: "GET",
+  });
+}
+
 export async function processCardPayment(
   paymentId,
-  { paymentToken, paymentMethodId, installments, payerEmail },
+  {
+    paymentToken,
+    paymentMethodId,
+    paymentTypeId,
+    installments,
+    payerEmail,
+    payerIdentificationType,
+    payerIdentificationNumber,
+  },
 ) {
   return request(`/api/payments/${paymentId}/card`, {
     method: "POST",
+
     body: JSON.stringify({
       paymentToken,
       paymentMethodId,
+      paymentTypeId,
       installments,
       payerEmail,
+      payerIdentificationType,
+      payerIdentificationNumber,
     }),
   });
 }
@@ -80,6 +99,7 @@ export async function processCardPayment(
 export async function processPixPayment(paymentId, { payerEmail }) {
   return request(`/api/payments/${paymentId}/pix`, {
     method: "POST",
+
     body: JSON.stringify({
       payerEmail,
     }),

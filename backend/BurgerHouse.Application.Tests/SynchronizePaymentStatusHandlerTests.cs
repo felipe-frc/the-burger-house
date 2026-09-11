@@ -110,6 +110,42 @@ public class SynchronizePaymentStatusHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ShouldCancelPendingPayment_WhenPixExpired()
+    {
+        var payment = CreatePayment();
+        var repository = new FakePaymentRepository(payment);
+        var handler = new SynchronizePaymentStatusHandler(repository);
+
+        var changed = await handler.HandleAsync(
+            ExternalOrderId,
+            PaymentGatewayStatus.Expired
+        );
+
+        Assert.True(changed);
+        Assert.Equal(PaymentStatus.Cancelled, payment.Status);
+        Assert.Equal(1, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldPersistExternalPaymentIdFromOrderLookup()
+    {
+        var payment = CreatePayment();
+        var repository = new FakePaymentRepository(payment);
+        var handler = new SynchronizePaymentStatusHandler(repository);
+
+        var changed = await handler.HandleAsync(
+            ExternalOrderId,
+            PaymentGatewayStatus.Pending,
+            externalPaymentId: "mp-payment-456"
+        );
+
+        Assert.True(changed);
+        Assert.Equal("mp-payment-456", payment.ExternalPaymentId);
+        Assert.Equal(PaymentStatus.Pending, payment.Status);
+        Assert.Equal(1, repository.SaveChangesCount);
+    }
+
+    [Fact]
     public async Task HandleAsync_ShouldNotChangePendingPayment_WhenGatewayIsPending()
     {
         var payment = CreatePayment();
@@ -231,7 +267,6 @@ public class SynchronizePaymentStatusHandlerTests
     }
 
     [Theory]
-    [InlineData(PaymentGatewayStatus.Expired)]
     [InlineData(PaymentGatewayStatus.Refunded)]
     [InlineData(PaymentGatewayStatus.PartiallyRefunded)]
     [InlineData(PaymentGatewayStatus.ChargedBack)]

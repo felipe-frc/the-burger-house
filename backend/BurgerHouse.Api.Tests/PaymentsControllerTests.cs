@@ -53,7 +53,9 @@ public class PaymentsControllerTests
             PaymentToken = "temporary-payment-token",
             PaymentMethodId = "master",
             Installments = 2,
-            PayerEmail = "cliente@email.com"
+            PayerEmail = "cliente@email.com",
+            PayerIdentificationType = "CPF",
+            PayerIdentificationNumber = "12345678909"
         };
 
         var result = await controller.ProcessCardAsync(
@@ -82,6 +84,16 @@ public class PaymentsControllerTests
         Assert.Equal(
             87.80m,
             gateway.ReceivedRequest.Amount
+        );
+
+        Assert.Equal(
+            "CPF",
+            gateway.ReceivedRequest.PayerIdentificationType
+        );
+
+        Assert.Equal(
+            "12345678909",
+            gateway.ReceivedRequest.PayerIdentificationNumber
         );
     }
 
@@ -135,7 +147,9 @@ public class PaymentsControllerTests
             PaymentToken = "",
             PaymentMethodId = "master",
             Installments = 2,
-            PayerEmail = "cliente@email.com"
+            PayerEmail = "cliente@email.com",
+            PayerIdentificationType = "CPF",
+            PayerIdentificationNumber = "12345678909"
         };
 
         var result = await controller.ProcessCardAsync(
@@ -308,7 +322,9 @@ public class PaymentsControllerTests
             PaymentToken = "temporary-payment-token",
             PaymentMethodId = "master",
             Installments = 2,
-            PayerEmail = "cliente@email.com"
+            PayerEmail = "cliente@email.com",
+            PayerIdentificationType = "CPF",
+            PayerIdentificationNumber = "12345678909"
         };
     }
 

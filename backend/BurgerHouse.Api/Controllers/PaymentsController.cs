@@ -1,7 +1,12 @@
+using BurgerHouse.Application.Abstractions.Payments;
+using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Payments.CreatePayment;
 using BurgerHouse.Application.Payments.GetPaymentStatus;
 using BurgerHouse.Application.Payments.ProcessCardPayment;
 using BurgerHouse.Application.Payments.ProcessPixPayment;
+using BurgerHouse.Application.Payments.SynchronizePaymentStatus;
+using BurgerHouse.Domain.Enums;
+using BurgerHouse.Infrastructure.Payments.MercadoPago;
 
 using Microsoft.AspNetCore.Mvc;
 
@@ -23,11 +28,23 @@ public class PaymentsController : ControllerBase
     private readonly GetPaymentStatusHandler?
         _getPaymentStatusHandler;
 
+    private readonly IPaymentRepository?
+        _paymentRepository;
+
+    private readonly MercadoPagoOrderLookup?
+        _mercadoPagoOrderLookup;
+
+    private readonly SynchronizePaymentStatusHandler?
+        _synchronizePaymentStatusHandler;
+
     public PaymentsController(
         CreatePaymentHandler createPaymentHandler,
         ProcessCardPaymentHandler processCardPaymentHandler,
         ProcessPixPaymentHandler? processPixPaymentHandler = null,
-        GetPaymentStatusHandler? getPaymentStatusHandler = null)
+        GetPaymentStatusHandler? getPaymentStatusHandler = null,
+        IPaymentRepository? paymentRepository = null,
+        MercadoPagoOrderLookup? mercadoPagoOrderLookup = null,
+        SynchronizePaymentStatusHandler? synchronizePaymentStatusHandler = null)
     {
         _createPaymentHandler =
             createPaymentHandler;
@@ -40,6 +57,15 @@ public class PaymentsController : ControllerBase
 
         _getPaymentStatusHandler =
             getPaymentStatusHandler;
+
+        _paymentRepository =
+            paymentRepository;
+
+        _mercadoPagoOrderLookup =
+            mercadoPagoOrderLookup;
+
+        _synchronizePaymentStatusHandler =
+            synchronizePaymentStatusHandler;
     }
 
     [HttpGet("{paymentId:int}")]
@@ -64,6 +90,11 @@ public class PaymentsController : ControllerBase
 
         try
         {
+            await RefreshPendingPaymentStatusAsync(
+                paymentId,
+                cancellationToken
+            );
+
             var response =
                 await _getPaymentStatusHandler
                     .HandleAsync(
@@ -94,7 +125,8 @@ public class PaymentsController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<CreatePaymentResponse>>
+    public async Task<
+        ActionResult<CreatePaymentResponse>>
         CreateAsync(
             [FromBody] CreatePaymentRequest request,
             CancellationToken cancellationToken)
@@ -149,7 +181,8 @@ public class PaymentsController : ControllerBase
             var command =
                 new ProcessCardPaymentRequest
                 {
-                    PaymentId = paymentId,
+                    PaymentId =
+                        paymentId,
 
                     PaymentToken =
                         request.PaymentToken,
@@ -157,11 +190,20 @@ public class PaymentsController : ControllerBase
                     PaymentMethodId =
                         request.PaymentMethodId,
 
+                    PaymentTypeId =
+                        request.PaymentTypeId,
+
                     Installments =
                         request.Installments,
 
                     PayerEmail =
-                        request.PayerEmail
+                        request.PayerEmail,
+
+                    PayerIdentificationType =
+                        request.PayerIdentificationType,
+
+                    PayerIdentificationNumber =
+                        request.PayerIdentificationNumber
                 };
 
             var response =
@@ -177,14 +219,16 @@ public class PaymentsController : ControllerBase
         {
             return NotFound(new
             {
-                error = exception.Message
+                error =
+                    exception.Message
             });
         }
         catch (ArgumentException exception)
         {
             return BadRequest(new
             {
-                error = exception.Message
+                error =
+                    exception.Message
             });
         }
         catch (HttpRequestException exception)
@@ -220,7 +264,8 @@ public class PaymentsController : ControllerBase
         {
             return Conflict(new
             {
-                error = exception.Message
+                error =
+                    exception.Message
             });
         }
     }
@@ -271,14 +316,16 @@ public class PaymentsController : ControllerBase
         {
             return NotFound(new
             {
-                error = exception.Message
+                error =
+                    exception.Message
             });
         }
         catch (ArgumentException exception)
         {
             return BadRequest(new
             {
-                error = exception.Message
+                error =
+                    exception.Message
             });
         }
         catch (HttpRequestException exception)
@@ -314,9 +361,86 @@ public class PaymentsController : ControllerBase
         {
             return Conflict(new
             {
-                error = exception.Message
+                error =
+                    exception.Message
             });
         }
+    }
+
+    private async Task
+        RefreshPendingPaymentStatusAsync(
+            int paymentId,
+            CancellationToken cancellationToken)
+    {
+        if (
+            _paymentRepository is null ||
+            _mercadoPagoOrderLookup is null ||
+            _synchronizePaymentStatusHandler is null
+        )
+        {
+            return;
+        }
+
+        var payment =
+            await _paymentRepository
+                .GetByIdAsync(
+                    paymentId,
+                    cancellationToken
+                );
+
+        if (
+            payment is null ||
+            payment.Status !=
+                PaymentStatus.Pending ||
+            string.IsNullOrWhiteSpace(
+                payment.ExternalOrderId
+            )
+        )
+        {
+            return;
+        }
+
+        MercadoPagoOrderSnapshot?
+            snapshot;
+
+        try
+        {
+            snapshot =
+                await _mercadoPagoOrderLookup
+                    .GetAsync(
+                        payment.ExternalOrderId,
+                        cancellationToken
+                    );
+        }
+        catch (HttpRequestException)
+        {
+            return;
+        }
+
+        if (snapshot is null)
+        {
+            return;
+        }
+
+        if (
+            snapshot.PaymentStatus is not (
+                PaymentGatewayStatus.Approved or
+                PaymentGatewayStatus.Rejected or
+                PaymentGatewayStatus.Cancelled or
+                PaymentGatewayStatus.Expired
+            )
+        )
+        {
+            return;
+        }
+
+        await _synchronizePaymentStatusHandler
+            .HandleAsync(
+                snapshot.Id,
+                snapshot.PaymentStatus,
+                cancellationToken,
+                snapshot.ExternalPaymentId
+            );
     }
 
     private static bool

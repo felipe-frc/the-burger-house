@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+
 using BurgerHouse.Application.Abstractions.Payments;
+
 using Microsoft.Extensions.Logging;
 
 namespace BurgerHouse.Infrastructure.Payments.MercadoPago;
@@ -202,106 +204,13 @@ public sealed class MercadoPagoPaymentGateway
                     errorBody
                 );
 
-            var root =
-                document.RootElement;
-
             var details =
                 new List<string>();
 
-            AddPropertyIfSafe(
-                root,
-                "message",
+            CollectSafeErrorDetails(
+                document.RootElement,
                 details
             );
-
-            AddPropertyIfSafe(
-                root,
-                "error",
-                details
-            );
-
-            AddPropertyIfSafe(
-                root,
-                "status",
-                details
-            );
-
-            if (root.TryGetProperty(
-                    "errors",
-                    out var errorsElement) &&
-                errorsElement.ValueKind ==
-                    JsonValueKind.Array)
-            {
-                foreach (var error in
-                         errorsElement
-                             .EnumerateArray())
-                {
-                    AddPropertyIfSafe(
-                        error,
-                        "code",
-                        details
-                    );
-
-                    AddPropertyIfSafe(
-                        error,
-                        "message",
-                        details
-                    );
-
-                    if (error.TryGetProperty(
-                            "details",
-                            out var errorDetails) &&
-                        errorDetails.ValueKind ==
-                            JsonValueKind.Array)
-                    {
-                        foreach (var detail in
-                                 errorDetails
-                                     .EnumerateArray())
-                        {
-                            if (detail.ValueKind ==
-                                JsonValueKind.String)
-                            {
-                                var value =
-                                    detail
-                                        .GetString();
-
-                                if (!string
-                                    .IsNullOrWhiteSpace(
-                                        value))
-                                {
-                                    details.Add(
-                                        $"detail: {value}"
-                                    );
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (root.TryGetProperty(
-                    "cause",
-                    out var causeElement) &&
-                causeElement.ValueKind ==
-                    JsonValueKind.Array)
-            {
-                foreach (var cause in
-                         causeElement
-                             .EnumerateArray())
-                {
-                    AddPropertyIfSafe(
-                        cause,
-                        "code",
-                        details
-                    );
-
-                    AddPropertyIfSafe(
-                        cause,
-                        "description",
-                        details
-                    );
-                }
-            }
 
             if (details.Count == 0)
             {
@@ -309,21 +218,190 @@ public sealed class MercadoPagoPaymentGateway
                     "Unrecognized provider error payload";
             }
 
+            var distinctDetails =
+                details
+                    .Where(detail =>
+                        !string.IsNullOrWhiteSpace(
+                            detail
+                        ))
+                    .Distinct(
+                        StringComparer.OrdinalIgnoreCase
+                    );
+
             var result =
                 string.Join(
                     " | ",
-                    details
+                    distinctDetails
                 );
 
-            return result.Length <= 1000
+            return result.Length <= 1500
                 ? result
-                : result[..1000];
+                : result[..1500];
         }
         catch (JsonException)
         {
             return
                 "Non-JSON provider error payload";
         }
+    }
+
+    private static void CollectSafeErrorDetails(
+        JsonElement element,
+        ICollection<string> details,
+        int depth = 0)
+    {
+        if (depth > 5)
+        {
+            return;
+        }
+
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.String:
+                AddSafeDetailText(
+                    element.GetString(),
+                    "detail",
+                    details
+                );
+
+                return;
+
+            case JsonValueKind.Number:
+                AddSafeDetailText(
+                    element.ToString(),
+                    "detail",
+                    details
+                );
+
+                return;
+
+            case JsonValueKind.Array:
+                foreach (var item in
+                         element.EnumerateArray())
+                {
+                    CollectSafeErrorDetails(
+                        item,
+                        details,
+                        depth + 1
+                    );
+                }
+
+                return;
+
+            case JsonValueKind.Object:
+                break;
+
+            default:
+                return;
+        }
+
+        AddPropertyIfSafe(
+            element,
+            "code",
+            details
+        );
+
+        AddPropertyIfSafe(
+            element,
+            "message",
+            details
+        );
+
+        AddPropertyIfSafe(
+            element,
+            "error",
+            details
+        );
+
+        AddPropertyIfSafe(
+            element,
+            "description",
+            details
+        );
+
+        AddPropertyIfSafe(
+            element,
+            "detail",
+            details
+        );
+
+        AddPropertyIfSafe(
+            element,
+            "field",
+            details
+        );
+
+        AddPropertyIfSafe(
+            element,
+            "path",
+            details
+        );
+
+        AddPropertyIfSafe(
+            element,
+            "status",
+            details
+        );
+
+        AddPropertyIfSafe(
+            element,
+            "status_detail",
+            details
+        );
+
+        AddPropertyIfSafe(
+            element,
+            "type",
+            details
+        );
+
+        CollectNestedSafeProperty(
+            element,
+            "errors",
+            details,
+            depth
+        );
+
+        CollectNestedSafeProperty(
+            element,
+            "details",
+            details,
+            depth
+        );
+
+        CollectNestedSafeProperty(
+            element,
+            "cause",
+            details,
+            depth
+        );
+
+        CollectNestedSafeProperty(
+            element,
+            "causes",
+            details,
+            depth
+        );
+    }
+
+    private static void CollectNestedSafeProperty(
+        JsonElement element,
+        string propertyName,
+        ICollection<string> details,
+        int depth)
+    {
+        if (!element.TryGetProperty(
+                propertyName,
+                out var nested))
+        {
+            return;
+        }
+
+        CollectSafeErrorDetails(
+            nested,
+            details,
+            depth + 1
+        );
     }
 
     private static void AddPropertyIfSafe(
@@ -345,17 +423,35 @@ public sealed class MercadoPagoPaymentGateway
             return;
         }
 
-        var value =
-            property.ToString();
+        AddSafeDetailText(
+            property.ToString(),
+            propertyName,
+            details
+        );
+    }
 
+    private static void AddSafeDetailText(
+        string? value,
+        string label,
+        ICollection<string> details)
+    {
         if (string.IsNullOrWhiteSpace(
                 value))
         {
             return;
         }
 
+        var normalizedValue =
+            value.Trim();
+
+        if (normalizedValue.Length > 500)
+        {
+            normalizedValue =
+                normalizedValue[..500];
+        }
+
         details.Add(
-            $"{propertyName}: {value}"
+            $"{label}: {normalizedValue}"
         );
     }
 }

@@ -118,6 +118,19 @@ public class PaymentStateTransitionTests
     }
 
     [Fact]
+    public void SetExternalPaymentId_ShouldAllowSameValueAfterApproval()
+    {
+        var payment = CreatePayment();
+
+        payment.SetExternalPaymentId("MP-123");
+        payment.Approve();
+        payment.SetExternalPaymentId("MP-123");
+
+        Assert.Equal("MP-123", payment.ExternalPaymentId);
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+    }
+
+    [Fact]
     public void SetExternalPaymentId_ShouldThrow_WhenPaymentIsAlreadyApproved()
     {
         var payment = CreatePayment();

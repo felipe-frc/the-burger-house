@@ -1,4 +1,5 @@
 using System.Globalization;
+
 using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Domain.Enums;
 
@@ -36,6 +37,9 @@ internal static class MercadoPagoRequestFactory
         var paymentMethod =
             CreatePaymentMethod(request);
 
+        var identification =
+            CreateIdentification(request);
+
         var formattedAmount =
             request.Amount.ToString(
                 "0.00",
@@ -44,18 +48,28 @@ internal static class MercadoPagoRequestFactory
 
         return new MercadoPagoCreateOrderRequest
         {
-            TotalAmount = formattedAmount,
+            TotalAmount =
+                formattedAmount,
 
             ExternalReference =
                 request.OrderId.ToString(
                     CultureInfo.InvariantCulture
                 ),
 
-            Payer = new MercadoPagoPayerRequest
-            {
-                Email =
-                    request.PayerEmail.Trim()
-            },
+            Payer =
+                new MercadoPagoPayerRequest
+                {
+                    Email =
+                        request.PayerEmail.Trim(),
+
+                    FirstName =
+                        CreateSandboxPayerFirstName(
+                            request
+                        ),
+
+                    Identification =
+                        identification
+                },
 
             Transactions =
                 new MercadoPagoTransactionsRequest
@@ -75,6 +89,68 @@ internal static class MercadoPagoRequestFactory
         };
     }
 
+    private static string?
+        CreateSandboxPayerFirstName(
+            PaymentGatewayRequest request)
+    {
+        if (request.Method != PaymentMethod.Pix)
+        {
+            return null;
+        }
+
+        var email =
+            request.PayerEmail.Trim();
+
+        return email.EndsWith(
+            "@testuser.com",
+            StringComparison.OrdinalIgnoreCase
+        )
+            ? "APRO"
+            : null;
+    }
+
+    private static MercadoPagoIdentificationRequest?
+        CreateIdentification(
+            PaymentGatewayRequest request)
+    {
+        var type =
+            request.PayerIdentificationType?
+                .Trim();
+
+        var number =
+            request.PayerIdentificationNumber?
+                .Trim();
+
+        if (string.IsNullOrWhiteSpace(type) &&
+            string.IsNullOrWhiteSpace(number))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(type))
+        {
+            throw new ArgumentException(
+                "Payer identification type cannot be empty."
+            );
+        }
+
+        if (string.IsNullOrWhiteSpace(number))
+        {
+            throw new ArgumentException(
+                "Payer identification number cannot be empty."
+            );
+        }
+
+        return new MercadoPagoIdentificationRequest
+        {
+            Type =
+                type,
+
+            Number =
+                number
+        };
+    }
+
     private static MercadoPagoPaymentMethodRequest
         CreatePaymentMethod(
             PaymentGatewayRequest request)
@@ -91,7 +167,10 @@ internal static class MercadoPagoRequestFactory
             PaymentMethod.CreditCard =>
                 CreateCardPaymentMethod(
                     request,
-                    "credit_card"
+                    "credit_card",
+                    NormalizeCreditPaymentMethodId(
+                        request.PaymentMethodId
+                    )
                 ),
 
             PaymentMethod.DebitCard =>
@@ -118,14 +197,18 @@ internal static class MercadoPagoRequestFactory
 
         return CreateCardPaymentMethod(
             request,
-            "debit_card"
+            "debit_card",
+            NormalizeDebitPaymentMethodId(
+                request.PaymentMethodId
+            )
         );
     }
 
     private static MercadoPagoPaymentMethodRequest
         CreateCardPaymentMethod(
             PaymentGatewayRequest request,
-            string type)
+            string expectedType,
+            string paymentMethodId)
     {
         if (string.IsNullOrWhiteSpace(
                 request.PaymentToken))
@@ -136,7 +219,7 @@ internal static class MercadoPagoRequestFactory
         }
 
         if (string.IsNullOrWhiteSpace(
-                request.PaymentMethodId))
+                paymentMethodId))
         {
             throw new ArgumentException(
                 "Payment method id cannot be empty."
@@ -150,18 +233,82 @@ internal static class MercadoPagoRequestFactory
             );
         }
 
+        var paymentTypeId =
+            string.IsNullOrWhiteSpace(
+                request.PaymentTypeId)
+                ? expectedType
+                : request.PaymentTypeId
+                    .Trim()
+                    .ToLowerInvariant();
+
+        if (!string.Equals(
+                paymentTypeId,
+                expectedType,
+                StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"Payment type '{paymentTypeId}' does not match '{expectedType}'."
+            );
+        }
+
         return new MercadoPagoPaymentMethodRequest
         {
             Id =
-                request.PaymentMethodId.Trim(),
+                paymentMethodId,
 
-            Type = type,
+            Type =
+                paymentTypeId,
 
             Token =
                 request.PaymentToken.Trim(),
 
             Installments =
                 request.Installments
+        };
+    }
+
+    private static string
+        NormalizeCreditPaymentMethodId(
+            string? paymentMethodId)
+    {
+        if (string.IsNullOrWhiteSpace(
+                paymentMethodId))
+        {
+            return string.Empty;
+        }
+
+        return paymentMethodId
+            .Trim()
+            .ToLowerInvariant();
+    }
+
+    private static string
+        NormalizeDebitPaymentMethodId(
+            string? paymentMethodId)
+    {
+        if (string.IsNullOrWhiteSpace(
+                paymentMethodId))
+        {
+            return string.Empty;
+        }
+
+        var normalizedId =
+            paymentMethodId
+                .Trim()
+                .ToLowerInvariant();
+
+        return normalizedId switch
+        {
+            "elo" => "debelo",
+            "master" => "debmaster",
+            "mastercard" => "debmaster",
+            "visa" => "debvisa",
+
+            "debelo" => "debelo",
+            "debmaster" => "debmaster",
+            "debvisa" => "debvisa",
+
+            _ => normalizedId
         };
     }
 }

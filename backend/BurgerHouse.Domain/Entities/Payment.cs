@@ -63,8 +63,6 @@ public class Payment
 
     public void SetExternalOrderId(string externalOrderId)
     {
-        EnsurePending();
-
         if (string.IsNullOrWhiteSpace(externalOrderId))
             throw new ArgumentException(
                 "External order id cannot be empty."
@@ -82,14 +80,14 @@ public class Payment
             );
         }
 
+        EnsurePending();
+
         ExternalOrderId = normalizedId;
         UpdatedAt = DateTime.UtcNow;
     }
 
     public void SetExternalPaymentId(string externalPaymentId)
     {
-        EnsurePending();
-
         if (string.IsNullOrWhiteSpace(externalPaymentId))
             throw new ArgumentException(
                 "External payment id cannot be empty."
@@ -106,6 +104,8 @@ public class Payment
                 "External payment id has already been assigned."
             );
         }
+
+        EnsurePending();
 
         ExternalPaymentId = normalizedId;
         UpdatedAt = DateTime.UtcNow;

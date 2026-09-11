@@ -6,20 +6,28 @@ namespace BurgerHouse.Application.Payments.ProcessCardPayment;
 
 public sealed class ProcessCardPaymentHandler
 {
-    private readonly IPaymentRepository _paymentRepository;
-    private readonly IPaymentGateway _paymentGateway;
+    private readonly IPaymentRepository
+        _paymentRepository;
+
+    private readonly IPaymentGateway
+        _paymentGateway;
 
     public ProcessCardPaymentHandler(
         IPaymentRepository paymentRepository,
         IPaymentGateway paymentGateway)
     {
-        _paymentRepository = paymentRepository;
-        _paymentGateway = paymentGateway;
+        _paymentRepository =
+            paymentRepository;
+
+        _paymentGateway =
+            paymentGateway;
     }
 
-    public async Task<ProcessCardPaymentResponse> HandleAsync(
-        ProcessCardPaymentRequest request,
-        CancellationToken cancellationToken = default)
+    public async Task<ProcessCardPaymentResponse>
+        HandleAsync(
+            ProcessCardPaymentRequest request,
+            CancellationToken cancellationToken =
+                default)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -61,6 +69,22 @@ public sealed class ProcessCardPaymentHandler
             );
         }
 
+        if (string.IsNullOrWhiteSpace(
+                request.PayerIdentificationType))
+        {
+            throw new ArgumentException(
+                "Payer identification type cannot be empty."
+            );
+        }
+
+        if (string.IsNullOrWhiteSpace(
+                request.PayerIdentificationNumber))
+        {
+            throw new ArgumentException(
+                "Payer identification number cannot be empty."
+            );
+        }
+
         var payment =
             await _paymentRepository.GetByIdAsync(
                 request.PaymentId,
@@ -83,7 +107,8 @@ public sealed class ProcessCardPaymentHandler
             );
         }
 
-        if (payment.Status != PaymentStatus.Pending)
+        if (payment.Status !=
+            PaymentStatus.Pending)
         {
             throw new InvalidOperationException(
                 $"Payment in status '{payment.Status}' cannot be processed."
@@ -99,11 +124,35 @@ public sealed class ProcessCardPaymentHandler
             );
         }
 
+        var expectedPaymentTypeId =
+            payment.Method == PaymentMethod.DebitCard
+                ? "debit_card"
+                : "credit_card";
+
+        var receivedPaymentTypeId =
+            request.PaymentTypeId?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(
+                receivedPaymentTypeId) &&
+            !string.Equals(
+                receivedPaymentTypeId,
+                expectedPaymentTypeId,
+                StringComparison.OrdinalIgnoreCase
+            ))
+        {
+            throw new ArgumentException(
+                $"Payment type '{receivedPaymentTypeId}' does not match the selected payment method."
+            );
+        }
+
         var gatewayRequest =
             new PaymentGatewayRequest
             {
-                OrderId = payment.OrderId,
-                Amount = payment.Amount,
+                OrderId =
+                    payment.OrderId,
+
+                Amount =
+                    payment.Amount,
 
                 IdempotencyKey =
                     payment.IdempotencyKey,
@@ -117,11 +166,24 @@ public sealed class ProcessCardPaymentHandler
                 PaymentMethodId =
                     request.PaymentMethodId.Trim(),
 
+                PaymentTypeId =
+                    expectedPaymentTypeId,
+
                 Installments =
                     request.Installments,
 
                 PayerEmail =
-                    request.PayerEmail.Trim()
+                    request.PayerEmail.Trim(),
+
+                PayerIdentificationType =
+                    request
+                        .PayerIdentificationType
+                        .Trim(),
+
+                PayerIdentificationNumber =
+                    request
+                        .PayerIdentificationNumber
+                        .Trim()
             };
 
         PaymentGatewayResult gatewayResult;
@@ -208,10 +270,17 @@ public sealed class ProcessCardPaymentHandler
 
         return new ProcessCardPaymentResponse
         {
-            PaymentId = payment.Id,
-            OrderId = payment.OrderId,
-            Amount = payment.Amount,
-            Status = payment.Status,
+            PaymentId =
+                payment.Id,
+
+            OrderId =
+                payment.OrderId,
+
+            Amount =
+                payment.Amount,
+
+            Status =
+                payment.Status,
 
             ExternalOrderId =
                 payment.ExternalOrderId,
@@ -221,8 +290,9 @@ public sealed class ProcessCardPaymentHandler
         };
     }
 
-    private static bool IsDefinitiveProviderRejection(
-        HttpRequestException exception)
+    private static bool
+        IsDefinitiveProviderRejection(
+            HttpRequestException exception)
     {
         if (exception.StatusCode is null)
         {

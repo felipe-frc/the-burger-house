@@ -119,6 +119,8 @@ public sealed class ProcessPixPaymentHandler
             string.IsNullOrWhiteSpace(
                 gatewayResult.PixQrCode) &&
             string.IsNullOrWhiteSpace(
+                gatewayResult.PixQrCodeBase64) &&
+            string.IsNullOrWhiteSpace(
                 gatewayResult.PixTicketUrl))
         {
             throw new InvalidOperationException(
@@ -156,6 +158,9 @@ public sealed class ProcessPixPaymentHandler
                 break;
 
             case PaymentGatewayStatus.Expired:
+                payment.Cancel();
+                break;
+
             case PaymentGatewayStatus.Refunded:
             case PaymentGatewayStatus.PartiallyRefunded:
             case PaymentGatewayStatus.ChargedBack:

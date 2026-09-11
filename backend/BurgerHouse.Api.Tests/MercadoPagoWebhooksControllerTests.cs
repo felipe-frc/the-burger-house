@@ -207,6 +207,29 @@ public class MercadoPagoWebhooksControllerTests
     }
 
     [Fact]
+    public async Task Receive_ShouldRejectDevelopmentFallback_WhenOrderCannotBeVerified()
+    {
+        const string dataId = "order-456";
+
+        var controller = CreateController(
+            dataId,
+            type: "order",
+            environmentName: Environments.Development
+        );
+
+        controller.Request.Headers["x-signature"] =
+            "ts=1700000000,v1=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        controller.Request.Headers["x-request-id"] = "request-123";
+
+        var result = await controller.Receive(
+            CreateWebhookRequest("order", dataId),
+            CancellationToken.None
+        );
+
+        Assert.IsType<UnauthorizedObjectResult>(result);
+    }
+
+    [Fact]
     public async Task Receive_ShouldIgnoreValidWebhook_WhenTypeIsNotOrder()
     {
         const string requestId =
@@ -296,12 +319,147 @@ public class MercadoPagoWebhooksControllerTests
         );
     }
 
+    [Fact]
+    public async Task Receive_ShouldRemainIdempotent_WhenWebhookIsRepeated()
+    {
+        const string requestId = "request-123";
+        const string dataId = "order-456";
+
+        var payment = CreatePendingPayment(dataId);
+        var repository = new FakePaymentRepository(payment);
+        var controller = CreateController(
+            dataId,
+            type: "order",
+            repository: repository,
+            orderJson: CreateApprovedOrderJson(dataId)
+        );
+
+        controller.Request.Headers["x-signature"] =
+            CreateValidSignature(requestId, dataId);
+        controller.Request.Headers["x-request-id"] = requestId;
+
+        var request = CreateWebhookRequest("order", dataId);
+
+        var first = await controller.Receive(
+            request,
+            CancellationToken.None
+        );
+
+        var second = await controller.Receive(
+            request,
+            CancellationToken.None
+        );
+
+        Assert.IsType<OkObjectResult>(first);
+
+        var secondResult = Assert.IsType<OkObjectResult>(second);
+        var json = JsonSerializer.SerializeToElement(secondResult.Value);
+
+        Assert.False(json.GetProperty("synchronized").GetBoolean());
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.Equal(1, repository.SaveChangesCount);
+    }
+
+    [Fact]
+    public async Task Receive_ShouldIgnoreNonOrderWebhook_WithoutValidatingSignature()
+    {
+        var controller = CreateController(
+            dataId: "payment-456",
+            type: "payment"
+        );
+
+        var result = await controller.Receive(
+            CreateWebhookRequest("payment", "payment-456"),
+            CancellationToken.None
+        );
+
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        var json = JsonSerializer.SerializeToElement(okResult.Value);
+
+        Assert.True(json.GetProperty("ignored").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Receive_ShouldReturnBadGateway_WhenOrderLookupIsUnavailable()
+    {
+        const string requestId = "request-123";
+        const string dataId = "order-456";
+
+        var controller = CreateController(
+            dataId,
+            type: "order",
+            orderStatusCode: HttpStatusCode.ServiceUnavailable
+        );
+
+        controller.Request.Headers["x-signature"] =
+            CreateValidSignature(requestId, dataId);
+        controller.Request.Headers["x-request-id"] = requestId;
+
+        var result = await controller.Receive(
+            CreateWebhookRequest("order", dataId),
+            CancellationToken.None
+        );
+
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status502BadGateway, statusResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task Receive_ShouldReturnBadGateway_WhenOrderResponseIsInvalid()
+    {
+        const string requestId = "request-123";
+        const string dataId = "order-456";
+
+        var controller = CreateController(
+            dataId,
+            type: "order",
+            orderJson: "not-json"
+        );
+
+        controller.Request.Headers["x-signature"] =
+            CreateValidSignature(requestId, dataId);
+        controller.Request.Headers["x-request-id"] = requestId;
+
+        var result = await controller.Receive(
+            CreateWebhookRequest("order", dataId),
+            CancellationToken.None
+        );
+
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status502BadGateway, statusResult.StatusCode);
+    }
+
+    [Fact]
+    public async Task Receive_ShouldReturnConflict_WhenVerifiedOrderDoesNotExistLocally()
+    {
+        const string requestId = "request-123";
+        const string dataId = "order-456";
+
+        var controller = CreateController(
+            dataId,
+            type: "order",
+            orderJson: CreateApprovedOrderJson(dataId)
+        );
+
+        controller.Request.Headers["x-signature"] =
+            CreateValidSignature(requestId, dataId);
+        controller.Request.Headers["x-request-id"] = requestId;
+
+        var result = await controller.Receive(
+            CreateWebhookRequest("order", dataId),
+            CancellationToken.None
+        );
+
+        Assert.IsType<ConflictObjectResult>(result);
+    }
+
     private static MercadoPagoWebhooksController CreateController(
         string dataId,
         string type,
         FakePaymentRepository? repository = null,
         string? orderJson = null,
-        string environmentName = "Production")
+        string environmentName = "Production",
+        HttpStatusCode orderStatusCode = HttpStatusCode.OK)
     {
         var options = Options.Create(
             new MercadoPagoOptions
@@ -318,7 +476,8 @@ public class MercadoPagoWebhooksControllerTests
 
         var messageHandler =
             new FakeHttpMessageHandler(
-                orderJson
+                orderJson,
+                orderStatusCode
             );
 
         var orderLookup =
@@ -458,17 +617,29 @@ public class MercadoPagoWebhooksControllerTests
         : HttpMessageHandler
     {
         private readonly string? _orderJson;
+        private readonly HttpStatusCode _statusCode;
 
         public FakeHttpMessageHandler(
-            string? orderJson)
+            string? orderJson,
+            HttpStatusCode statusCode)
         {
             _orderJson = orderJson;
+            _statusCode = statusCode;
         }
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
+            if (_statusCode != HttpStatusCode.OK)
+            {
+                return Task.FromResult(
+                    new HttpResponseMessage(
+                        _statusCode
+                    )
+                );
+            }
+
             if (string.IsNullOrWhiteSpace(_orderJson))
             {
                 return Task.FromResult(

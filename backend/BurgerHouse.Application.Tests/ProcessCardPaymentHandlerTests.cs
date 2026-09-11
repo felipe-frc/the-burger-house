@@ -77,6 +77,20 @@ public class ProcessCardPaymentHandlerTests
             PaymentMethod.CreditCard,
             gateway.ReceivedRequest.Method
         );
+
+        Assert.Equal(
+            "CPF",
+            gateway
+                .ReceivedRequest
+                .PayerIdentificationType
+        );
+
+        Assert.Equal(
+            "12345678909",
+            gateway
+                .ReceivedRequest
+                .PayerIdentificationNumber
+        );
     }
 
     [Fact]
@@ -680,7 +694,13 @@ public class ProcessCardPaymentHandlerTests
                 installments,
 
             PayerEmail =
-                "cliente@email.com"
+                "cliente@email.com",
+
+            PayerIdentificationType =
+                "CPF",
+
+            PayerIdentificationNumber =
+                "12345678909"
         };
     }
 

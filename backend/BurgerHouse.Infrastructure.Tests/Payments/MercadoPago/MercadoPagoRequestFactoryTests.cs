@@ -82,6 +82,20 @@ public class MercadoPagoRequestFactoryTests
             result.Payer.Email
         );
 
+        Assert.NotNull(
+            result.Payer.Identification
+        );
+
+        Assert.Equal(
+            "CPF",
+            result.Payer.Identification.Type
+        );
+
+        Assert.Equal(
+            "12345678909",
+            result.Payer.Identification.Number
+        );
+
         var payment =
             Assert.Single(
                 result
@@ -110,14 +124,24 @@ public class MercadoPagoRequestFactoryTests
         );
     }
 
-    [Fact]
-    public void Create_ShouldMapDebitCardCorrectly()
+    [Theory]
+    [InlineData("elo", "debelo")]
+    [InlineData("master", "debmaster")]
+    [InlineData("visa", "debvisa")]
+    [InlineData("debelo", "debelo")]
+    [InlineData("debmaster", "debmaster")]
+    [InlineData("debvisa", "debvisa")]
+    public void Create_ShouldMapDebitCardIdentifierCorrectly(
+        string receivedPaymentMethodId,
+        string expectedPaymentMethodId)
     {
         var request =
             CreateValidRequest(
+                paymentMethodId:
+                    receivedPaymentMethodId,
+                installments: 1,
                 method:
-                    PaymentMethod.DebitCard,
-                installments: 1
+                    PaymentMethod.DebitCard
             );
 
         var result =
@@ -133,7 +157,7 @@ public class MercadoPagoRequestFactoryTests
             );
 
         Assert.Equal(
-            "master",
+            expectedPaymentMethodId,
             payment.PaymentMethod.Id
         );
 
@@ -143,13 +167,22 @@ public class MercadoPagoRequestFactoryTests
         );
 
         Assert.Equal(
-            "temporary-payment-token",
-            payment.PaymentMethod.Token
+            1,
+            payment.PaymentMethod.Installments
+        );
+
+        Assert.NotNull(
+            result.Payer.Identification
         );
 
         Assert.Equal(
-            1,
-            payment.PaymentMethod.Installments
+            "CPF",
+            result.Payer.Identification.Type
+        );
+
+        Assert.Equal(
+            "12345678909",
+            result.Payer.Identification.Number
         );
     }
 
@@ -158,13 +191,12 @@ public class MercadoPagoRequestFactoryTests
     {
         var request =
             CreateValidRequest(
+                installments: 2,
                 method:
-                    PaymentMethod.DebitCard,
-                installments: 2
+                    PaymentMethod.DebitCard
             );
 
-        Assert.Throws<
-            ArgumentException>(
+        Assert.Throws<ArgumentException>(
             () =>
                 MercadoPagoRequestFactory
                     .Create(request)
@@ -220,35 +252,28 @@ public class MercadoPagoRequestFactoryTests
         Assert.Null(
             payment.PaymentMethod.Installments
         );
+
+        Assert.Null(
+            result.Payer.Identification
+        );
     }
 
     [Fact]
     public void Create_ShouldTrimTextValues()
     {
         var request =
-            new PaymentGatewayRequest
-            {
-                OrderId = 15,
-
-                Amount = 87.80m,
-
-                IdempotencyKey =
-                    "00000000-0000-0000-0000-000000000001",
-
-                Method =
-                    PaymentMethod.CreditCard,
-
-                PaymentToken =
+            CreateValidRequest(
+                paymentToken:
                     "  temporary-payment-token  ",
-
-                PaymentMethodId =
+                paymentMethodId:
                     "  master  ",
-
-                Installments = 2,
-
-                PayerEmail =
-                    "  cliente@email.com  "
-            };
+                payerEmail:
+                    "  cliente@email.com  ",
+                payerIdentificationType:
+                    "  CPF  ",
+                payerIdentificationNumber:
+                    "  12345678909  "
+            );
 
         var result =
             MercadoPagoRequestFactory.Create(
@@ -276,6 +301,36 @@ public class MercadoPagoRequestFactoryTests
             "cliente@email.com",
             result.Payer.Email
         );
+
+        Assert.NotNull(
+            result.Payer.Identification
+        );
+
+        Assert.Equal(
+            "CPF",
+            result.Payer.Identification.Type
+        );
+
+        Assert.Equal(
+            "12345678909",
+            result.Payer.Identification.Number
+        );
+    }
+
+    [Fact]
+    public void Create_ShouldRejectIncompleteIdentification()
+    {
+        var request =
+            CreateValidRequest(
+                payerIdentificationNumber:
+                    string.Empty
+            );
+
+        Assert.Throws<ArgumentException>(
+            () =>
+                MercadoPagoRequestFactory
+                    .Create(request)
+        );
     }
 
     [Fact]
@@ -286,8 +341,7 @@ public class MercadoPagoRequestFactoryTests
                 orderId: 0
             );
 
-        Assert.Throws<
-            ArgumentException>(
+        Assert.Throws<ArgumentException>(
             () =>
                 MercadoPagoRequestFactory
                     .Create(request)
@@ -302,8 +356,7 @@ public class MercadoPagoRequestFactoryTests
                 amount: 0m
             );
 
-        Assert.Throws<
-            ArgumentException>(
+        Assert.Throws<ArgumentException>(
             () =>
                 MercadoPagoRequestFactory
                     .Create(request)
@@ -319,8 +372,7 @@ public class MercadoPagoRequestFactoryTests
                     string.Empty
             );
 
-        Assert.Throws<
-            ArgumentException>(
+        Assert.Throws<ArgumentException>(
             () =>
                 MercadoPagoRequestFactory
                     .Create(request)
@@ -335,8 +387,7 @@ public class MercadoPagoRequestFactoryTests
                 installments: 0
             );
 
-        Assert.Throws<
-            ArgumentException>(
+        Assert.Throws<ArgumentException>(
             () =>
                 MercadoPagoRequestFactory
                     .Create(request)
@@ -352,8 +403,7 @@ public class MercadoPagoRequestFactoryTests
                     string.Empty
             );
 
-        Assert.Throws<
-            ArgumentException>(
+        Assert.Throws<ArgumentException>(
             () =>
                 MercadoPagoRequestFactory
                     .Create(request)
@@ -366,34 +416,49 @@ public class MercadoPagoRequestFactoryTests
             decimal amount = 87.80m,
             string paymentToken =
                 "temporary-payment-token",
+            string paymentMethodId =
+                "master",
             int installments = 2,
             string payerEmail =
                 "cliente@email.com",
+            string payerIdentificationType =
+                "CPF",
+            string payerIdentificationNumber =
+                "12345678909",
             PaymentMethod method =
                 PaymentMethod.CreditCard)
     {
         return new PaymentGatewayRequest
         {
-            OrderId = orderId,
+            OrderId =
+                orderId,
 
-            Amount = amount,
+            Amount =
+                amount,
 
             IdempotencyKey =
                 "00000000-0000-0000-0000-000000000001",
 
-            Method = method,
+            Method =
+                method,
 
             PaymentToken =
                 paymentToken,
 
             PaymentMethodId =
-                "master",
+                paymentMethodId,
 
             Installments =
                 installments,
 
             PayerEmail =
-                payerEmail
+                payerEmail,
+
+            PayerIdentificationType =
+                payerIdentificationType,
+
+            PayerIdentificationNumber =
+                payerIdentificationNumber
         };
     }
 }

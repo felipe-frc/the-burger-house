@@ -17,7 +17,8 @@ public sealed class SynchronizePaymentStatusHandler
     public async Task<bool> HandleAsync(
         string externalOrderId,
         PaymentGatewayStatus gatewayStatus,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? externalPaymentId = null)
     {
         if (string.IsNullOrWhiteSpace(externalOrderId))
         {
@@ -44,9 +45,31 @@ public sealed class SynchronizePaymentStatusHandler
             );
         }
 
+        var changed = false;
+
+        if (!string.IsNullOrWhiteSpace(externalPaymentId))
+        {
+            var previousExternalPaymentId =
+                payment.ExternalPaymentId;
+
+            payment.SetExternalPaymentId(
+                externalPaymentId
+            );
+
+            changed =
+                previousExternalPaymentId is null;
+        }
+
         if (gatewayStatus == PaymentGatewayStatus.Pending)
         {
-            return false;
+            if (changed)
+            {
+                await _paymentRepository.SaveChangesAsync(
+                    cancellationToken
+                );
+            }
+
+            return changed;
         }
 
         var targetStatus = gatewayStatus switch
@@ -60,6 +83,9 @@ public sealed class SynchronizePaymentStatusHandler
             PaymentGatewayStatus.Cancelled =>
                 PaymentStatus.Cancelled,
 
+            PaymentGatewayStatus.Expired =>
+                PaymentStatus.Cancelled,
+
             _ => throw new InvalidOperationException(
                 $"Gateway status '{gatewayStatus}' " +
                 "cannot be synchronized with the current payment model."
@@ -68,7 +94,14 @@ public sealed class SynchronizePaymentStatusHandler
 
         if (payment.Status == targetStatus)
         {
-            return false;
+            if (changed)
+            {
+                await _paymentRepository.SaveChangesAsync(
+                    cancellationToken
+                );
+            }
+
+            return changed;
         }
 
         if (payment.Status != PaymentStatus.Pending)
@@ -99,10 +132,12 @@ public sealed class SynchronizePaymentStatusHandler
                 );
         }
 
+        changed = true;
+
         await _paymentRepository.SaveChangesAsync(
             cancellationToken
         );
 
-        return true;
+        return changed;
     }
 }

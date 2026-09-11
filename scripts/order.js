@@ -1,6 +1,15 @@
-﻿import { createOrder, createPayment, processCardPayment } from "./api.js";
+﻿import {
+  createOrder,
+  createPayment,
+  getPaymentStatus,
+  processCardPayment,
+  processPixPayment,
+} from "./api.js";
+
 import { WHATSAPP_PHONE_NUMBER } from "./config.js";
+
 import { getCartSubtotal, getCartTotalWithDelivery, getDeliveryFee, updateCart } from "./cart.js";
+
 import {
   getAddressText,
   getIsFetchingCep,
@@ -8,11 +17,30 @@ import {
   resetAddressForm,
   validateAddressFields,
 } from "./address.js";
+
 import { getLocalizedEntity, translate } from "./i18n.js";
+
 import { MENU_PRODUCT_BY_ID } from "./data.js";
+
 import { clearCart, getCart, getOrderType, ORDER_TYPES, resetOrderType } from "./state.js";
+
 import { escapeHTML, formatPrice, isStoreOpenNow } from "./utils.js";
+
 import { initializePaymentForm, unmountPaymentForm } from "./payment.js";
+
+import {
+  PAYMENT_METHODS,
+  clearPixInstructions,
+  configurePaymentMethodUI,
+  getPixPayerEmail,
+  getSelectedPaymentMethod,
+  resetPaymentMethodUI,
+  setPaymentMethodLocked,
+  setPixRetryEnabled,
+  setPixInstructions,
+  setPixStatus,
+} from "./payment-methods.js";
+
 import {
   closeAllModals,
   elements,
@@ -26,6 +54,12 @@ import {
   showToast,
 } from "./ui.js";
 
+const PIX_POLL_INTERVAL_MS = 3000;
+
+const PIX_POLL_TIMEOUT_MS = 10 * 60 * 1000;
+
+const PIX_SANDBOX_QR_VISIBLE_MS = 15 * 1000;
+
 /**
  * @typedef {{
  *   fingerprint: string,
@@ -34,12 +68,28 @@ import {
  *   deliveryFee: number,
  *   total: number,
  *   paymentId: number | null,
- *   idempotencyKey: string | null
+ *   idempotencyKey: string | null,
+ *   paymentMethod: number | null,
+ *   confirmationDispatched: boolean
  * }} CheckoutSession
  */
 
 /** @type {CheckoutSession | null} */
 let checkoutSession = null;
+
+let pixPollingGeneration = 0;
+
+let pixPollingTimerId = null;
+
+function stopPixPolling() {
+  pixPollingGeneration++;
+
+  if (pixPollingTimerId !== null) {
+    window.clearTimeout(pixPollingTimerId);
+
+    pixPollingTimerId = null;
+  }
+}
 
 function getOrderNotes() {
   if (!elements.orderNotesInput) {
@@ -95,7 +145,7 @@ function getCheckoutFingerprint(cart) {
 
 function createIdempotencyKey() {
   if (!globalThis.crypto || typeof globalThis.crypto.randomUUID !== "function") {
-    throw new Error("O navegador nÃ£o oferece suporte Ã  geraÃ§Ã£o segura de UUID.");
+    throw new Error("O navegador não oferece suporte à geração segura de UUID.");
   }
 
   return globalThis.crypto.randomUUID();
@@ -115,6 +165,46 @@ function isCancelledStatus(status) {
 
 function isPendingStatus(status) {
   return status === 1 || String(status).toLowerCase() === "pending";
+}
+
+function shouldHoldSandboxPixApproval(payerEmail) {
+  if (import.meta.env?.MODE === "test") {
+    return false;
+  }
+
+  const normalizedEmail = String(payerEmail ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!normalizedEmail.endsWith("@testuser.com")) {
+    return false;
+  }
+
+  const hostname = String(globalThis.location?.hostname ?? "").toLowerCase();
+
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+function showPixInstructionsAndFocus(result) {
+  setPixInstructions({
+    qrCode: result?.qrCode,
+
+    qrCodeBase64: result?.qrCodeBase64,
+
+    ticketUrl: result?.ticketUrl,
+  });
+
+  window.requestAnimationFrame(() => {
+    const instructions = document.getElementById("pix-instructions");
+
+    if (instructions && typeof instructions.scrollIntoView === "function") {
+      instructions.scrollIntoView({
+        behavior: "smooth",
+
+        block: "nearest",
+      });
+    }
+  });
 }
 
 /**
@@ -150,18 +240,31 @@ function getApiErrorCode(error) {
 }
 
 function resetCheckoutSession() {
+  stopPixPolling();
+
   checkoutSession = null;
 
   unmountPaymentForm();
+
+  resetPaymentMethodUI();
 }
 
 function resetPaymentAttempt() {
+  stopPixPolling();
+
   if (!checkoutSession) {
     return;
   }
 
   checkoutSession.paymentId = null;
+
   checkoutSession.idempotencyKey = null;
+
+  checkoutSession.paymentMethod = null;
+
+  setPaymentMethodLocked(false);
+
+  clearPixInstructions();
 }
 
 function setGoToPaymentLoading(isLoading) {
@@ -182,7 +285,10 @@ function setGoToPaymentLoading(isLoading) {
 
     button.innerHTML = `
       <span class="inline-flex items-center gap-2">
-        <span class="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+        <span
+          class="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"
+        ></span>
+
         Preparando...
       </span>
     `;
@@ -209,9 +315,11 @@ function loadReview() {
   elements.reviewItems.innerHTML = "";
 
   if (cart.length === 0) {
-    elements.reviewItems.innerHTML = `<p class="text-zinc-500 italic">${escapeHTML(
-      translate("review.empty"),
-    )}</p>`;
+    elements.reviewItems.innerHTML = `
+      <p class="text-zinc-500 italic">
+        ${escapeHTML(translate("review.empty"))}
+      </p>
+    `;
 
     elements.reviewAddress.textContent = translate("review.addressMissing");
 
@@ -236,16 +344,16 @@ function loadReview() {
     itemRow.className = "flex items-center justify-between gap-3 border-b border-zinc-200 pb-2";
 
     itemRow.innerHTML = `
-      <div class="min-w-0">
-        <p class="font-medium text-zinc-800 break-words">
-          ${item.quantity}x ${escapeHTML(localizedItem.name)}
-        </p>
-      </div>
+        <div class="min-w-0">
+          <p class="font-medium text-zinc-800 break-words">
+            ${item.quantity}x ${escapeHTML(localizedItem.name)}
+          </p>
+        </div>
 
-      <span class="font-semibold text-amber-700 whitespace-nowrap">
-        ${formatPrice(itemSubtotal)}
-      </span>
-    `;
+        <span class="font-semibold text-amber-700 whitespace-nowrap">
+          ${formatPrice(itemSubtotal)}
+        </span>
+      `;
 
     elements.reviewItems.appendChild(itemRow);
   });
@@ -256,21 +364,33 @@ function loadReview() {
 
   summaryDiv.innerHTML = `
     <div class="flex items-center justify-between text-sm text-zinc-600">
-      <span>${escapeHTML(translate("review.orderType"))}</span>
+      <span>
+        ${escapeHTML(translate("review.orderType"))}
+      </span>
 
-      <span>${escapeHTML(getOrderTypeLabel())}</span>
+      <span>
+        ${escapeHTML(getOrderTypeLabel())}
+      </span>
     </div>
 
     <div class="flex items-center justify-between text-sm text-zinc-600">
-      <span>${escapeHTML(translate("review.subtotal"))}</span>
+      <span>
+        ${escapeHTML(translate("review.subtotal"))}
+      </span>
 
-      <span>${formatPrice(subtotal)}</span>
+      <span>
+        ${formatPrice(subtotal)}
+      </span>
     </div>
 
     <div class="flex items-center justify-between text-sm text-zinc-600">
-      <span>${escapeHTML(translate("review.deliveryFee"))}</span>
+      <span>
+        ${escapeHTML(translate("review.deliveryFee"))}
+      </span>
 
-      <span>${formatPrice(deliveryFee)}</span>
+      <span>
+        ${formatPrice(deliveryFee)}
+      </span>
     </div>
   `;
 
@@ -296,33 +416,52 @@ async function prepareOrderForPayment() {
 
   checkoutSession = {
     fingerprint,
+
     orderId: createdOrder.orderId,
+
     subtotal: createdOrder.subtotal,
+
     deliveryFee: createdOrder.deliveryFee,
+
     total: createdOrder.total,
+
     paymentId: null,
+
     idempotencyKey: null,
+
+    paymentMethod: null,
+
+    confirmationDispatched: false,
   };
 
   return checkoutSession;
 }
 
-async function ensurePaymentCreated() {
+async function ensurePaymentCreated(paymentMethod) {
   if (!checkoutSession) {
-    throw new Error("O pedido ainda nÃ£o foi preparado para pagamento.");
+    throw new Error("O pedido ainda não foi preparado para pagamento.");
   }
 
   if (checkoutSession.paymentId && checkoutSession.idempotencyKey) {
+    if (checkoutSession.paymentMethod !== paymentMethod) {
+      throw new Error("Já existe uma tentativa de pagamento ativa com outro meio de pagamento.");
+    }
+
     return checkoutSession.paymentId;
   }
 
   const idempotencyKey = createIdempotencyKey();
 
-  const payment = await createPayment(checkoutSession.orderId, idempotencyKey);
+  const payment =
+    paymentMethod === PAYMENT_METHODS.CREDIT_CARD
+      ? await createPayment(checkoutSession.orderId, idempotencyKey)
+      : await createPayment(checkoutSession.orderId, idempotencyKey, paymentMethod);
 
   checkoutSession.paymentId = payment.paymentId;
 
   checkoutSession.idempotencyKey = idempotencyKey;
+
+  checkoutSession.paymentMethod = paymentMethod;
 
   if (Number.isFinite(Number(payment.amount))) {
     checkoutSession.total = Number(payment.amount);
@@ -335,7 +474,7 @@ async function ensurePaymentCreated() {
 
 function buildWhatsAppMessage() {
   if (!checkoutSession) {
-    throw new Error("NÃ£o existe pedido confirmado.");
+    throw new Error("Não existe pedido confirmado.");
   }
 
   const cart = getCart();
@@ -355,7 +494,8 @@ function buildWhatsAppMessage() {
 
     const itemSubtotal = item.price * item.quantity;
 
-    message += `- ${item.quantity}x ${localizedItem.name} (${formatPrice(itemSubtotal)})\n`;
+    message +=
+      `- ${item.quantity}x ` + `${localizedItem.name} ` + `(${formatPrice(itemSubtotal)})\n`;
   });
 
   message += `\n*${translate("whatsapp.summary")}:*\n`;
@@ -378,10 +518,16 @@ function buildWhatsAppMessage() {
 }
 
 function resetOrderAfterPayment() {
+  stopPixPolling();
+
   clearCart();
+
   updateCart();
+
   resetOrderType();
+
   resetAddressForm();
+
   clearOrderNotes();
 
   setPaymentProcessing(false);
@@ -392,9 +538,16 @@ function resetOrderAfterPayment() {
 }
 
 function sendConfirmationToWhatsApp() {
+  if (!checkoutSession || checkoutSession.confirmationDispatched) {
+    return;
+  }
+
+  checkoutSession.confirmationDispatched = true;
+
   const message = buildWhatsAppMessage();
 
-  const url = `https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent(message)}`;
+  const url =
+    `https://wa.me/` + `${WHATSAPP_PHONE_NUMBER}` + `?text=${encodeURIComponent(message)}`;
 
   const whatsappWindow = window.open(url, "_blank");
 
@@ -407,12 +560,178 @@ function sendConfirmationToWhatsApp() {
   }
 }
 
+function isPaymentModalOpen() {
+  return Boolean(elements.paymentModal && !elements.paymentModal.classList.contains("hidden"));
+}
+
+function startPixStatusPolling(paymentId, approvalNotBefore = 0) {
+  stopPixPolling();
+
+  const generation = pixPollingGeneration;
+
+  const startedAt = Date.now();
+
+  let consecutiveFailures = 0;
+
+  const scheduleNextCheck = (delay = PIX_POLL_INTERVAL_MS) => {
+    pixPollingTimerId = window.setTimeout(checkStatus, delay);
+  };
+
+  const checkStatus = async () => {
+    pixPollingTimerId = null;
+
+    if (generation !== pixPollingGeneration) {
+      return;
+    }
+
+    if (!checkoutSession || checkoutSession.paymentId !== paymentId) {
+      return;
+    }
+
+    if (!isPaymentModalOpen()) {
+      return;
+    }
+
+    if (Date.now() - startedAt >= PIX_POLL_TIMEOUT_MS) {
+      stopPixPolling();
+
+      setPixStatus("O tempo de acompanhamento automático terminou.");
+
+      showPaymentError(
+        "Ainda não recebemos a confirmação do PIX. Verifique o pagamento antes de gerar uma nova cobrança.",
+      );
+
+      return;
+    }
+
+    try {
+      const result = await getPaymentStatus(paymentId);
+
+      if (
+        generation !== pixPollingGeneration ||
+        !checkoutSession ||
+        checkoutSession.paymentId !== paymentId ||
+        !isPaymentModalOpen()
+      ) {
+        return;
+      }
+
+      consecutiveFailures = 0;
+
+      if (Number.isFinite(Number(result.amount))) {
+        checkoutSession.total = Number(result.amount);
+
+        setPaymentTotal(checkoutSession.total);
+      }
+
+      if (isApprovedStatus(result.status)) {
+        if (approvalNotBefore > Date.now()) {
+          setPixStatus("PIX gerado. Aguardando confirmação do pagamento.");
+
+          scheduleNextCheck(Math.max(PIX_POLL_INTERVAL_MS, approvalNotBefore - Date.now()));
+
+          return;
+        }
+
+        setPixStatus("Pagamento aprovado!");
+
+        stopPixPolling();
+
+        sendConfirmationToWhatsApp();
+
+        return;
+      }
+
+      if (isRejectedStatus(result.status)) {
+        setPixStatus("Pagamento PIX recusado.");
+
+        resetPaymentAttempt();
+
+        showPaymentError("O pagamento PIX foi recusado. Você pode gerar uma nova cobrança.");
+
+        return;
+      }
+
+      if (isCancelledStatus(result.status)) {
+        setPixStatus("Pagamento PIX cancelado.");
+
+        resetPaymentAttempt();
+
+        showPaymentError("O pagamento PIX foi cancelado. Você pode tentar novamente.");
+
+        return;
+      }
+
+      if (isPendingStatus(result.status)) {
+        setPixStatus("Aguardando confirmação do pagamento...");
+
+        scheduleNextCheck();
+
+        return;
+      }
+
+      stopPixPolling();
+
+      showPaymentError("O pagamento retornou um status inesperado.");
+    } catch (error) {
+      if (
+        generation !== pixPollingGeneration ||
+        !checkoutSession ||
+        checkoutSession.paymentId !== paymentId ||
+        !isPaymentModalOpen()
+      ) {
+        return;
+      }
+
+      console.error("Não foi possível consultar o status do PIX:", error);
+
+      consecutiveFailures++;
+
+      if (consecutiveFailures >= 3) {
+        setPixStatus("Conexão instável. Continuaremos tentando confirmar o pagamento.");
+      }
+
+      scheduleNextCheck();
+    }
+  };
+
+  const initialDelay =
+    approvalNotBefore > Date.now()
+      ? Math.max(PIX_POLL_INTERVAL_MS, approvalNotBefore - Date.now())
+      : PIX_POLL_INTERVAL_MS;
+
+  pixPollingTimerId = window.setTimeout(checkStatus, initialDelay);
+}
+
+async function activateSelectedPaymentMethod(amount) {
+  const paymentMethod = getSelectedPaymentMethod();
+
+  unmountPaymentForm();
+
+  if (paymentMethod === PAYMENT_METHODS.PIX) {
+    return;
+  }
+
+  await initializePaymentForm(amount, handleCardPaymentSubmit);
+}
+
 /**
  * @param {any} cardData
  */
-async function handlePaymentSubmit(cardData) {
+async function handleCardPaymentSubmit(cardData) {
   if (!checkoutSession) {
-    showPaymentError("O pedido nÃ£o estÃ¡ preparado para pagamento.");
+    showPaymentError("O pedido não está preparado para pagamento.");
+
+    return;
+  }
+
+  const selectedMethod = getSelectedPaymentMethod();
+
+  if (
+    selectedMethod !== PAYMENT_METHODS.CREDIT_CARD &&
+    selectedMethod !== PAYMENT_METHODS.DEBIT_CARD
+  ) {
+    showPaymentError("Selecione crédito ou débito para pagar com cartão.");
 
     return;
   }
@@ -421,24 +740,37 @@ async function handlePaymentSubmit(cardData) {
 
   const paymentMethodId = String(cardData?.paymentMethodId ?? "").trim();
 
-  const installments = Number(cardData?.installments);
+  const paymentTypeId = String(cardData?.paymentTypeId ?? "").trim();
+
+  const installments =
+    selectedMethod === PAYMENT_METHODS.DEBIT_CARD ? 1 : Number(cardData?.installments);
 
   const payerEmail = String(cardData?.cardholderEmail ?? elements.paymentEmail?.value ?? "").trim();
 
+  const payerIdentificationType = String(cardData?.identificationType ?? "").trim();
+
+  const payerIdentificationNumber = String(cardData?.identificationNumber ?? "").trim();
+
   if (!paymentToken) {
-    showPaymentError("NÃ£o foi possÃ­vel gerar o token do cartÃ£o. Confira os dados.");
+    showPaymentError("Não foi possível gerar o token do cartão. Confira os dados.");
 
     return;
   }
 
   if (!paymentMethodId) {
-    showPaymentError("NÃ£o foi possÃ­vel identificar a bandeira do cartÃ£o.");
+    showPaymentError("Não foi possível identificar a bandeira do cartão.");
+
+    return;
+  }
+
+  if (!paymentTypeId) {
+    showPaymentError("Não foi possível identificar o tipo do cartão.");
 
     return;
   }
 
   if (!Number.isInteger(installments) || installments <= 0) {
-    showPaymentError("Selecione uma quantidade vÃ¡lida de parcelas.");
+    showPaymentError("Selecione uma quantidade válida de parcelas.");
 
     return;
   }
@@ -449,19 +781,38 @@ async function handlePaymentSubmit(cardData) {
     return;
   }
 
+  if (!payerIdentificationType) {
+    showPaymentError("Selecione o tipo de documento do pagador.");
+
+    return;
+  }
+
+  if (!payerIdentificationNumber) {
+    showPaymentError("Informe o número do documento do pagador.");
+
+    return;
+  }
+
   hidePaymentError();
 
   setPaymentProcessing(true);
 
-  try {
-    const paymentId = await ensurePaymentCreated();
+  setPaymentMethodLocked(true);
 
-    const result = await processCardPayment(paymentId, {
+  try {
+    const paymentId = await ensurePaymentCreated(selectedMethod);
+
+    const cardPaymentPayload = {
       paymentToken,
       paymentMethodId,
+      paymentTypeId,
       installments,
       payerEmail,
-    });
+      payerIdentificationType,
+      payerIdentificationNumber,
+    };
+
+    const result = await processCardPayment(paymentId, cardPaymentPayload);
 
     if (Number.isFinite(Number(result.amount))) {
       checkoutSession.total = Number(result.amount);
@@ -476,7 +827,7 @@ async function handlePaymentSubmit(cardData) {
     if (isRejectedStatus(result.status)) {
       resetPaymentAttempt();
 
-      showPaymentError("O pagamento foi recusado. Confira os dados do cartÃ£o e tente novamente.");
+      showPaymentError("O pagamento foi recusado. Confira os dados do cartão e tente novamente.");
 
       return;
     }
@@ -484,14 +835,14 @@ async function handlePaymentSubmit(cardData) {
     if (isCancelledStatus(result.status)) {
       resetPaymentAttempt();
 
-      showPaymentError("O pagamento foi cancelado. VocÃª pode tentar novamente.");
+      showPaymentError("O pagamento foi cancelado. Você pode tentar novamente.");
 
       return;
     }
 
     if (isPendingStatus(result.status)) {
       showPaymentError(
-        "O pagamento estÃ¡ em anÃ¡lise. Aguarde a confirmaÃ§Ã£o antes de tentar novamente.",
+        "O pagamento está em análise. Aguarde a confirmação antes de tentar novamente.",
       );
 
       return;
@@ -499,7 +850,7 @@ async function handlePaymentSubmit(cardData) {
 
     showPaymentError("O Mercado Pago retornou um status de pagamento inesperado.");
   } catch (error) {
-    console.error("NÃ£o foi possÃ­vel processar o pagamento:", error);
+    console.error("Não foi possível processar o pagamento:", error);
 
     const status = getApiErrorStatus(error);
 
@@ -517,13 +868,160 @@ async function handlePaymentSubmit(cardData) {
 
     if (status === 502 || code === "payment_provider_unavailable") {
       showPaymentError(
-        "NÃ£o foi possÃ­vel confirmar o resultado do pagamento. Aguarde antes de tentar novamente.",
+        "Não foi possível confirmar o resultado do pagamento. Aguarde antes de tentar novamente.",
       );
 
       return;
     }
 
-    showPaymentError("NÃ£o foi possÃ­vel processar o pagamento. Tente novamente.");
+    if (!checkoutSession?.paymentId) {
+      setPaymentMethodLocked(false);
+    }
+
+    showPaymentError("Não foi possível processar o pagamento. Tente novamente.");
+  } finally {
+    setPaymentProcessing(false);
+  }
+}
+
+async function handlePixPaymentSubmit() {
+  if (!checkoutSession) {
+    showPaymentError("O pedido não está preparado para pagamento.");
+
+    return;
+  }
+
+  const payerEmail = getPixPayerEmail();
+
+  if (!payerEmail) {
+    showPaymentError("Informe o e-mail do pagador para gerar o PIX.");
+
+    return;
+  }
+
+  if (!payerEmail.includes("@")) {
+    showPaymentError("Informe um e-mail válido.");
+
+    return;
+  }
+
+  hidePaymentError();
+
+  clearPixInstructions();
+
+  setPixStatus("Gerando PIX...");
+
+  setPaymentProcessing(true);
+
+  setPaymentMethodLocked(true);
+
+  try {
+    const paymentId = await ensurePaymentCreated(PAYMENT_METHODS.PIX);
+
+    const result = await processPixPayment(paymentId, {
+      payerEmail,
+    });
+
+    if (Number.isFinite(Number(result.amount))) {
+      checkoutSession.total = Number(result.amount);
+
+      setPaymentTotal(checkoutSession.total);
+    }
+
+    const hasPixInstructions = Boolean(
+      String(result?.qrCode ?? "").trim() ||
+      String(result?.qrCodeBase64 ?? "").trim() ||
+      String(result?.ticketUrl ?? "").trim(),
+    );
+
+    if (hasPixInstructions || isPendingStatus(result.status)) {
+      showPixInstructionsAndFocus(result);
+    }
+
+    const approvalNotBefore =
+      hasPixInstructions && shouldHoldSandboxPixApproval(payerEmail)
+        ? Date.now() + PIX_SANDBOX_QR_VISIBLE_MS
+        : 0;
+
+    if (isApprovedStatus(result.status)) {
+      if (approvalNotBefore > Date.now()) {
+        setPixStatus("PIX gerado. Aguardando confirmação do pagamento.");
+
+        showToast("PIX gerado. Agora conclua o pagamento pelo seu banco.", "#0284c7");
+
+        startPixStatusPolling(paymentId, approvalNotBefore);
+
+        return;
+      }
+
+      sendConfirmationToWhatsApp();
+
+      return;
+    }
+
+    if (isRejectedStatus(result.status)) {
+      resetPaymentAttempt();
+
+      showPaymentError("Não foi possível gerar o pagamento PIX. Tente novamente.");
+
+      return;
+    }
+
+    if (isCancelledStatus(result.status)) {
+      resetPaymentAttempt();
+
+      showPaymentError("A cobrança PIX foi cancelada.");
+
+      return;
+    }
+
+    if (isPendingStatus(result.status)) {
+      setPixStatus("PIX gerado. Aguardando confirmação do pagamento.");
+
+      showToast("PIX gerado. Agora conclua o pagamento pelo seu banco.", "#0284c7");
+
+      startPixStatusPolling(paymentId, approvalNotBefore);
+
+      return;
+    }
+
+    showPaymentError("O Mercado Pago retornou um status PIX inesperado.");
+  } catch (error) {
+    console.error("Não foi possível gerar o PIX:", error);
+
+    const status = getApiErrorStatus(error);
+
+    const code = getApiErrorCode(error);
+
+    if (status === 422 || code === "payment_provider_rejected") {
+      resetPaymentAttempt();
+
+      showPaymentError(
+        "O Mercado Pago recusou a criação do PIX. Confira os dados e tente novamente.",
+      );
+
+      return;
+    }
+
+    if (status === 502 || code === "payment_provider_unavailable") {
+      setPixRetryEnabled();
+
+      setPixStatus("Não foi possível confirmar a criação da cobrança.");
+
+      showPaymentError(
+        "O resultado da criação do PIX não pôde ser confirmado. Aguarde antes de tentar novamente.",
+      );
+
+      return;
+    }
+
+    if (!checkoutSession?.paymentId) {
+      setPaymentMethodLocked(false);
+    } else {
+      setPixRetryEnabled();
+    }
+
+    showPaymentError("Não foi possível gerar o PIX. Tente novamente.");
   } finally {
     setPaymentProcessing(false);
   }
@@ -561,13 +1059,35 @@ async function openPaymentStep() {
 
     openModal(elements.paymentModal);
 
-    await initializePaymentForm(session.total, handlePaymentSubmit);
+    configurePaymentMethodUI({
+      defaultMethod: PAYMENT_METHODS.CREDIT_CARD,
+
+      onMethodChange: async () => {
+        stopPixPolling();
+
+        hidePaymentError();
+
+        clearPixInstructions();
+
+        try {
+          await activateSelectedPaymentMethod(session.total);
+        } catch (error) {
+          console.error("Não foi possível trocar o meio de pagamento:", error);
+
+          showPaymentError("Não foi possível carregar o meio de pagamento selecionado.");
+        }
+      },
+
+      onPixSubmit: handlePixPaymentSubmit,
+    });
+
+    await activateSelectedPaymentMethod(session.total);
   } catch (error) {
-    console.error("NÃ£o foi possÃ­vel preparar o pagamento:", error);
+    console.error("Não foi possível preparar o pagamento:", error);
 
-    showPaymentError("NÃ£o foi possÃ­vel carregar o pagamento.");
+    showPaymentError("Não foi possível carregar o pagamento.");
 
-    showToast("NÃ£o foi possÃ­vel preparar o pagamento. Tente novamente.");
+    showToast("Não foi possível preparar o pagamento. Tente novamente.");
   } finally {
     setGoToPaymentLoading(false);
   }
@@ -579,7 +1099,11 @@ export function bindOrderEvents() {
   }
 
   if (elements.closeModalBtn) {
-    elements.closeModalBtn.onclick = () => closeAllModals();
+    elements.closeModalBtn.onclick = () => {
+      stopPixPolling();
+
+      closeAllModals();
+    };
   }
 
   if (elements.goToAddressBtn) {
@@ -638,6 +1162,10 @@ export function bindOrderEvents() {
 
   if (elements.backToReviewBtn) {
     elements.backToReviewBtn.onclick = () => {
+      stopPixPolling();
+
+      unmountPaymentForm();
+
       loadReview();
 
       openModal(elements.reviewModal);

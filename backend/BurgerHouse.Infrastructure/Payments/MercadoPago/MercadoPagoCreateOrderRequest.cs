@@ -37,6 +37,34 @@ internal sealed class MercadoPagoPayerRequest
     [JsonPropertyName("email")]
     public string Email { get; init; } =
         string.Empty;
+
+    [JsonPropertyName("first_name")]
+    [JsonIgnore(
+        Condition = JsonIgnoreCondition.WhenWritingNull
+    )]
+    public string? FirstName { get; init; }
+
+    [JsonPropertyName("identification")]
+    [JsonIgnore(
+        Condition = JsonIgnoreCondition.WhenWritingNull
+    )]
+    public MercadoPagoIdentificationRequest?
+        Identification
+    {
+        get;
+        init;
+    }
+}
+
+internal sealed class MercadoPagoIdentificationRequest
+{
+    [JsonPropertyName("type")]
+    public string Type { get; init; } =
+        string.Empty;
+
+    [JsonPropertyName("number")]
+    public string Number { get; init; } =
+        string.Empty;
 }
 
 internal sealed class MercadoPagoTransactionsRequest

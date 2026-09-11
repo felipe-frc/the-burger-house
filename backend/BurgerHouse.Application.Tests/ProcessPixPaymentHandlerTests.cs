@@ -309,6 +309,66 @@ public class ProcessPixPaymentHandlerTests
         );
     }
 
+    [Fact]
+    public async Task HandleAsync_ShouldAcceptPendingResultWithBase64QrCodeOnly()
+    {
+        var payment = CreatePayment(PaymentMethod.Pix);
+
+        var handler = new ProcessPixPaymentHandler(
+            new FakePaymentRepository(payment),
+            new FakePaymentGateway(
+                new PaymentGatewayResult
+                {
+                    ExternalOrderId = "mp-order-123",
+                    ExternalPaymentId = "mp-payment-456",
+                    Status = PaymentGatewayStatus.Pending,
+                    PixQrCodeBase64 = "BASE64QR"
+                }
+            )
+        );
+
+        var response = await handler.HandleAsync(
+            new ProcessPixPaymentRequest
+            {
+                PaymentId = 10,
+                PayerEmail = "cliente@email.com"
+            }
+        );
+
+        Assert.Equal(PaymentStatus.Pending, response.Status);
+        Assert.Equal("BASE64QR", response.QrCodeBase64);
+        Assert.Equal("mp-order-123", payment.ExternalOrderId);
+        Assert.Equal("mp-payment-456", payment.ExternalPaymentId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldCancelPayment_WhenPixAlreadyExpired()
+    {
+        var payment = CreatePayment(PaymentMethod.Pix);
+        var handler = new ProcessPixPaymentHandler(
+            new FakePaymentRepository(payment),
+            new FakePaymentGateway(
+                new PaymentGatewayResult
+                {
+                    ExternalOrderId = "mp-order-123",
+                    ExternalPaymentId = "mp-payment-456",
+                    Status = PaymentGatewayStatus.Expired
+                }
+            )
+        );
+
+        var response = await handler.HandleAsync(
+            new ProcessPixPaymentRequest
+            {
+                PaymentId = 10,
+                PayerEmail = "cliente@email.com"
+            }
+        );
+
+        Assert.Equal(PaymentStatus.Cancelled, response.Status);
+        Assert.Equal(PaymentStatus.Cancelled, payment.Status);
+    }
+
     private static Payment CreatePayment(
         PaymentMethod method)
     {
