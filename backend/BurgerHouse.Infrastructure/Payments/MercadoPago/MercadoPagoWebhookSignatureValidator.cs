@@ -34,8 +34,7 @@ public sealed class MercadoPagoWebhookSignatureValidator
     public bool IsValid(
         string? xSignature,
         string? xRequestId,
-        string? dataId,
-        string? notificationId = null)
+        string? dataId)
     {
         if (string.IsNullOrWhiteSpace(xSignature) ||
             string.IsNullOrWhiteSpace(xRequestId) ||

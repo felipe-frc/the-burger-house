@@ -2,778 +2,214 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-
 using BurgerHouse.Api.Controllers;
 using BurgerHouse.Api.Webhooks.MercadoPago;
-using BurgerHouse.Application.Abstractions.Persistence;
-using BurgerHouse.Application.Payments.SynchronizePaymentStatus;
+using BurgerHouse.Application.Payments.SynchronizeCheckoutPayment;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
 using BurgerHouse.Infrastructure.Payments.MercadoPago;
-
-using Microsoft.AspNetCore.Hosting;
+using BurgerHouse.Infrastructure.Persistence;
+using BurgerHouse.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace BurgerHouse.Api.Tests;
 
 public class MercadoPagoWebhooksControllerTests
 {
-    private const string Secret =
-        "local-controller-test-secret";
-
-    private const string AccessToken =
-        "local-controller-test-access-token";
-
-    private const string IdempotencyKey =
-        "11111111-1111-4111-8111-111111111111";
-
-    [Fact]
-    public async Task Receive_ShouldReturnUnauthorized_WhenSignatureIsInvalid()
+    [Theory]
+    [InlineData("approved", PaymentStatus.Approved, OrderStatus.Received)]
+    [InlineData("pending", PaymentStatus.Pending, OrderStatus.PendingPayment)]
+    [InlineData("rejected", PaymentStatus.Rejected, OrderStatus.PendingPayment)]
+    [InlineData("cancelled", PaymentStatus.Cancelled, OrderStatus.PendingPayment)]
+    [InlineData("refunded", PaymentStatus.Refunded, OrderStatus.PendingPayment)]
+    [InlineData("charged_back", PaymentStatus.ChargedBack, OrderStatus.PendingPayment)]
+    public async Task SynchronizesVerifiedPaymentAndRepeatsSafely(string status, PaymentStatus expected, OrderStatus orderStatus)
     {
-        var controller = CreateController(
-            dataId: "order-456",
-            type: "order",
-            environmentName: Environments.Production
-        );
-
-        controller.Request.Headers["x-signature"] =
-            "ts=1700000000,v1=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
-        controller.Request.Headers["x-request-id"] =
-            "request-123";
-
-        var request = CreateWebhookRequest(
-            type: "order",
-            dataId: "order-456"
-        );
-
-        var result = await controller.Receive(
-            request,
-            CancellationToken.None
-        );
-
-        Assert.IsType<UnauthorizedObjectResult>(
-            result
-        );
+        using var fixture = new Fixture();
+        fixture.Status = status;
+        Assert.IsType<OkObjectResult>(await fixture.Receive());
+        var saved = await fixture.Payment();
+        Assert.Equal(expected, saved.Status);
+        Assert.Equal(PaymentMethod.Pix, saved.Method);
+        Assert.Equal("123", saved.ExternalPaymentId);
+        Assert.Equal(orderStatus, await fixture.OrderStatus());
+        var updated = saved.UpdatedAt;
+        Assert.IsType<OkObjectResult>(await fixture.Receive());
+        Assert.Equal(updated, (await fixture.Payment()).UpdatedAt);
     }
 
     [Fact]
-    public async Task Receive_ShouldSynchronizePayment_WhenOrderSignatureIsValid()
+    public async Task RefundAndChargebackDoNotUndoReceivedOrder()
     {
-        const string requestId =
-            "request-123";
+        using var fixture = new Fixture();
+        await fixture.Receive();
+        fixture.Detail = "partially_refunded";
+        Assert.IsType<OkObjectResult>(await fixture.Receive());
+        Assert.Equal(PaymentStatus.PartiallyRefunded, (await fixture.Payment()).Status);
+        fixture.Status = "charged_back";
+        Assert.IsType<OkObjectResult>(await fixture.Receive());
+        Assert.Equal(PaymentStatus.ChargedBack, (await fixture.Payment()).Status);
+        Assert.Equal(OrderStatus.Received, await fixture.OrderStatus());
+    }
 
-        const string dataId =
-            "order-456";
-
-        var payment =
-            CreatePendingPayment(dataId);
-
-        var repository =
-            new FakePaymentRepository(payment);
-
-        var controller = CreateController(
-            dataId,
-            type: "order",
-            repository: repository,
-            orderJson: CreateApprovedOrderJson(dataId)
-        );
-
-        controller.Request.Headers["x-signature"] =
-            CreateValidSignature(
-                requestId,
-                dataId
-            );
-
-        controller.Request.Headers["x-request-id"] =
-            requestId;
-
-        var request = CreateWebhookRequest(
-            type: "order",
-            dataId: dataId
-        );
-
-        var result = await controller.Receive(
-            request,
-            CancellationToken.None
-        );
-
-        var okResult =
-            Assert.IsType<OkObjectResult>(
-                result
-            );
-
-        var json =
-            JsonSerializer.SerializeToElement(
-                okResult.Value
-            );
-
-        Assert.True(
-            json.GetProperty("received").GetBoolean()
-        );
-
-        Assert.True(
-            json.GetProperty("synchronized").GetBoolean()
-        );
-
-        Assert.Equal(
-            PaymentStatus.Approved,
-            payment.Status
-        );
-
-        Assert.Equal(
-            1,
-            repository.SaveChangesCount
-        );
+    [Theory]
+    [InlineData("amount")]
+    [InlineData("currency")]
+    [InlineData("reference")]
+    [InlineData("missing-payment")]
+    [InlineData("method")]
+    [InlineData("external-id")]
+    public async Task RejectsMismatchesWithoutSaving(string mismatch)
+    {
+        using var fixture = new Fixture();
+        if (mismatch == "amount") fixture.Amount = 1m;
+        if (mismatch == "currency") fixture.Currency = "USD";
+        if (mismatch == "reference") fixture.Reference = "invalid";
+        if (mismatch == "missing-payment") fixture.Reference = "999";
+        if (mismatch == "method") fixture.Type = "ticket";
+        if (mismatch == "external-id")
+        {
+            await using var db = fixture.Open();
+            var payment = await db.Payments.SingleAsync();
+            payment.SetExternalPaymentId("456");
+            await db.SaveChangesAsync();
+        }
+        Assert.IsType<ConflictObjectResult>(await fixture.Receive());
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+        Assert.Equal(OrderStatus.PendingPayment, await fixture.OrderStatus());
     }
 
     [Fact]
-    public async Task Receive_ShouldUseSandboxFallbackAndSynchronize_WhenSignatureIsInvalidInDevelopment()
+    public async Task InvalidSignatureNeverCallsProvider()
     {
-        const string dataId =
-            "order-456";
-
-        var payment =
-            CreatePendingPayment(dataId);
-
-        var repository =
-            new FakePaymentRepository(payment);
-
-        var controller = CreateController(
-            dataId,
-            type: "order",
-            repository: repository,
-            orderJson: CreateApprovedOrderJson(dataId),
-            environmentName: Environments.Development
-        );
-
-        controller.Request.Headers["x-signature"] =
-            "ts=1700000000,v1=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
-        controller.Request.Headers["x-request-id"] =
-            "request-123";
-
-        var request = CreateWebhookRequest(
-            type: "order",
-            dataId: dataId
-        );
-
-        var result = await controller.Receive(
-            request,
-            CancellationToken.None
-        );
-
-        var okResult =
-            Assert.IsType<OkObjectResult>(
-                result
-            );
-
-        var json =
-            JsonSerializer.SerializeToElement(
-                okResult.Value
-            );
-
-        Assert.True(
-            json.GetProperty("received").GetBoolean()
-        );
-
-        Assert.True(
-            json.GetProperty("synchronized").GetBoolean()
-        );
-
-        Assert.True(
-            json.GetProperty("sandboxFallback").GetBoolean()
-        );
-
-        Assert.Equal(
-            "mercado-pago-orders-api",
-            json.GetProperty("verifiedBy").GetString()
-        );
-
-        Assert.Equal(
-            PaymentStatus.Approved,
-            payment.Status
-        );
-
-        Assert.Equal(
-            1,
-            repository.SaveChangesCount
-        );
+        using var fixture = new Fixture();
+        Assert.IsType<UnauthorizedObjectResult>(await fixture.Receive(validSignature: false));
+        Assert.Equal(0, fixture.Calls);
     }
 
     [Fact]
-    public async Task Receive_ShouldRejectDevelopmentFallback_WhenOrderCannotBeVerified()
+    public async Task MissingIdAndOtherTopicDoNotCallProvider()
     {
-        const string dataId = "order-456";
-
-        var controller = CreateController(
-            dataId,
-            type: "order",
-            environmentName: Environments.Development
-        );
-
-        controller.Request.Headers["x-signature"] =
-            "ts=1700000000,v1=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        controller.Request.Headers["x-request-id"] = "request-123";
-
-        var result = await controller.Receive(
-            CreateWebhookRequest("order", dataId),
-            CancellationToken.None
-        );
-
-        Assert.IsType<UnauthorizedObjectResult>(result);
+        using var fixture = new Fixture();
+        Assert.IsType<BadRequestObjectResult>(await fixture.Receive(dataId: ""));
+        Assert.IsType<OkObjectResult>(await fixture.Receive(topic: "merchant_order"));
+        Assert.Equal(0, fixture.Calls);
     }
 
     [Fact]
-    public async Task Receive_ShouldIgnoreValidWebhook_WhenTypeIsNotOrder()
+    public async Task ProviderNotFoundDoesNotApprove()
     {
-        const string requestId =
-            "request-123";
-
-        const string dataId =
-            "payment-456";
-
-        var controller = CreateController(
-            dataId,
-            type: "payment"
-        );
-
-        controller.Request.Headers["x-signature"] =
-            CreateValidSignature(
-                requestId,
-                dataId
-            );
-
-        controller.Request.Headers["x-request-id"] =
-            requestId;
-
-        var request = CreateWebhookRequest(
-            type: "payment",
-            dataId: dataId
-        );
-
-        var result = await controller.Receive(
-            request,
-            CancellationToken.None
-        );
-
-        var okResult =
-            Assert.IsType<OkObjectResult>(
-                result
-            );
-
-        var json =
-            JsonSerializer.SerializeToElement(
-                okResult.Value
-            );
-
-        Assert.True(
-            json.GetProperty("received").GetBoolean()
-        );
-
-        Assert.True(
-            json.GetProperty("ignored").GetBoolean()
-        );
+        using var fixture = new Fixture { HttpStatus = HttpStatusCode.NotFound };
+        Assert.Equal(502, Assert.IsType<ObjectResult>(await fixture.Receive()).StatusCode);
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
     }
 
     [Fact]
-    public async Task Receive_ShouldReturnBadRequest_WhenQueryAndBodyDataIdsDiffer()
+    public async Task ProviderLookupRunsWithoutDatabaseTransaction()
     {
-        const string requestId =
-            "request-123";
-
-        const string signedDataId =
-            "order-456";
-
-        var controller = CreateController(
-            signedDataId,
-            type: "order"
-        );
-
-        controller.Request.Headers["x-signature"] =
-            CreateValidSignature(
-                requestId,
-                signedDataId
-            );
-
-        controller.Request.Headers["x-request-id"] =
-            requestId;
-
-        var request = CreateWebhookRequest(
-            type: "order",
-            dataId: "different-order-999"
-        );
-
-        var result = await controller.Receive(
-            request,
-            CancellationToken.None
-        );
-
-        Assert.IsType<BadRequestObjectResult>(
-            result
-        );
+        using var fixture = new Fixture();
+        Assert.IsType<OkObjectResult>(await fixture.Receive());
+        Assert.False(fixture.TransactionObservedDuringLookup);
     }
 
     [Fact]
-    public async Task Receive_ShouldRemainIdempotent_WhenWebhookIsRepeated()
+    public async Task ConcurrentWebhooksCommitOneConsistentResult()
     {
-        const string requestId = "request-123";
-        const string dataId = "order-456";
-
-        var payment = CreatePendingPayment(dataId);
-        var repository = new FakePaymentRepository(payment);
-        var controller = CreateController(
-            dataId,
-            type: "order",
-            repository: repository,
-            orderJson: CreateApprovedOrderJson(dataId)
-        );
-
-        controller.Request.Headers["x-signature"] =
-            CreateValidSignature(requestId, dataId);
-        controller.Request.Headers["x-request-id"] = requestId;
-
-        var request = CreateWebhookRequest("order", dataId);
-
-        var first = await controller.Receive(
-            request,
-            CancellationToken.None
-        );
-
-        var second = await controller.Receive(
-            request,
-            CancellationToken.None
-        );
-
-        Assert.IsType<OkObjectResult>(first);
-
-        var secondResult = Assert.IsType<OkObjectResult>(second);
-        var json = JsonSerializer.SerializeToElement(secondResult.Value);
-
-        Assert.False(json.GetProperty("synchronized").GetBoolean());
-        Assert.Equal(PaymentStatus.Approved, payment.Status);
-        Assert.Equal(1, repository.SaveChangesCount);
+        using var fixture = new Fixture();
+        var results = await Task.WhenAll(Task.Run(() => fixture.Receive()), Task.Run(() => fixture.Receive()));
+        Assert.All(results, result => Assert.IsType<OkObjectResult>(result));
+        Assert.Equal(PaymentStatus.Approved, (await fixture.Payment()).Status);
+        Assert.Equal(OrderStatus.Received, await fixture.OrderStatus());
     }
 
     [Fact]
-    public async Task Receive_ShouldIgnoreNonOrderWebhook_WithoutValidatingSignature()
+    public async Task FailureSavingOrderRollsBackPaymentAndRetrySucceeds()
     {
-        var controller = CreateController(
-            dataId: "payment-456",
-            type: "payment"
-        );
-
-        var result = await controller.Receive(
-            CreateWebhookRequest("payment", "payment-456"),
-            CancellationToken.None
-        );
-
-        var okResult = Assert.IsType<OkObjectResult>(result);
-        var json = JsonSerializer.SerializeToElement(okResult.Value);
-
-        Assert.True(json.GetProperty("ignored").GetBoolean());
+        using var fixture = new Fixture();
+        await using (var db = fixture.Open())
+            await db.Database.ExecuteSqlRawAsync("CREATE TRIGGER fail_order BEFORE UPDATE ON Orders BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;");
+        Assert.Equal(503, Assert.IsType<ObjectResult>(await fixture.Receive()).StatusCode);
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Pending, payment.Status);
+        Assert.Equal(PaymentMethod.Unknown, payment.Method);
+        Assert.Null(payment.ExternalPaymentId);
+        Assert.Equal(OrderStatus.PendingPayment, await fixture.OrderStatus());
+        await using (var db = fixture.Open()) await db.Database.ExecuteSqlRawAsync("DROP TRIGGER fail_order");
+        Assert.IsType<OkObjectResult>(await fixture.Receive());
+        Assert.Equal(OrderStatus.Received, await fixture.OrderStatus());
     }
 
     [Fact]
-    public async Task Receive_ShouldReturnBadGateway_WhenOrderLookupIsUnavailable()
+    public async Task MissingOrderIsRejectedWithoutPaymentUpdate()
     {
-        const string requestId = "request-123";
-        const string dataId = "order-456";
-
-        var controller = CreateController(
-            dataId,
-            type: "order",
-            orderStatusCode: HttpStatusCode.ServiceUnavailable
-        );
-
-        controller.Request.Headers["x-signature"] =
-            CreateValidSignature(requestId, dataId);
-        controller.Request.Headers["x-request-id"] = requestId;
-
-        var result = await controller.Receive(
-            CreateWebhookRequest("order", dataId),
-            CancellationToken.None
-        );
-
-        var statusResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(StatusCodes.Status502BadGateway, statusResult.StatusCode);
+        using var fixture = new Fixture();
+        await using (var db = fixture.Open())
+        {
+            await db.Database.OpenConnectionAsync();
+            await db.Database.ExecuteSqlRawAsync("PRAGMA foreign_keys = OFF;");
+            await db.Database.ExecuteSqlRawAsync("DELETE FROM Orders;");
+        }
+        Assert.IsType<ConflictObjectResult>(await fixture.Receive());
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
     }
 
-    [Fact]
-    public async Task Receive_ShouldReturnBadGateway_WhenOrderResponseIsInvalid()
+    internal sealed class Fixture : IDisposable
     {
-        const string requestId = "request-123";
-        const string dataId = "order-456";
-
-        var controller = CreateController(
-            dataId,
-            type: "order",
-            orderJson: "not-json"
-        );
-
-        controller.Request.Headers["x-signature"] =
-            CreateValidSignature(requestId, dataId);
-        controller.Request.Headers["x-request-id"] = requestId;
-
-        var result = await controller.Receive(
-            CreateWebhookRequest("order", dataId),
-            CancellationToken.None
-        );
-
-        var statusResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(StatusCodes.Status502BadGateway, statusResult.StatusCode);
-    }
-
-    [Fact]
-    public async Task Receive_ShouldReturnConflict_WhenVerifiedOrderDoesNotExistLocally()
-    {
-        const string requestId = "request-123";
-        const string dataId = "order-456";
-
-        var controller = CreateController(
-            dataId,
-            type: "order",
-            orderJson: CreateApprovedOrderJson(dataId)
-        );
-
-        controller.Request.Headers["x-signature"] =
-            CreateValidSignature(requestId, dataId);
-        controller.Request.Headers["x-request-id"] = requestId;
-
-        var result = await controller.Receive(
-            CreateWebhookRequest("order", dataId),
-            CancellationToken.None
-        );
-
-        Assert.IsType<ConflictObjectResult>(result);
-    }
-
-    private static MercadoPagoWebhooksController CreateController(
-        string dataId,
-        string type,
-        FakePaymentRepository? repository = null,
-        string? orderJson = null,
-        string environmentName = "Production",
-        HttpStatusCode orderStatusCode = HttpStatusCode.OK)
-    {
-        var options = Options.Create(
-            new MercadoPagoOptions
+        private const string Secret = "local-test-webhook-secret";
+        private readonly string _path = Path.Combine(Path.GetTempPath(), $"burger-webhook-{Guid.NewGuid()}.db");
+        public string Status = "approved", Detail = "accredited", Currency = "BRL", Type = "bank_transfer", Reference = "1";
+        public decimal Amount = 43.90m;
+        public HttpStatusCode HttpStatus = HttpStatusCode.OK;
+        public int Calls;
+        public bool TransactionObservedDuringLookup;
+        public Fixture()
+        {
+            using var db = Open();
+            db.Database.EnsureCreated();
+            var order = new Order(0);
+            order.AddItem(new OrderItem(1, 1, 43.90m));
+            db.Orders.Add(order);
+            db.SaveChanges();
+            var payment = new Payment(order.Id, order.Total, Guid.NewGuid().ToString("D"), PaymentMethod.Unknown);
+            payment.SetExternalPreferenceId("pref-1");
+            db.Payments.Add(payment);
+            db.SaveChanges();
+            Reference = payment.Id.ToString();
+        }
+        public BurgerHouseDbContext Open() => new(new DbContextOptionsBuilder<BurgerHouseDbContext>().UseSqlite($"Data Source={_path};Pooling=False;Default Timeout=10").Options);
+        public async Task<Payment> Payment() { await using var db = Open(); return await db.Payments.SingleAsync(); }
+        public async Task<OrderStatus> OrderStatus() { await using var db = Open(); return (await db.Orders.SingleAsync()).Status; }
+        public async Task<IActionResult> Receive(bool validSignature = true, string dataId = "123", string topic = "payment")
+        {
+            await using var db = Open();
+            using var http = new HttpClient(new Stub(this, () => db.Database.CurrentTransaction is not null));
+            var options = Options.Create(new MercadoPagoOptions { AccessToken = "local-test-token", WebhookSecret = Secret });
+            var controller = new MercadoPagoWebhooksController(new MercadoPagoWebhookSignatureValidator(options),
+                new MercadoPagoPaymentLookup(http, options),
+                new SynchronizeCheckoutPaymentHandler(new PaymentRepository(db), new OrderRepository(db)), db);
+            var context = new DefaultHttpContext();
+            context.Request.QueryString = new QueryString($"?data.id={dataId}&type={topic}");
+            var ts = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var hash = HMACSHA256.HashData(Encoding.UTF8.GetBytes(Secret), Encoding.UTF8.GetBytes($"id:{dataId};request-id:test-request;ts:{ts};"));
+            context.Request.Headers["x-signature"] = validSignature ? $"ts={ts},v1={Convert.ToHexString(hash).ToLowerInvariant()}" : "invalid";
+            context.Request.Headers["x-request-id"] = "test-request";
+            controller.ControllerContext = new ControllerContext { HttpContext = context };
+            return await controller.Receive(new MercadoPagoWebhookRequest { Type = topic, Data = new MercadoPagoWebhookData { Id = dataId } }, default);
+        }
+        public void Dispose() => File.Delete(_path);
+        private sealed class Stub(Fixture fixture, Func<bool> hasActiveTransaction) : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
             {
-                WebhookSecret = Secret,
-                AccessToken = AccessToken
+                Interlocked.Increment(ref fixture.Calls);
+                fixture.TransactionObservedDuringLookup = hasActiveTransaction();
+                var payload = new { id = "123", external_reference = fixture.Reference, status = fixture.Status, status_detail = fixture.Detail,
+                    transaction_amount = fixture.Amount, currency_id = fixture.Currency, payment_type_id = fixture.Type, payment_method_id = "pix" };
+                return Task.FromResult(new HttpResponseMessage(fixture.HttpStatus) { Content = new StringContent(JsonSerializer.Serialize(payload)) });
             }
-        );
-
-        var validator =
-            new MercadoPagoWebhookSignatureValidator(
-                options
-            );
-
-        var messageHandler =
-            new FakeHttpMessageHandler(
-                orderJson,
-                orderStatusCode
-            );
-
-        var orderLookup =
-            new MercadoPagoOrderLookup(
-                new HttpClient(messageHandler),
-                options
-            );
-
-        repository ??=
-            new FakePaymentRepository();
-
-        var synchronizePaymentStatusHandler =
-            new SynchronizePaymentStatusHandler(
-                repository
-            );
-
-        var environment =
-            new TestWebHostEnvironment
-            {
-                EnvironmentName =
-                    environmentName
-            };
-
-        var logger =
-            NullLogger<MercadoPagoWebhooksController>.Instance;
-
-        var controller =
-            new MercadoPagoWebhooksController(
-                validator,
-                orderLookup,
-                synchronizePaymentStatusHandler,
-                environment,
-                logger
-            );
-
-        var httpContext =
-            new DefaultHttpContext();
-
-        httpContext.Request.QueryString =
-            new QueryString(
-                $"?data.id={Uri.EscapeDataString(dataId)}" +
-                $"&type={Uri.EscapeDataString(type)}"
-            );
-
-        controller.ControllerContext =
-            new ControllerContext
-            {
-                HttpContext = httpContext
-            };
-
-        return controller;
-    }
-
-    private static Payment CreatePendingPayment(
-        string externalOrderId)
-    {
-        var payment = new Payment(
-            orderId: 25,
-            amount: 87.80m,
-            idempotencyKey: IdempotencyKey
-        );
-
-        payment.SetExternalOrderId(
-            externalOrderId
-        );
-
-        return payment;
-    }
-
-    private static string CreateApprovedOrderJson(
-        string orderId)
-    {
-        return JsonSerializer.Serialize(
-            new
-            {
-                id = orderId,
-                status = "processed",
-                status_detail = "accredited",
-                transactions = new
-                {
-                    payments = new[]
-                    {
-                        new
-                        {
-                            id = "payment-123",
-                            status = "processed",
-                            status_detail = "accredited"
-                        }
-                    }
-                }
-            }
-        );
-    }
-
-    private static MercadoPagoWebhookRequest CreateWebhookRequest(
-        string type,
-        string dataId)
-    {
-        return new MercadoPagoWebhookRequest
-        {
-            Type = type,
-            Action = "updated",
-            Data = new MercadoPagoWebhookData
-            {
-                Id = dataId
-            }
-        };
-    }
-
-    private static string CreateValidSignature(
-        string requestId,
-        string dataId)
-    {
-        var timestamp =
-            DateTimeOffset.UtcNow
-                .ToUnixTimeSeconds()
-                .ToString();
-
-        var manifest =
-            $"id:{dataId};" +
-            $"request-id:{requestId};" +
-            $"ts:{timestamp};";
-
-        var hash = HMACSHA256.HashData(
-            Encoding.UTF8.GetBytes(Secret),
-            Encoding.UTF8.GetBytes(manifest)
-        );
-
-        var signature =
-            Convert.ToHexString(hash)
-                .ToLowerInvariant();
-
-        return $"ts={timestamp},v1={signature}";
-    }
-
-    private sealed class FakeHttpMessageHandler
-        : HttpMessageHandler
-    {
-        private readonly string? _orderJson;
-        private readonly HttpStatusCode _statusCode;
-
-        public FakeHttpMessageHandler(
-            string? orderJson,
-            HttpStatusCode statusCode)
-        {
-            _orderJson = orderJson;
-            _statusCode = statusCode;
         }
-
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            if (_statusCode != HttpStatusCode.OK)
-            {
-                return Task.FromResult(
-                    new HttpResponseMessage(
-                        _statusCode
-                    )
-                );
-            }
-
-            if (string.IsNullOrWhiteSpace(_orderJson))
-            {
-                return Task.FromResult(
-                    new HttpResponseMessage(
-                        HttpStatusCode.NotFound
-                    )
-                );
-            }
-
-            var response =
-                new HttpResponseMessage(
-                    HttpStatusCode.OK
-                )
-                {
-                    Content = new StringContent(
-                        _orderJson,
-                        Encoding.UTF8,
-                        "application/json"
-                    )
-                };
-
-            return Task.FromResult(response);
-        }
-    }
-
-    private sealed class FakePaymentRepository
-        : IPaymentRepository
-    {
-        private readonly List<Payment> _payments;
-
-        public int SaveChangesCount { get; private set; }
-
-        public FakePaymentRepository(
-            params Payment[] payments)
-        {
-            _payments = [.. payments];
-        }
-
-        public Task AddAsync(
-            Payment payment,
-            CancellationToken cancellationToken = default)
-        {
-            _payments.Add(payment);
-
-            return Task.CompletedTask;
-        }
-
-        public Task<Payment?> GetByIdAsync(
-            int paymentId,
-            CancellationToken cancellationToken = default)
-        {
-            var payment =
-                _payments.FirstOrDefault(
-                    item => item.Id == paymentId
-                );
-
-            return Task.FromResult(payment);
-        }
-
-        public Task<Payment?> GetByExternalOrderIdAsync(
-            string externalOrderId,
-            CancellationToken cancellationToken = default)
-        {
-            var payment =
-                _payments.FirstOrDefault(
-                    item =>
-                        item.ExternalOrderId ==
-                        externalOrderId
-                );
-
-            return Task.FromResult(payment);
-        }
-
-        public Task<Payment?> GetByIdempotencyKeyAsync(
-            string idempotencyKey,
-            CancellationToken cancellationToken = default)
-        {
-            var payment =
-                _payments.FirstOrDefault(
-                    item =>
-                        item.IdempotencyKey ==
-                        idempotencyKey
-                );
-
-            return Task.FromResult(payment);
-        }
-
-        public Task<Payment?> GetActiveByOrderIdAsync(
-            int orderId,
-            CancellationToken cancellationToken = default)
-        {
-            var payment =
-                _payments.FirstOrDefault(
-                    item =>
-                        item.OrderId == orderId &&
-                        (
-                            item.Status ==
-                                PaymentStatus.Pending ||
-                            item.Status ==
-                                PaymentStatus.Approved
-                        )
-                );
-
-            return Task.FromResult(payment);
-        }
-
-        public Task SaveChangesAsync(
-            CancellationToken cancellationToken = default)
-        {
-            SaveChangesCount++;
-
-            return Task.CompletedTask;
-        }
-    }
-
-    private sealed class TestWebHostEnvironment
-        : IWebHostEnvironment
-    {
-        public string ApplicationName { get; set; } =
-            "BurgerHouse.Api.Tests";
-
-        public IFileProvider WebRootFileProvider { get; set; } =
-            new NullFileProvider();
-
-        public string WebRootPath { get; set; } =
-            string.Empty;
-
-        public string EnvironmentName { get; set; } =
-            Environments.Production;
-
-        public string ContentRootPath { get; set; } =
-            string.Empty;
-
-        public IFileProvider ContentRootFileProvider { get; set; } =
-            new NullFileProvider();
     }
 }

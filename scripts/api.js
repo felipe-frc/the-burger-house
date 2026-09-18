@@ -47,61 +47,12 @@ export async function createOrder(orderType, items) {
   });
 }
 
-export async function createPayment(orderId, idempotencyKey, method = null) {
-  const body = {
-    orderId,
-    idempotencyKey,
-  };
-
-  if (method !== null && method !== undefined) {
-    body.method = method;
-  }
-
-  return request("/api/payments", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
+export async function createCheckout(orderId) {
+  return request(`/api/checkout/${orderId}`, { method: "POST" });
 }
 
 export async function getPaymentStatus(paymentId) {
   return request(`/api/payments/${paymentId}`, {
     method: "GET",
-  });
-}
-
-export async function processCardPayment(
-  paymentId,
-  {
-    paymentToken,
-    paymentMethodId,
-    paymentTypeId,
-    installments,
-    payerEmail,
-    payerIdentificationType,
-    payerIdentificationNumber,
-  },
-) {
-  return request(`/api/payments/${paymentId}/card`, {
-    method: "POST",
-
-    body: JSON.stringify({
-      paymentToken,
-      paymentMethodId,
-      paymentTypeId,
-      installments,
-      payerEmail,
-      payerIdentificationType,
-      payerIdentificationNumber,
-    }),
-  });
-}
-
-export async function processPixPayment(paymentId, { payerEmail }) {
-  return request(`/api/payments/${paymentId}/pix`, {
-    method: "POST",
-
-    body: JSON.stringify({
-      payerEmail,
-    }),
   });
 }

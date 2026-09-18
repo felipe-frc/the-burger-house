@@ -1,305 +1,66 @@
+using System.Globalization;
 using System.Text.Json;
-
 using BurgerHouse.Api.Webhooks.MercadoPago;
-using BurgerHouse.Application.Payments.SynchronizePaymentStatus;
+using BurgerHouse.Application.Payments.SynchronizeCheckoutPayment;
 using BurgerHouse.Infrastructure.Payments.MercadoPago;
-
+using BurgerHouse.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 namespace BurgerHouse.Api.Controllers;
 
 [ApiController]
 [Route("api/webhooks/mercadopago")]
-public sealed class MercadoPagoWebhooksController : ControllerBase
+public sealed class MercadoPagoWebhooksController(
+    MercadoPagoWebhookSignatureValidator signatureValidator,
+    MercadoPagoPaymentLookup paymentLookup,
+    SynchronizeCheckoutPaymentHandler synchronizer,
+    BurgerHouseDbContext dbContext) : ControllerBase
 {
-    private readonly MercadoPagoWebhookSignatureValidator _signatureValidator;
-    private readonly MercadoPagoOrderLookup _orderLookup;
-    private readonly SynchronizePaymentStatusHandler _synchronizePaymentStatusHandler;
-    private readonly IWebHostEnvironment _environment;
-    private readonly ILogger<MercadoPagoWebhooksController> _logger;
-
-    public MercadoPagoWebhooksController(
-        MercadoPagoWebhookSignatureValidator signatureValidator,
-        MercadoPagoOrderLookup orderLookup,
-        SynchronizePaymentStatusHandler synchronizePaymentStatusHandler,
-        IWebHostEnvironment environment,
-        ILogger<MercadoPagoWebhooksController> logger)
-    {
-        _signatureValidator = signatureValidator;
-        _orderLookup = orderLookup;
-        _synchronizePaymentStatusHandler =
-            synchronizePaymentStatusHandler;
-        _environment = environment;
-        _logger = logger;
-    }
-
     [HttpPost]
-    public async Task<IActionResult> Receive(
-        [FromBody] MercadoPagoWebhookRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> Receive([FromBody] MercadoPagoWebhookRequest request, CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(request);
-
-        var xSignature =
-            Request.Headers["x-signature"]
-                .FirstOrDefault();
-
-        var xRequestId =
-            Request.Headers["x-request-id"]
-                .FirstOrDefault();
-
-        var signedDataId =
-            Request.Query["data.id"]
-                .FirstOrDefault();
-
-        var notificationType =
-            Request.Query["type"]
-                .FirstOrDefault();
-
-        var notificationId =
-            request.Id.ValueKind switch
-            {
-                JsonValueKind.String =>
-                    request.Id.GetString(),
-
-                JsonValueKind.Number =>
-                    request.Id.GetRawText(),
-
-                _ => null
-            };
-
-        if (!string.IsNullOrWhiteSpace(request.Data?.Id) &&
-            !string.Equals(
-                request.Data.Id,
-                signedDataId,
-                StringComparison.Ordinal))
-        {
-            return BadRequest(new
-            {
-                error = "Webhook data id mismatch."
-            });
-        }
-
-        if (!string.Equals(
-                notificationType,
-                "order",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return Ok(new
-            {
-                received = true,
-                ignored = true
-            });
-        }
-
-        var isValid = _signatureValidator.IsValid(
-            xSignature,
-            xRequestId,
-            signedDataId,
-            notificationId
-        );
-
-        var sandboxFallback = false;
-
-        if (!isValid)
-        {
-            if (!_environment.IsDevelopment() ||
-                !string.Equals(
-                    notificationType,
-                    "order",
-                    StringComparison.OrdinalIgnoreCase) ||
-                string.IsNullOrWhiteSpace(signedDataId))
-            {
-                return Unauthorized(new
-                {
-                    error = "Invalid webhook signature."
-                });
-            }
-
-            sandboxFallback = true;
-        }
-
-        if (string.IsNullOrWhiteSpace(signedDataId))
-        {
-            return BadRequest(new
-            {
-                error = "Webhook order id is required."
-            });
-        }
-
-        MercadoPagoOrderSnapshot? order;
+        var dataId = Request.Query["data.id"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(dataId)) return BadRequest(new { error = "Payment id is required." });
+        if (!signatureValidator.IsValid(Request.Headers["x-signature"].FirstOrDefault(),
+            Request.Headers["x-request-id"].FirstOrDefault(), dataId))
+            return Unauthorized(new { error = "Invalid webhook signature." });
+        if (!string.IsNullOrWhiteSpace(request.Data?.Id) && request.Data.Id != dataId)
+            return BadRequest(new { error = "Webhook data id mismatch." });
+        var type = Request.Query["type"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(type) && !string.IsNullOrWhiteSpace(request.Type) && type != request.Type)
+            return BadRequest(new { error = "Webhook type mismatch." });
+        type ??= request.Type;
+        if (type != "payment") return Ok(new { received = true, ignored = true });
+        if (!long.TryParse(dataId, NumberStyles.None, CultureInfo.InvariantCulture, out var numericId) || numericId <= 0)
+            return BadRequest(new { error = "Invalid payment id." });
 
         try
         {
-            order = await _orderLookup.GetAsync(
-                signedDataId,
-                cancellationToken
-            );
+            var snapshot = await paymentLookup.GetAsync(dataId, ct);
+            if (snapshot is null || snapshot.Id != dataId)
+                return StatusCode(502, new { error = "Could not verify the notified payment." });
+            if (!int.TryParse(snapshot.ExternalReference, NumberStyles.None, CultureInfo.InvariantCulture, out var paymentId) || paymentId <= 0)
+                return Conflict(new { error = "Invalid local payment reference." });
+            var method = MercadoPagoPaymentMethodMapper.Map(snapshot.PaymentTypeId, snapshot.PaymentMethodId);
+            if (snapshot.CurrencyId != "BRL")
+                throw new InvalidOperationException("Payment currency is incompatible.");
+
+            // The provider call above never holds a database transaction. This short, non-deferred
+            // SQLite transaction serializes the local reload, correlation checks and state changes.
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(ct);
+            var changed = await synchronizer.HandleAsync(paymentId, snapshot.Id, snapshot.TransactionAmount,
+                snapshot.CurrencyId, method, snapshot.PaymentStatus, ct);
+            await transaction.CommitAsync(ct);
+            return Ok(new { received = true, synchronized = changed });
         }
-        catch (HttpRequestException exception)
-        {
-            _logger.LogWarning(
-                exception,
-                "Mercado Pago order verification failed."
-            );
-
-            return StatusCode(
-                StatusCodes.Status502BadGateway,
-                new
-                {
-                    error = "Could not verify Mercado Pago order."
-                }
-            );
-        }
-        catch (TaskCanceledException exception)
-            when (!cancellationToken.IsCancellationRequested)
-        {
-            _logger.LogWarning(
-                exception,
-                "Mercado Pago order verification timed out."
-            );
-
-            return StatusCode(
-                StatusCodes.Status502BadGateway,
-                new
-                {
-                    error = "Could not verify Mercado Pago order."
-                }
-            );
-        }
-        catch (JsonException exception)
-        {
-            _logger.LogWarning(
-                exception,
-                "Mercado Pago returned an invalid order response."
-            );
-
-            return StatusCode(
-                StatusCodes.Status502BadGateway,
-                new
-                {
-                    error = "Could not verify Mercado Pago order."
-                }
-            );
-        }
-        catch (InvalidOperationException exception)
-        {
-            _logger.LogWarning(
-                exception,
-                "Mercado Pago returned an incomplete order response."
-            );
-
-            return StatusCode(
-                StatusCodes.Status502BadGateway,
-                new
-                {
-                    error = "Could not verify Mercado Pago order."
-                }
-            );
-        }
-
-        if (order is null ||
-            !string.Equals(
-                order.Id,
-                signedDataId,
-                StringComparison.Ordinal))
-        {
-            if (sandboxFallback)
-            {
-                _logger.LogWarning(
-                    "Mercado Pago Sandbox webhook could not be verified " +
-                    "through the Orders API."
-                );
-
-                return Unauthorized(new
-                {
-                    error = "Invalid webhook signature."
-                });
-            }
-
-            _logger.LogWarning(
-                "Mercado Pago webhook Order {OrderId} " +
-                "could not be verified through the Orders API.",
-                signedDataId
-            );
-
-            return StatusCode(
-                StatusCodes.Status502BadGateway,
-                new
-                {
-                    error = "Could not verify Mercado Pago order."
-                }
-            );
-        }
-
-        if (sandboxFallback)
-        {
-            _logger.LogWarning(
-                "Mercado Pago Sandbox webhook signature failed, but " +
-                "Order {OrderId} was verified directly through the " +
-                "Mercado Pago API. Status: {Status}. Detail: {StatusDetail}.",
-                order.Id,
-                order.ProviderStatus,
-                order.ProviderStatusDetail ?? "(missing)"
-            );
-        }
-
-        bool changed;
-
-        try
-        {
-            changed =
-                await _synchronizePaymentStatusHandler.HandleAsync(
-                    order.Id,
-                    order.PaymentStatus,
-                    cancellationToken,
-                    order.ExternalPaymentId
-                );
-        }
-        catch (KeyNotFoundException exception)
-        {
-            _logger.LogWarning(
-                exception,
-                "Local payment for Mercado Pago Order {OrderId} " +
-                "was not found.",
-                order.Id
-            );
-
-            return Conflict(new
-            {
-                error = "Local payment was not found."
-            });
-        }
-        catch (InvalidOperationException exception)
-        {
-            _logger.LogWarning(
-                exception,
-                "Mercado Pago Order {OrderId} could not be " +
-                "synchronized with the local payment.",
-                order.Id
-            );
-
-            return Conflict(new
-            {
-                error = "Payment status could not be synchronized."
-            });
-        }
-
-        if (sandboxFallback)
-        {
-            return Ok(new
-            {
-                received = true,
-                synchronized = changed,
-                sandboxFallback = true,
-                verifiedBy = "mercado-pago-orders-api"
-            });
-        }
-
-        return Ok(new
-        {
-            received = true,
-            synchronized = changed
-        });
+        catch (KeyNotFoundException) { return Conflict(new { error = "Local payment or order was not found." }); }
+        catch (InvalidOperationException) { return Conflict(new { error = "Payment data or transition is incompatible." }); }
+        catch (HttpRequestException) { return StatusCode(502, new { error = "Payment verification failed." }); }
+        catch (JsonException) { return StatusCode(502, new { error = "Invalid provider response." }); }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return StatusCode(502, new { error = "Payment verification timed out." }); }
+        catch (DbUpdateException) { return StatusCode(503, new { error = "Payment update must be retried." }); }
+        catch (SqliteException) { return StatusCode(503, new { error = "Payment update must be retried." }); }
     }
 }

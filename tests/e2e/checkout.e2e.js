@@ -24,9 +24,35 @@ test.beforeEach(async ({ page }) => {
     window.__openedUrls = [];
     window.open = (url) => {
       window.__openedUrls.push(String(url));
-      return null;
+      return {};
     };
   });
+
+  await page.route("**/api/orders", async (route) => {
+    const body = route.request().postDataJSON();
+    const deliveryFee = body.orderType === "pickup" ? 0 : 5;
+    await route.fulfill({
+      json: { orderId: 99, subtotal: 43.9, deliveryFee, total: 43.9 + deliveryFee },
+    });
+  });
+  await page.route("**/api/checkout/99", (route) =>
+    route.fulfill({
+      json: {
+        paymentId: 17,
+        preferenceId: "pref-test",
+        initPoint: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref-test",
+      },
+    }),
+  );
+  await page.route("https://www.mercadopago.com.br/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: '<script>location.replace("http://127.0.0.1:4173/?status=approved")</script>',
+    }),
+  );
+  await page.route("**/api/payments/17", (route) =>
+    route.fulfill({ json: { paymentId: 17, orderId: 99, amount: 48.9, status: 2 } }),
+  );
 
   await page.route("**/ws/38400000/json/**", async (route) => {
     await route.fulfill({
@@ -94,7 +120,9 @@ test("deve simular o fluxo completo de compra com entrega", async ({ page }) => 
 
   await page.locator("#order-notes").fill("Sem cebola.");
 
-  await page.locator("#finish-order-btn").click();
+  await page.locator("#go-to-payment-btn").click();
+  await expect(page.locator("#confirm-whatsapp-btn")).toBeVisible();
+  await page.locator("#confirm-whatsapp-btn").click();
 
   await expect
     .poll(async () => {
@@ -205,7 +233,9 @@ test("deve enviar observações longas no pedido final", async ({ page }) => {
   await page.locator("#house-number").fill("123");
   await page.locator("#go-to-review-btn").click();
   await page.locator("#order-notes").fill(longNotes);
-  await page.locator("#finish-order-btn").click();
+  await page.locator("#go-to-payment-btn").click();
+  await expect(page.locator("#confirm-whatsapp-btn")).toBeVisible();
+  await page.locator("#confirm-whatsapp-btn").click();
 
   await expect
     .poll(async () => {

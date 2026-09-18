@@ -42,41 +42,9 @@ public class PaymentRepository : IPaymentRepository
             );
     }
 
-    public async Task<Payment?> GetByExternalOrderIdAsync(
-        string externalOrderId,
-        CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(externalOrderId))
-            return null;
 
-        var normalizedExternalOrderId =
-            externalOrderId.Trim();
 
-        return await _dbContext.Payments
-            .FirstOrDefaultAsync(
-                payment =>
-                    payment.ExternalOrderId ==
-                    normalizedExternalOrderId,
-                cancellationToken
-            );
-    }
 
-    public async Task<Payment?> GetByIdempotencyKeyAsync(
-        string idempotencyKey,
-        CancellationToken cancellationToken = default)
-    {
-        if (string.IsNullOrWhiteSpace(idempotencyKey))
-            return null;
-
-        var normalizedKey = idempotencyKey.Trim();
-
-        return await _dbContext.Payments
-            .FirstOrDefaultAsync(
-                payment =>
-                    payment.IdempotencyKey == normalizedKey,
-                cancellationToken
-            );
-    }
 
     public async Task<Payment?> GetActiveByOrderIdAsync(
         int orderId,

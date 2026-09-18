@@ -10,6 +10,8 @@ Aplicação web de **cardápio digital para hamburgueria**, desenvolvida com **H
 
 ## 📌 Sobre o projeto
 
+O fluxo de pagamentos usa Mercado Pago Checkout Pro. Consulte [configuração, retorno, webhook e banco](docs/checkout-pro.md).
+
 O **The Burger House** simula uma experiência real de compra em uma hamburgueria. O cliente pode navegar pelo cardápio, adicionar produtos ao carrinho, escolher entre **entrega ou retirada**, consultar endereço por CEP, revisar o pedido e finalizar o atendimento pelo WhatsApp.
 
 Mais do que uma interface, o projeto foi estruturado para demonstrar competências de desenvolvimento front-end em um cenário próximo ao profissional: **arquitetura modular, regras de negócio isoladas, gerenciamento de estado, consumo de API, testes em múltiplas camadas, acessibilidade, performance, segurança e automação com CI/CD**.

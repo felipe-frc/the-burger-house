@@ -51,3 +51,33 @@ describe("payment status API", () => {
     expect(result.method).toBe(1);
   });
 });
+
+it("posts the order and obtains Checkout Pro without card data", async () => {
+  const { createOrder, createCheckout } = await import("../scripts/api.js");
+  const items = [{ productCode: "burger-praiano", quantity: 1, observation: null }];
+  await createOrder("pickup", items);
+  await createCheckout(99);
+  expect(fetch.mock.calls[0][0]).toContain("/api/orders");
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ orderType: "pickup", items });
+  expect(fetch.mock.calls[1][0]).toContain("/api/checkout/99");
+  expect(fetch.mock.calls[1][1].method).toBe("POST");
+  expect(fetch.mock.calls[1][1].body).toBeUndefined();
+});
+it("preserves API error status and safe message for checkout retries", async () => {
+  fetch.mockResolvedValue({
+    ...response({ error: "Checkout unavailable" }),
+    ok: false,
+    status: 409,
+  });
+  const { createCheckout } = await import("../scripts/api.js");
+  await expect(createCheckout(99)).rejects.toMatchObject({
+    name: "ApiError",
+    status: 409,
+    message: "Checkout unavailable",
+  });
+  fetch.mockResolvedValue({ ok: false, status: 502, headers: { get: () => null } });
+  await expect(createCheckout(99)).rejects.toMatchObject({
+    status: 502,
+    message: "A API retornou o status 502.",
+  });
+});

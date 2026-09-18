@@ -7,4 +7,8 @@ public sealed class MercadoPagoOptions
     public string AccessToken { get; init; } = string.Empty;
 
     public string WebhookSecret { get; init; } = string.Empty;
+
+    public string? ReturnUrl { get; init; }
+
+    public string? NotificationUrl { get; init; }
 }

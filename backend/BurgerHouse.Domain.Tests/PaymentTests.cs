@@ -9,12 +9,13 @@ public class PaymentTests
         "11111111-1111-4111-8111-111111111111";
 
     [Fact]
-    public void Constructor_ShouldCreatePendingCreditCardPaymentByDefault()
+    public void Constructor_ShouldCreatePendingPaymentWithExplicitMethod()
     {
         var payment = new Payment(
             orderId: 1,
             amount: 87.80m,
-            idempotencyKey: IdempotencyKey
+            idempotencyKey: IdempotencyKey,
+            method: PaymentMethod.CreditCard
         );
 
         Assert.Equal(1, payment.OrderId);
@@ -85,7 +86,8 @@ public class PaymentTests
             () => new Payment(
                 0,
                 87.80m,
-                IdempotencyKey
+                IdempotencyKey,
+                PaymentMethod.CreditCard
             )
         );
     }
@@ -97,7 +99,8 @@ public class PaymentTests
             () => new Payment(
                 1,
                 0m,
-                IdempotencyKey
+                IdempotencyKey,
+                PaymentMethod.CreditCard
             )
         );
     }
@@ -109,7 +112,8 @@ public class PaymentTests
             () => new Payment(
                 1,
                 87.80m,
-                " "
+                " ",
+                PaymentMethod.CreditCard
             )
         );
     }
@@ -121,7 +125,8 @@ public class PaymentTests
             () => new Payment(
                 1,
                 87.80m,
-                "invalid-key"
+                "invalid-key",
+                PaymentMethod.CreditCard
             )
         );
     }
@@ -132,7 +137,8 @@ public class PaymentTests
         var payment = new Payment(
             1,
             87.80m,
-            IdempotencyKey
+            IdempotencyKey,
+            PaymentMethod.CreditCard
         );
 
         payment.SetExternalPaymentId("MP-123");
@@ -151,7 +157,8 @@ public class PaymentTests
         var payment = new Payment(
             1,
             87.80m,
-            IdempotencyKey
+            IdempotencyKey,
+            PaymentMethod.CreditCard
         );
 
         Assert.Throws<ArgumentException>(
@@ -165,7 +172,8 @@ public class PaymentTests
         var payment = new Payment(
             1,
             87.80m,
-            IdempotencyKey
+            IdempotencyKey,
+            PaymentMethod.CreditCard
         );
 
         payment.Approve();
@@ -182,7 +190,8 @@ public class PaymentTests
         var payment = new Payment(
             1,
             87.80m,
-            IdempotencyKey
+            IdempotencyKey,
+            PaymentMethod.CreditCard
         );
 
         payment.Reject();
@@ -199,7 +208,8 @@ public class PaymentTests
         var payment = new Payment(
             1,
             87.80m,
-            IdempotencyKey
+            IdempotencyKey,
+            PaymentMethod.CreditCard
         );
 
         payment.Cancel();

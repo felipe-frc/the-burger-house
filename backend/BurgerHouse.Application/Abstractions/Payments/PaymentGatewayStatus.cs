@@ -6,7 +6,6 @@ public enum PaymentGatewayStatus
     Approved = 2,
     Rejected = 3,
     Cancelled = 4,
-    Expired = 5,
     Refunded = 6,
     PartiallyRefunded = 7,
     ChargedBack = 8

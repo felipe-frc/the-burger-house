@@ -95,9 +95,6 @@ function setupUiDom() {
     <button id="go-to-review-btn"></button>
     <button id="back-to-address-btn"></button>
 
-    <button id="finish-order-btn">
-      <span>Finalizar pedido</span>
-    </button>
 
     <div id="cart-items"></div>
     <span id="cart-total"></span>
@@ -325,14 +322,10 @@ describe("ui extended behavior", () => {
     );
   });
 
-  it("shows and hides address warnings and finish button loading", async () => {
+  it("shows and hides address warnings", async () => {
     const ui = await loadUiModule();
 
     const warning = document.getElementById("address-warn");
-
-    const finishButton = document.getElementById("finish-order-btn");
-
-    const originalHtml = finishButton.innerHTML;
 
     ui.showAddressWarning("CEP inválido");
 
@@ -343,22 +336,6 @@ describe("ui extended behavior", () => {
     ui.hideAddressWarning();
 
     expect(warning.classList.contains("hidden")).toBe(true);
-
-    ui.setFinishButtonLoading(true);
-
-    expect(finishButton.disabled).toBe(true);
-
-    expect(finishButton.classList.contains("opacity-80")).toBe(true);
-
-    expect(finishButton.textContent).toContain("Enviando...");
-
-    ui.setFinishButtonLoading(false);
-
-    expect(finishButton.disabled).toBe(false);
-
-    expect(finishButton.classList.contains("opacity-80")).toBe(false);
-
-    expect(finishButton.innerHTML).toBe(originalHtml);
   });
 
   it("renders menu categories and product cards", async () => {

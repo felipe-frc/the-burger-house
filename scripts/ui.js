@@ -86,47 +86,7 @@ export const elements = {
     document.getElementById("back-to-review-btn")
   ),
 
-  finishOrderBtn: /** @type {HTMLButtonElement | null} */ (
-    document.getElementById("finish-order-btn")
-  ),
-
-  paymentForm: /** @type {HTMLFormElement | null} */ (document.getElementById("form-checkout")),
-
-  paymentSubmitBtn: /** @type {HTMLButtonElement | null} */ (
-    document.getElementById("form-checkout__submit")
-  ),
-
-  paymentTotal: /** @type {HTMLElement | null} */ (document.getElementById("payment-total")),
-
   paymentError: /** @type {HTMLElement | null} */ (document.getElementById("payment-error")),
-
-  paymentProgress: /** @type {HTMLProgressElement | null} */ (
-    document.getElementById("payment-progress")
-  ),
-
-  paymentCardholderName: /** @type {HTMLInputElement | null} */ (
-    document.getElementById("form-checkout__cardholderName")
-  ),
-
-  paymentIdentificationType: /** @type {HTMLSelectElement | null} */ (
-    document.getElementById("form-checkout__identificationType")
-  ),
-
-  paymentIdentificationNumber: /** @type {HTMLInputElement | null} */ (
-    document.getElementById("form-checkout__identificationNumber")
-  ),
-
-  paymentEmail: /** @type {HTMLInputElement | null} */ (
-    document.getElementById("form-checkout__cardholderEmail")
-  ),
-
-  paymentInstallments: /** @type {HTMLSelectElement | null} */ (
-    document.getElementById("form-checkout__installments")
-  ),
-
-  paymentIssuer: /** @type {HTMLSelectElement | null} */ (
-    document.getElementById("form-checkout__issuer")
-  ),
 
   cartItemsContainer: /** @type {HTMLElement | null} */ (document.getElementById("cart-items")),
 
@@ -405,89 +365,6 @@ export function hidePaymentError() {
   elements.paymentError.textContent = "";
 
   elements.paymentError.classList.add("hidden");
-}
-
-/**
- * @param {number} total
- */
-export function setPaymentTotal(total) {
-  if (!elements.paymentTotal) return;
-
-  elements.paymentTotal.textContent = formatPrice(total);
-}
-
-/**
- * @param {boolean} isProcessing
- */
-export function setPaymentProcessing(isProcessing) {
-  const button = elements.paymentSubmitBtn;
-
-  const progress = elements.paymentProgress;
-
-  if (button) {
-    if (isProcessing) {
-      button.disabled = true;
-
-      button.dataset.originalHtml = button.innerHTML;
-
-      button.classList.add("opacity-80", "cursor-not-allowed");
-
-      button.innerHTML = `
-        <span class="inline-flex items-center gap-2">
-          <span class="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
-          Processando...
-        </span>
-      `;
-    } else {
-      button.disabled = false;
-
-      button.classList.remove("opacity-80", "cursor-not-allowed");
-
-      if (button.dataset.originalHtml) {
-        button.innerHTML = button.dataset.originalHtml;
-      }
-    }
-  }
-
-  if (progress) {
-    progress.classList.toggle("hidden", !isProcessing);
-
-    progress.value = isProcessing ? 50 : 0;
-  }
-}
-
-/**
- * @param {boolean} isLoading
- */
-export function setFinishButtonLoading(isLoading) {
-  const button = elements.finishOrderBtn;
-
-  if (!button) return;
-
-  if (isLoading) {
-    button.disabled = true;
-
-    button.dataset.originalHtml = button.innerHTML;
-
-    button.classList.add("opacity-80", "cursor-not-allowed");
-
-    button.innerHTML = `
-      <span class="inline-flex items-center gap-2">
-        <span class="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
-        ${translate("order.sending")}
-      </span>
-    `;
-
-    return;
-  }
-
-  button.disabled = false;
-
-  button.classList.remove("opacity-80", "cursor-not-allowed");
-
-  if (button.dataset.originalHtml) {
-    button.innerHTML = button.dataset.originalHtml;
-  }
 }
 
 export function renderMenu() {

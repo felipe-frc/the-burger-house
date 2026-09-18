@@ -1,12 +1,8 @@
 using System.Reflection;
 
 using BurgerHouse.Api.Controllers;
-using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
-using BurgerHouse.Application.Orders.CreateOrder;
-using BurgerHouse.Application.Payments.CreatePayment;
 using BurgerHouse.Application.Payments.GetPaymentStatus;
-using BurgerHouse.Application.Payments.ProcessCardPayment;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
 
@@ -166,36 +162,7 @@ public class GetPaymentStatusControllerTests
         );
     }
 
-    private static PaymentsController
-        CreateController(
-            IPaymentRepository
-                paymentRepository)
-    {
-        var createPaymentHandler =
-            new CreatePaymentHandler(
-                new FakeOrderRepository(),
-                paymentRepository
-            );
-
-        var processCardPaymentHandler =
-            new ProcessCardPaymentHandler(
-                paymentRepository,
-                new FakePaymentGateway()
-            );
-
-        var getPaymentStatusHandler =
-            new GetPaymentStatusHandler(
-                paymentRepository
-            );
-
-        return new PaymentsController(
-            createPaymentHandler,
-            processCardPaymentHandler,
-            processPixPaymentHandler: null,
-            getPaymentStatusHandler:
-                getPaymentStatusHandler
-        );
-    }
+    private static PaymentsController CreateController(IPaymentRepository repository) => new(new GetPaymentStatusHandler(repository));
 
     private static Payment CreatePayment(
         int id = 10,
@@ -237,23 +204,6 @@ public class GetPaymentStatusControllerTests
             instance,
             value
         );
-    }
-
-    private sealed class
-        FakePaymentGateway
-        : IPaymentGateway
-    {
-        public Task<PaymentGatewayResult>
-            ProcessAsync(
-                PaymentGatewayRequest request,
-                CancellationToken
-                    cancellationToken =
-                        default)
-        {
-            throw new InvalidOperationException(
-                "Payment gateway should not be called by GET status tests."
-            );
-        }
     }
 
     private sealed class
@@ -302,43 +252,9 @@ public class GetPaymentStatusControllerTests
             );
         }
 
-        public Task<Payment?>
-            GetByExternalOrderIdAsync(
-                string externalOrderId,
-                CancellationToken
-                    cancellationToken =
-                        default)
-        {
-            var payment =
-                _payments.FirstOrDefault(
-                    item =>
-                        item.ExternalOrderId ==
-                        externalOrderId
-                );
 
-            return Task.FromResult(
-                payment
-            );
-        }
 
-        public Task<Payment?>
-            GetByIdempotencyKeyAsync(
-                string idempotencyKey,
-                CancellationToken
-                    cancellationToken =
-                        default)
-        {
-            var payment =
-                _payments.FirstOrDefault(
-                    item =>
-                        item.IdempotencyKey ==
-                        idempotencyKey
-                );
 
-            return Task.FromResult(
-                payment
-            );
-        }
 
         public Task<Payment?>
             GetActiveByOrderIdAsync(
@@ -374,36 +290,4 @@ public class GetPaymentStatusControllerTests
         }
     }
 
-    private sealed class
-        FakeOrderRepository
-        : IOrderRepository
-    {
-        public Task AddAsync(
-            Order order,
-            CancellationToken
-                cancellationToken =
-                    default)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task<Order?>
-            GetByIdAsync(
-                int id,
-                CancellationToken
-                    cancellationToken =
-                        default)
-        {
-            return Task.FromResult<
-                Order?>(null);
-        }
-
-        public Task SaveChangesAsync(
-            CancellationToken
-                cancellationToken =
-                    default)
-        {
-            return Task.CompletedTask;
-        }
-    }
 }

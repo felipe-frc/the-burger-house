@@ -1,5 +1,5 @@
 using BurgerHouse.Domain.Entities;
-using BurgerHouse.Domain.Enums;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace BurgerHouse.Infrastructure.Persistence;
@@ -13,8 +13,11 @@ public class BurgerHouseDbContext : DbContext
     }
 
     public DbSet<Product> Products => Set<Product>();
+
     public DbSet<Order> Orders => Set<Order>();
+
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+
     public DbSet<Payment> Payments => Set<Payment>();
 
     protected override void OnModelCreating(
@@ -153,6 +156,7 @@ public class BurgerHouseDbContext : DbContext
                 .IsRequired();
 
             entity.Ignore(order => order.Subtotal);
+
             entity.Ignore(order => order.Total);
 
             entity.HasMany(order => order.Items)
@@ -213,10 +217,7 @@ public class BurgerHouseDbContext : DbContext
                 .IsRequired();
 
             entity.Property(payment => payment.Method)
-                .IsRequired()
-                .HasDefaultValue(
-                    PaymentMethod.CreditCard
-                );
+                .IsRequired();
 
             entity.Property(payment => payment.IdempotencyKey)
                 .IsRequired()
@@ -225,14 +226,14 @@ public class BurgerHouseDbContext : DbContext
             entity.HasIndex(payment => payment.IdempotencyKey)
                 .IsUnique();
 
-            entity.Property(payment => payment.ExternalOrderId)
-                .HasMaxLength(100);
-
-            entity.HasIndex(payment => payment.ExternalOrderId)
-                .IsUnique();
-
             entity.Property(payment => payment.ExternalPaymentId)
                 .HasMaxLength(100);
+
+            entity.Property(payment => payment.ExternalPreferenceId)
+                .HasMaxLength(100);
+
+            entity.HasIndex(payment => payment.ExternalPreferenceId)
+                .IsUnique();
 
             entity.HasIndex(payment => payment.ExternalPaymentId)
                 .IsUnique();

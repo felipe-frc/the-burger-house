@@ -211,41 +211,9 @@ public class GetPaymentStatusHandlerTests
             );
         }
 
-        public Task<Payment?>
-            GetByExternalOrderIdAsync(
-                string externalOrderId,
-                CancellationToken cancellationToken =
-                    default)
-        {
-            var payment =
-                _payments.FirstOrDefault(
-                    item =>
-                        item.ExternalOrderId ==
-                        externalOrderId
-                );
 
-            return Task.FromResult(
-                payment
-            );
-        }
 
-        public Task<Payment?>
-            GetByIdempotencyKeyAsync(
-                string idempotencyKey,
-                CancellationToken cancellationToken =
-                    default)
-        {
-            var payment =
-                _payments.FirstOrDefault(
-                    item =>
-                        item.IdempotencyKey ==
-                        idempotencyKey
-                );
 
-            return Task.FromResult(
-                payment
-            );
-        }
 
         public Task<Payment?>
             GetActiveByOrderIdAsync(

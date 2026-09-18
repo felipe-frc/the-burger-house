@@ -149,7 +149,8 @@ public class PaymentStateTransitionTests
         return new Payment(
             orderId: 1,
             amount: 87.80m,
-            idempotencyKey: IdempotencyKey
+            idempotencyKey: IdempotencyKey,
+            method: PaymentMethod.CreditCard
         );
     }
 }
