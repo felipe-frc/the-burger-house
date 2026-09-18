@@ -39,6 +39,10 @@ public class MercadoPagoPaymentLookupTests
     [InlineData("bank_transfer", "other")]
     [InlineData("credit_card", "pix")]
     [InlineData("debit_card", "account_money")]
+    [InlineData(null, "pix")]
+    [InlineData("bank_transfer", null)]
+    [InlineData("", "pix")]
+    [InlineData("bank_transfer", "")]
     [InlineData(null, null)]
     public void RejectsUnsupportedMethod(string? type, string? method) =>
         Assert.Throws<InvalidOperationException>(() => MercadoPagoPaymentMethodMapper.Map(type, method));
@@ -50,6 +54,8 @@ public class MercadoPagoPaymentLookupTests
         Assert.NotNull(result);
         Assert.Equal("123", result.Id);
         Assert.Equal("17", result.ExternalReference);
+        Assert.Equal(PaymentGatewayStatus.Approved, result.PaymentStatus);
+        Assert.Equal("approved", result.ProviderStatus);
         Assert.Equal(43.90m, result.TransactionAmount);
         Assert.Equal("BRL", result.CurrencyId);
         Assert.Equal("pix", result.PaymentMethodId);

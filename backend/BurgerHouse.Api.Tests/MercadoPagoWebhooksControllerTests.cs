@@ -19,6 +19,36 @@ namespace BurgerHouse.Api.Tests;
 
 public class MercadoPagoWebhooksControllerTests
 {
+    [Fact]
+    public async Task PixEvolvesFromPendingToApprovedAndRepeatedApprovalIsIdempotent()
+    {
+        using var fixture = new Fixture { Status = "pending", Detail = "pending_waiting_transfer" };
+
+        Assert.True(Synchronized(await fixture.Receive()));
+        var pending = await fixture.Payment();
+        Assert.Equal(PaymentMethod.Pix, pending.Method);
+        Assert.Equal(PaymentStatus.Pending, pending.Status);
+        Assert.Equal("123", pending.ExternalPaymentId);
+        Assert.Equal(OrderStatus.PendingPayment, await fixture.OrderStatus());
+
+        fixture.Status = "approved";
+        fixture.Detail = "accredited";
+        Assert.True(Synchronized(await fixture.Receive()));
+        var approved = await fixture.Payment();
+        Assert.Equal(PaymentMethod.Pix, approved.Method);
+        Assert.Equal(PaymentStatus.Approved, approved.Status);
+        Assert.Equal("123", approved.ExternalPaymentId);
+        Assert.Equal(OrderStatus.Received, await fixture.OrderStatus());
+
+        var approvedAt = approved.UpdatedAt;
+        Assert.False(Synchronized(await fixture.Receive()));
+        var repeated = await fixture.Payment();
+        Assert.Equal(approvedAt, repeated.UpdatedAt);
+        Assert.Equal(PaymentStatus.Approved, repeated.Status);
+        Assert.Equal(OrderStatus.Received, await fixture.OrderStatus());
+        Assert.Equal(1, await fixture.PaymentCount());
+    }
+
     [Theory]
     [InlineData("approved", PaymentStatus.Approved, OrderStatus.Received)]
     [InlineData("pending", PaymentStatus.Pending, OrderStatus.PendingPayment)]
@@ -78,7 +108,13 @@ public class MercadoPagoWebhooksControllerTests
             await db.SaveChangesAsync();
         }
         Assert.IsType<ConflictObjectResult>(await fixture.Receive());
-        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+        var saved = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Pending, saved.Status);
+        if (mismatch == "external-id")
+        {
+            Assert.Equal("456", saved.ExternalPaymentId);
+            Assert.Equal(PaymentMethod.Unknown, saved.Method);
+        }
         Assert.Equal(OrderStatus.PendingPayment, await fixture.OrderStatus());
     }
 
@@ -181,6 +217,7 @@ public class MercadoPagoWebhooksControllerTests
         }
         public BurgerHouseDbContext Open() => new(new DbContextOptionsBuilder<BurgerHouseDbContext>().UseSqlite($"Data Source={_path};Pooling=False;Default Timeout=10").Options);
         public async Task<Payment> Payment() { await using var db = Open(); return await db.Payments.SingleAsync(); }
+        public async Task<int> PaymentCount() { await using var db = Open(); return await db.Payments.CountAsync(); }
         public async Task<OrderStatus> OrderStatus() { await using var db = Open(); return (await db.Orders.SingleAsync()).Status; }
         public async Task<IActionResult> Receive(bool validSignature = true, string dataId = "123", string topic = "payment")
         {
@@ -211,5 +248,13 @@ public class MercadoPagoWebhooksControllerTests
                 return Task.FromResult(new HttpResponseMessage(fixture.HttpStatus) { Content = new StringContent(JsonSerializer.Serialize(payload)) });
             }
         }
+    }
+
+    private static bool Synchronized(IActionResult result)
+    {
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var response = JsonSerializer.SerializeToElement(ok.Value);
+        Assert.True(response.GetProperty("received").GetBoolean());
+        return response.GetProperty("synchronized").GetBoolean();
     }
 }

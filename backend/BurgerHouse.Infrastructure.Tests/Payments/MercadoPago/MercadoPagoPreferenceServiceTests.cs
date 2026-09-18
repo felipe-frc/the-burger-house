@@ -32,7 +32,20 @@ public class MercadoPagoPreferenceServiceTests
         Assert.Equal(43.90m, root.GetProperty("items")[0].GetProperty("unit_price").GetDecimal());
         Assert.Equal("BRL", root.GetProperty("items")[0].GetProperty("currency_id").GetString());
         Assert.Equal("approved", root.GetProperty("auto_return").GetString());
-        Assert.Contains(root.GetProperty("payment_methods").GetProperty("excluded_payment_types").EnumerateArray(), x => x.GetProperty("id").GetString() == "ticket");
+        var paymentMethods = root.GetProperty("payment_methods");
+        var excludedTypes = paymentMethods.GetProperty("excluded_payment_types")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("id").GetString())
+            .ToArray();
+        Assert.Contains("ticket", excludedTypes);
+        Assert.DoesNotContain("bank_transfer", excludedTypes);
+        Assert.DoesNotContain("pix", excludedTypes);
+
+        if (paymentMethods.TryGetProperty("excluded_payment_methods", out var excludedMethods))
+        {
+            Assert.DoesNotContain(excludedMethods.EnumerateArray(),
+                item => item.GetProperty("id").GetString() == "pix");
+        }
     }
 
     [Fact]
