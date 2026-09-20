@@ -130,16 +130,33 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     MercadoPagoWebhookSignatureValidator>();
 
-builder.Services.AddHttpClient<MercadoPagoPreferenceService>(client => client.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddHttpClient<MercadoPagoPreferenceService>(
+    client =>
+        client.Timeout = TimeSpan.FromSeconds(15)
+);
 
-builder.Services.AddScoped<SynchronizeCheckoutPaymentHandler>();
-builder.Services.AddHttpClient<MercadoPagoPaymentLookup>(client => client.Timeout = TimeSpan.FromSeconds(15));
+builder.Services.AddScoped<
+    SynchronizeCheckoutPaymentHandler>();
+
+builder.Services.AddHttpClient<MercadoPagoPaymentLookup>(
+    client =>
+        client.Timeout = TimeSpan.FromSeconds(15)
+);
 
 builder.Services.AddControllers();
 
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext =
+        scope.ServiceProvider
+            .GetRequiredService<BurgerHouseDbContext>();
+
+    dbContext.Database.Migrate();
+}
 
 if (app.Environment.IsDevelopment())
 {
