@@ -1,4 +1,4 @@
-const configuredApiBaseUrl = String(import.meta.env?.VITE_API_BASE_URL ?? "")
+const configuredApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL ?? "")
   .trim()
   .replace(/\/+$/, "");
 
@@ -24,10 +24,9 @@ export const WHATSAPP_PHONE_NUMBER = "5564999244855";
 
 export const TOAST_DURATION_MS = 3000;
 
-const configuredForceStoreOpen = String(import.meta.env?.VITE_FORCE_STORE_OPEN ?? "")
+const configuredForceStoreOpen = String(import.meta.env.VITE_FORCE_STORE_OPEN ?? "")
   .trim()
   .toLowerCase();
 
-export const FORCE_STORE_OPEN = configuredForceStoreOpen
-  ? configuredForceStoreOpen === "true"
-  : false;
+export const FORCE_STORE_OPEN =
+  import.meta.env.MODE === "test" ? false : configuredForceStoreOpen === "true";
