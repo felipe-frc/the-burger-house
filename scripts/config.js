@@ -1,9 +1,16 @@
-const configuredApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL ?? "")
+const configuredApiBaseUrl = String(import.meta.env?.VITE_API_BASE_URL ?? "")
   .trim()
   .replace(/\/+$/, "");
 
+const hostname = globalThis.location?.hostname ?? "";
+
+const isLocalDevelopment = hostname === "localhost" || hostname === "127.0.0.1";
+
+const productionApiBaseUrl =
+  "https://the-burger-house-api-gqfkakgnfvfxd0g0.brazilsouth-01.azurewebsites.net";
+
 export const API_BASE_URL =
-  configuredApiBaseUrl || (import.meta.env.DEV ? "http://localhost:5041" : "");
+  configuredApiBaseUrl || (isLocalDevelopment ? "http://localhost:5041" : productionApiBaseUrl);
 
 export const DELIVERY_FEE = 5;
 
@@ -17,7 +24,7 @@ export const WHATSAPP_PHONE_NUMBER = "5564999244855";
 
 export const TOAST_DURATION_MS = 3000;
 
-const configuredForceStoreOpen = String(import.meta.env.VITE_FORCE_STORE_OPEN ?? "")
+const configuredForceStoreOpen = String(import.meta.env?.VITE_FORCE_STORE_OPEN ?? "")
   .trim()
   .toLowerCase();
 
