@@ -1,6 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
 using MercadoPago.Error;
 using MercadoPago.Webhook;
-
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -53,26 +54,149 @@ public sealed class MercadoPagoWebhookSignatureValidator
             return false;
         }
 
+        var normalizedSignature = xSignature.Trim();
+        var normalizedRequestId = xRequestId.Trim();
+        var normalizedDataId = dataId.Trim();
+
         try
         {
             WebhookSignatureValidator.Validate(
-                xSignature: xSignature,
-                xRequestId: xRequestId,
-                dataId: dataId,
+                xSignature: normalizedSignature,
+                xRequestId: normalizedRequestId,
+                dataId: normalizedDataId,
                 secret: _webhookSecret
+            );
+
+            _logger?.LogInformation(
+                "Mercado Pago webhook signature validated successfully. " +
+                "DataId: {DataId}, RequestId: {RequestId}, SecretFingerprint: {SecretFingerprint}.",
+                normalizedDataId,
+                normalizedRequestId,
+                GetSecretFingerprint()
             );
 
             return true;
         }
         catch (InvalidWebhookSignatureException exception)
         {
+            var timestamp =
+                GetSignatureValue(
+                    normalizedSignature,
+                    "ts"
+                );
+
+            var receivedV1 =
+                GetSignatureValue(
+                    normalizedSignature,
+                    "v1"
+                );
+
+            var computedV1 =
+                !string.IsNullOrWhiteSpace(timestamp)
+                    ? ComputeExpectedSignature(
+                        normalizedDataId,
+                        normalizedRequestId,
+                        timestamp
+                    )
+                    : null;
+
             _logger?.LogWarning(
                 "Mercado Pago webhook signature validation failed. " +
-                "Reason: {Reason}.",
-                exception.Reason
+                "Reason: {Reason}. " +
+                "DataId: {DataId}. " +
+                "RequestId: {RequestId}. " +
+                "Timestamp: {Timestamp}. " +
+                "ReceivedV1Prefix: {ReceivedV1Prefix}. " +
+                "ComputedV1Prefix: {ComputedV1Prefix}. " +
+                "SecretFingerprint: {SecretFingerprint}.",
+                exception.Reason,
+                normalizedDataId,
+                normalizedRequestId,
+                timestamp ?? "(missing)",
+                GetPrefix(receivedV1),
+                GetPrefix(computedV1),
+                GetSecretFingerprint()
             );
 
             return false;
         }
+    }
+
+    private string ComputeExpectedSignature(
+        string dataId,
+        string requestId,
+        string timestamp)
+    {
+        var manifest =
+            $"id:{dataId};" +
+            $"request-id:{requestId};" +
+            $"ts:{timestamp};";
+
+        var hash =
+            HMACSHA256.HashData(
+                Encoding.UTF8.GetBytes(_webhookSecret),
+                Encoding.UTF8.GetBytes(manifest)
+            );
+
+        return Convert
+            .ToHexString(hash)
+            .ToLowerInvariant();
+    }
+
+    private string GetSecretFingerprint()
+    {
+        var hash =
+            SHA256.HashData(
+                Encoding.UTF8.GetBytes(_webhookSecret)
+            );
+
+        return Convert
+            .ToHexString(hash)
+            .ToLowerInvariant()[..12];
+    }
+
+    private static string? GetSignatureValue(
+        string signature,
+        string key)
+    {
+        foreach (var part in signature.Split(','))
+        {
+            var separatorIndex =
+                part.IndexOf('=');
+
+            if (separatorIndex <= 0 ||
+                separatorIndex >= part.Length - 1)
+            {
+                continue;
+            }
+
+            var currentKey =
+                part[..separatorIndex].Trim();
+
+            var value =
+                part[(separatorIndex + 1)..].Trim();
+
+            if (string.Equals(
+                    currentKey,
+                    key,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private static string GetPrefix(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "(missing)";
+        }
+
+        return value.Length <= 16
+            ? value
+            : value[..16];
     }
 }
