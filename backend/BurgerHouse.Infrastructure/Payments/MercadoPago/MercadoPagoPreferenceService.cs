@@ -13,56 +13,108 @@ public sealed class MercadoPagoPreferenceService
     private readonly PreferenceClient _client;
     private readonly MercadoPagoOptions _options;
 
-    public MercadoPagoPreferenceService(HttpClient httpClient, IOptions<MercadoPagoOptions> options)
+    public MercadoPagoPreferenceService(
+        HttpClient httpClient,
+        IOptions<MercadoPagoOptions> options)
     {
         _options = options.Value;
+
         if (string.IsNullOrWhiteSpace(_options.AccessToken))
-            throw new InvalidOperationException("Mercado Pago access token was not configured.");
+        {
+            throw new InvalidOperationException(
+                "Mercado Pago access token was not configured."
+            );
+        }
+
         ValidatePublicUrl(_options.ReturnUrl);
-        ValidatePublicUrl(_options.NotificationUrl);
-        _client = new PreferenceClient(new DefaultHttpClient(httpClient));
+
+        _client = new PreferenceClient(
+            new DefaultHttpClient(httpClient)
+        );
     }
 
-    public async Task<Preference> GetOrCreateAsync(Payment payment, CancellationToken cancellationToken = default)
+    public async Task<Preference> GetOrCreateAsync(
+        Payment payment,
+        CancellationToken cancellationToken = default)
     {
         if (payment.Id <= 0)
-            throw new InvalidOperationException("Payment must be persisted before creating checkout.");
+        {
+            throw new InvalidOperationException(
+                "Payment must be persisted before creating checkout."
+            );
+        }
 
-        var reference = payment.Id.ToString(CultureInfo.InvariantCulture);
-        var requestOptions = new RequestOptions { AccessToken = _options.AccessToken };
+        var reference =
+            payment.Id.ToString(CultureInfo.InvariantCulture);
+
+        var requestOptions = new RequestOptions
+        {
+            AccessToken = _options.AccessToken
+        };
+
         Preference preference;
+
         if (payment.ExternalPreferenceId is not null)
         {
-            preference = await _client.GetAsync(payment.ExternalPreferenceId, requestOptions, cancellationToken);
-            if (preference.Id != payment.ExternalPreferenceId || preference.ExternalReference != reference)
-                throw new InvalidOperationException("Checkout preference does not match this payment.");
+            preference = await _client.GetAsync(
+                payment.ExternalPreferenceId,
+                requestOptions,
+                cancellationToken
+            );
+
+            if (preference.Id != payment.ExternalPreferenceId ||
+                preference.ExternalReference != reference)
+            {
+                throw new InvalidOperationException(
+                    "Checkout preference does not match this payment."
+                );
+            }
         }
         else
         {
             var request = new PreferenceRequest
             {
-                Items = [new PreferenceItemRequest
-                {
-                    Id = $"order-{payment.OrderId}",
-                    Title = $"Pedido The Burger House #{payment.OrderId}",
-                    Quantity = 1,
-                    CurrencyId = "BRL",
-                    UnitPrice = payment.Amount
-                }],
+                Items =
+                [
+                    new PreferenceItemRequest
+                    {
+                        Id = $"order-{payment.OrderId}",
+                        Title = $"Pedido The Burger House #{payment.OrderId}",
+                        Quantity = 1,
+                        CurrencyId = "BRL",
+                        UnitPrice = payment.Amount
+                    }
+                ],
+
                 ExternalReference = reference,
+
                 StatementDescriptor = "BURGER HOUSE",
+
                 PaymentMethods = new PreferencePaymentMethodsRequest
                 {
                     Installments = 12,
                     DefaultInstallments = 1,
-                    ExcludedPaymentTypes = [
-                        new PreferencePaymentTypeRequest { Id = "ticket" },
-                        new PreferencePaymentTypeRequest { Id = "atm" },
-                        new PreferencePaymentTypeRequest { Id = "digital_currency" }
+
+                    ExcludedPaymentTypes =
+                    [
+                        new PreferencePaymentTypeRequest
+                        {
+                            Id = "ticket"
+                        },
+
+                        new PreferencePaymentTypeRequest
+                        {
+                            Id = "atm"
+                        },
+
+                        new PreferencePaymentTypeRequest
+                        {
+                            Id = "digital_currency"
+                        }
                     ]
-                },
-                NotificationUrl = _options.NotificationUrl
+                }
             };
+
             if (!string.IsNullOrWhiteSpace(_options.ReturnUrl))
             {
                 request.BackUrls = new PreferenceBackUrlsRequest
@@ -71,32 +123,74 @@ public sealed class MercadoPagoPreferenceService
                     Pending = _options.ReturnUrl,
                     Failure = _options.ReturnUrl
                 };
+
                 request.AutoReturn = "approved";
             }
-            preference = await _client.CreateAsync(request, requestOptions, cancellationToken);
+
+            preference = await _client.CreateAsync(
+                request,
+                requestOptions,
+                cancellationToken
+            );
         }
 
-        if (string.IsNullOrWhiteSpace(preference.Id) || preference.ExternalReference != reference ||
+        if (string.IsNullOrWhiteSpace(preference.Id) ||
+            preference.ExternalReference != reference ||
             !IsCheckoutUrl(preference.InitPoint))
-            throw new InvalidOperationException("Mercado Pago returned an invalid checkout preference.");
-        if (preference.Expires == true && preference.ExpirationDateTo is not null &&
-            preference.ExpirationDateTo <= DateTime.UtcNow)
-            throw new InvalidOperationException("This checkout preference has expired.");
+        {
+            throw new InvalidOperationException(
+                "Mercado Pago returned an invalid checkout preference."
+            );
+        }
 
-        payment.SetExternalPreferenceId(preference.Id);
+        if (preference.Expires == true &&
+            preference.ExpirationDateTo is not null &&
+            preference.ExpirationDateTo <= DateTime.UtcNow)
+        {
+            throw new InvalidOperationException(
+                "This checkout preference has expired."
+            );
+        }
+
+        payment.SetExternalPreferenceId(
+            preference.Id
+        );
+
         return preference;
     }
 
     public static bool IsCheckoutUrl(string? value) =>
-        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == "https" &&
-        (uri.Host == "www.mercadopago.com.br" || uri.Host == "sandbox.mercadopago.com.br") &&
+        Uri.TryCreate(
+            value,
+            UriKind.Absolute,
+            out var uri
+        ) &&
+        uri.Scheme == "https" &&
+        (
+            uri.Host == "www.mercadopago.com.br" ||
+            uri.Host == "sandbox.mercadopago.com.br"
+        ) &&
         string.IsNullOrEmpty(uri.UserInfo);
 
     private static void ValidatePublicUrl(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return;
-        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme != "https" ||
-            uri.IsLoopback || !string.IsNullOrEmpty(uri.UserInfo))
-            throw new InvalidOperationException("Checkout return and notification URLs must be public HTTPS URLs.");
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (!Uri.TryCreate(
+                value,
+                UriKind.Absolute,
+                out var uri
+            ) ||
+            uri.Scheme != "https" ||
+            uri.IsLoopback ||
+            !string.IsNullOrEmpty(uri.UserInfo))
+        {
+            throw new InvalidOperationException(
+                "Checkout return URL must be a public HTTPS URL."
+            );
+        }
     }
 }
