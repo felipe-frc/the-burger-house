@@ -90,6 +90,10 @@ public sealed class MercadoPagoPreferenceService
 
                 StatementDescriptor = "BURGER HOUSE",
 
+                // Pix is asynchronous in Checkout Pro and can remain pending
+                // until the transfer is completed.
+                BinaryMode = false,
+
                 PaymentMethods = new PreferencePaymentMethodsRequest
                 {
                     Installments = 12,

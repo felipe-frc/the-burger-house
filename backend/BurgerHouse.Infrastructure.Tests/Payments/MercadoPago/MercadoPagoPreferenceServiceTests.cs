@@ -86,6 +86,11 @@ public class MercadoPagoPreferenceServiceTests
         );
 
         Assert.False(
+            root.GetProperty("binary_mode")
+                .GetBoolean()
+        );
+
+        Assert.False(
             root.TryGetProperty(
                 "notification_url",
                 out _
