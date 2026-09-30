@@ -52,7 +52,7 @@ describe("payment status API", () => {
   });
 });
 
-it("posts the order and obtains Checkout Pro without card data", async () => {
+it("posts the order and obtains hosted checkout without payment data", async () => {
   const { createOrder, createCheckout } = await import("../scripts/api.js");
   const items = [{ productCode: "burger-praiano", quantity: 1, observation: null }];
   await createOrder("pickup", items);

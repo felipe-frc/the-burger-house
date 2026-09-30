@@ -39,12 +39,12 @@ test.beforeEach(async ({ page }) => {
     route.fulfill({
       json: {
         paymentId: 17,
-        preferenceId: "pref-test",
-        initPoint: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=pref-test",
+        checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
+        initPoint: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
       },
     }),
   );
-  await page.route("https://www.mercadopago.com.br/**", (route) =>
+  await page.route("https://pagamento.pagbank.com.br/**", (route) =>
     route.fulfill({
       contentType: "text/html",
       body: '<script>location.replace("http://127.0.0.1:4173/?status=approved")</script>',

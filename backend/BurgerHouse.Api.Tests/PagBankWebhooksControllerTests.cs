@@ -1,0 +1,329 @@
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using BurgerHouse.Api.Controllers;
+using BurgerHouse.Application.Payments.SynchronizeCheckoutPayment;
+using BurgerHouse.Domain.Entities;
+using BurgerHouse.Domain.Enums;
+using BurgerHouse.Infrastructure.Payments.PagBank;
+using BurgerHouse.Infrastructure.Persistence;
+using BurgerHouse.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+
+namespace BurgerHouse.Api.Tests;
+
+public class PagBankWebhooksControllerTests
+{
+    [Fact]
+    public async Task ApprovedWebhookUpdatesPaymentAndOrderAndDuplicateIsIdempotent()
+    {
+        using var fixture = new Fixture();
+
+        Assert.True(Synchronized(await fixture.Receive()));
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.Equal(PaymentMethod.Pix, payment.Method);
+        Assert.Equal("CHAR_1", payment.ExternalPaymentId);
+        Assert.Equal(OrderStatus.Received, await fixture.OrderStatus());
+        var updatedAt = payment.UpdatedAt;
+
+        Assert.False(Synchronized(await fixture.Receive()));
+        Assert.Equal(updatedAt, (await fixture.Payment()).UpdatedAt);
+        Assert.Equal(1, await fixture.PaymentCount());
+    }
+
+    [Theory]
+    [InlineData("AUTHORIZED", PaymentStatus.Pending, OrderStatus.PendingPayment)]
+    [InlineData("WAITING", PaymentStatus.Pending, OrderStatus.PendingPayment)]
+    [InlineData("DECLINED", PaymentStatus.Rejected, OrderStatus.PendingPayment)]
+    [InlineData("CANCELED", PaymentStatus.Cancelled, OrderStatus.PendingPayment)]
+    public async Task MapsVerifiedProviderState(string status, PaymentStatus paymentStatus, OrderStatus orderStatus)
+    {
+        using var fixture = new Fixture { ChargeStatus = status };
+
+        Assert.IsType<OkObjectResult>(await fixture.Receive());
+
+        Assert.Equal(paymentStatus, (await fixture.Payment()).Status);
+        Assert.Equal(orderStatus, await fixture.OrderStatus());
+    }
+
+    [Theory]
+    [InlineData("missing-payment")]
+    [InlineData("missing-checkout")]
+    [InlineData("reference")]
+    [InlineData("amount")]
+    [InlineData("currency")]
+    [InlineData("external-payment")]
+    public async Task RejectsCorrelationMismatchWithoutUpdating(string mismatch)
+    {
+        using var fixture = new Fixture();
+        if (mismatch == "missing-payment") fixture.WebhookReference = "payment:999";
+        if (mismatch == "missing-checkout") await fixture.ClearCheckoutId();
+        if (mismatch == "reference") fixture.ChargeReference = "payment:999";
+        if (mismatch == "amount") fixture.AmountInCents = 100;
+        if (mismatch == "currency") fixture.Currency = "USD";
+        if (mismatch == "external-payment") await fixture.SetExternalPaymentId("CHAR_old");
+
+        Assert.IsType<ConflictObjectResult>(await fixture.Receive());
+
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Pending, payment.Status);
+        Assert.Equal(PaymentMethod.Unknown, payment.Method);
+        if (mismatch != "external-payment") Assert.Null(payment.ExternalPaymentId);
+        Assert.Equal(OrderStatus.PendingPayment, await fixture.OrderStatus());
+    }
+
+    [Fact]
+    public async Task InvalidSignatureDoesNotCallChargeApi()
+    {
+        using var fixture = new Fixture();
+
+        Assert.IsType<UnauthorizedObjectResult>(await fixture.Receive(validSignature: false));
+
+        Assert.Equal(0, fixture.LookupCalls);
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+    }
+
+    [Fact]
+    public async Task ProviderUnavailableDoesNotUpdatePayment()
+    {
+        using var fixture = new Fixture { LookupStatus = HttpStatusCode.InternalServerError };
+
+        Assert.Equal(502, Assert.IsType<ObjectResult>(await fixture.Receive()).StatusCode);
+
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+        Assert.Equal(OrderStatus.PendingPayment, await fixture.OrderStatus());
+    }
+
+    [Fact]
+    public async Task InvalidProviderResponseDoesNotUpdatePayment()
+    {
+        using var fixture = new Fixture { InvalidLookupJson = true };
+
+        Assert.Equal(502, Assert.IsType<ObjectResult>(await fixture.Receive()).StatusCode);
+
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+        Assert.Equal(OrderStatus.PendingPayment, await fixture.OrderStatus());
+    }
+
+    [Fact]
+    public async Task OfficialLookupRunsBeforeShortDatabaseTransaction()
+    {
+        using var fixture = new Fixture();
+
+        Assert.IsType<OkObjectResult>(await fixture.Receive());
+
+        Assert.False(fixture.TransactionObservedDuringLookup);
+    }
+
+    [Fact]
+    public async Task DelayedPendingWebhookDoesNotRegressApprovedPayment()
+    {
+        using var fixture = new Fixture();
+        Assert.True(Synchronized(await fixture.Receive()));
+        fixture.ChargeStatus = "WAITING";
+
+        Assert.False(Synchronized(await fixture.Receive()));
+
+        Assert.Equal(PaymentStatus.Approved, (await fixture.Payment()).Status);
+        Assert.Equal(OrderStatus.Received, await fixture.OrderStatus());
+    }
+
+    [Fact]
+    public async Task ConcurrentDuplicateWebhooksCommitOneConsistentResult()
+    {
+        using var fixture = new Fixture();
+
+        var results = await Task.WhenAll(
+            Task.Run(() => fixture.Receive()),
+            Task.Run(() => fixture.Receive()));
+
+        Assert.All(results, result => Assert.IsType<OkObjectResult>(result));
+        Assert.Equal(PaymentStatus.Approved, (await fixture.Payment()).Status);
+        Assert.Equal(OrderStatus.Received, await fixture.OrderStatus());
+        Assert.Equal(1, await fixture.PaymentCount());
+    }
+
+    [Fact]
+    public async Task PaymentAndOrderRollbackTogetherWhenOrderWriteFails()
+    {
+        using var fixture = new Fixture();
+        await using (var db = fixture.Open())
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                "CREATE TRIGGER fail_order BEFORE UPDATE ON Orders " +
+                "BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;");
+        }
+
+        Assert.Equal(503, Assert.IsType<ObjectResult>(await fixture.Receive()).StatusCode);
+
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Pending, payment.Status);
+        Assert.Equal(PaymentMethod.Unknown, payment.Method);
+        Assert.Null(payment.ExternalPaymentId);
+        Assert.Equal(OrderStatus.PendingPayment, await fixture.OrderStatus());
+    }
+
+    private static bool Synchronized(IActionResult result)
+    {
+        var body = JsonSerializer.SerializeToElement(Assert.IsType<OkObjectResult>(result).Value);
+        Assert.True(body.GetProperty("received").GetBoolean());
+        return body.GetProperty("synchronized").GetBoolean();
+    }
+
+    private sealed class Fixture : IDisposable
+    {
+        private readonly string _path = Path.Combine(Path.GetTempPath(), $"burger-pagbank-webhook-{Guid.NewGuid()}.db");
+        private readonly ECDsa _signer = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        private int _paymentId;
+
+        public string ChargeStatus = "PAID";
+        public string ChargeReference = "";
+        public string WebhookReference = "";
+        public string WebhookResourceId = "ORDE_1";
+        public string Currency = "BRL";
+        public int AmountInCents = 4390;
+        public HttpStatusCode LookupStatus = HttpStatusCode.OK;
+        public bool InvalidLookupJson;
+        public int LookupCalls;
+        public bool TransactionObservedDuringLookup;
+
+        public Fixture()
+        {
+            using var db = Open();
+            db.Database.EnsureCreated();
+            var order = new Order(0);
+            order.AddItem(new OrderItem(1, 1, 43.90m));
+            db.Orders.Add(order);
+            db.SaveChanges();
+            var payment = new Payment(
+                order.Id,
+                order.Total,
+                Guid.NewGuid().ToString("D"),
+                PaymentMethod.Unknown,
+                PaymentProvider.PagBank);
+            payment.SetExternalCheckoutId("CHEC_1");
+            db.Payments.Add(payment);
+            db.SaveChanges();
+            _paymentId = payment.Id;
+            ChargeReference = $"payment:{_paymentId}";
+            WebhookReference = ChargeReference;
+        }
+
+        public BurgerHouseDbContext Open() => new(
+            new DbContextOptionsBuilder<BurgerHouseDbContext>()
+                .UseSqlite($"Data Source={_path};Pooling=False;Default Timeout=10")
+                .Options);
+
+        public async Task<IActionResult> Receive(bool validSignature = true)
+        {
+            await using var db = Open();
+            using var signatureHttp = new HttpClient(new Stub(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new
+                {
+                    public_key = Convert.ToBase64String(_signer.ExportSubjectPublicKeyInfo())
+                }))
+            })));
+            using var lookupHttp = new HttpClient(new Stub(_ =>
+            {
+                Interlocked.Increment(ref LookupCalls);
+                TransactionObservedDuringLookup = db.Database.CurrentTransaction is not null;
+                return Task.FromResult(new HttpResponseMessage(LookupStatus)
+                {
+                    Content = new StringContent(InvalidLookupJson
+                        ? "not-json"
+                        : JsonSerializer.Serialize(new
+                        {
+                            id = "CHAR_1",
+                            reference_id = ChargeReference,
+                            status = ChargeStatus,
+                            amount = new
+                            {
+                                value = AmountInCents,
+                                currency = Currency,
+                                summary = new { total = AmountInCents, refunded = 0 }
+                            },
+                            payment_method = new { type = "PIX" }
+                        }))
+                });
+            }));
+            var options = Options.Create(new PagBankOptions
+            {
+                BaseUrl = "https://sandbox.api.pagseguro.com",
+                Token = "local-test-token"
+            });
+            var controller = new PagBankWebhooksController(
+                new PagBankWebhookSignatureValidator(signatureHttp, options),
+                new PagBankPaymentLookup(lookupHttp, options),
+                new SynchronizeCheckoutPaymentHandler(new PaymentRepository(db), new OrderRepository(db)),
+                db,
+                NullLogger<PagBankWebhooksController>.Instance);
+            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+            {
+                id = WebhookResourceId,
+                reference_id = WebhookReference,
+                charges = new[] { new { id = "CHAR_1" } }
+            }));
+            var signature = Convert.ToBase64String(_signer.SignData(
+                body,
+                HashAlgorithmName.SHA256,
+                DSASignatureFormat.Rfc3279DerSequence));
+            var context = new DefaultHttpContext();
+            context.Request.Body = new MemoryStream(body);
+            context.Request.ContentLength = body.Length;
+            context.Request.ContentType = "application/json";
+            context.Request.Headers["x-payload-signature"] = validSignature ? signature : "invalid";
+            controller.ControllerContext = new ControllerContext { HttpContext = context };
+            return await controller.Receive(default);
+        }
+
+        public async Task<Payment> Payment()
+        {
+            await using var db = Open();
+            return await db.Payments.SingleAsync();
+        }
+
+        public async Task<int> PaymentCount()
+        {
+            await using var db = Open();
+            return await db.Payments.CountAsync();
+        }
+
+        public async Task<OrderStatus> OrderStatus()
+        {
+            await using var db = Open();
+            return (await db.Orders.SingleAsync()).Status;
+        }
+
+        public async Task ClearCheckoutId()
+        {
+            await using var db = Open();
+            await db.Database.ExecuteSqlRawAsync("UPDATE Payments SET ExternalCheckoutId = NULL");
+        }
+
+        public async Task SetExternalPaymentId(string value)
+        {
+            await using var db = Open();
+            var payment = await db.Payments.SingleAsync();
+            payment.SetExternalPaymentId(value);
+            await db.SaveChangesAsync();
+        }
+
+        public void Dispose()
+        {
+            _signer.Dispose();
+            File.Delete(_path);
+        }
+
+        private sealed class Stub(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => send(request);
+        }
+    }
+}

@@ -59,11 +59,12 @@ beforeEach(() => {
   mocks.createOrder.mockResolvedValue({ orderId: 99, subtotal: 43.9, deliveryFee: 0, total: 43.9 });
   mocks.createCheckout.mockResolvedValue({
     paymentId: 17,
-    initPoint: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=test",
+    checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
+    initPoint: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
   });
 });
 
-it("creates an order and checkout, preserving return context without choosing a method", async () => {
+it("creates an order and PagBank checkout, preserving return context without choosing a method", async () => {
   const { openPaymentStep } = await import("../scripts/order.js");
   await openPaymentStep();
   expect(mocks.createOrder).toHaveBeenCalledWith("pickup", [
@@ -74,6 +75,18 @@ it("creates an order and checkout, preserving return context without choosing a 
   expect(context.paymentId).toBe(17);
   expect(context.message).toContain("Rua dos Testes 123");
   expect(context).not.toHaveProperty("paymentMethod");
+});
+
+it("keeps the temporary Mercado Pago initPoint fallback", async () => {
+  mocks.createCheckout.mockResolvedValue({
+    paymentId: 17,
+    initPoint: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=test",
+  });
+
+  await (await import("../scripts/order.js")).openPaymentStep();
+
+  expect(mocks.createCheckout).toHaveBeenCalledWith(99);
+  expect(JSON.parse(sessionStorage.getItem("burger-house-checkout")).paymentId).toBe(17);
 });
 
 it("does not create checkout if the order fails", async () => {

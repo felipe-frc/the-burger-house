@@ -43,6 +43,39 @@ public class PrepareCheckoutPaymentHandlerTests
     }
 
     [Fact]
+    public async Task CreatesAndReusesOnlyPagBankPaymentForPagBankCheckout()
+    {
+        var store = new Store();
+        var handler = new PrepareCheckoutPaymentHandler(store, store);
+
+        var payment = await handler.HandleAsync(1, PaymentProvider.PagBank);
+
+        Assert.Equal(PaymentProvider.PagBank, payment.Provider);
+        payment.SetExternalCheckoutId("CHEC_1");
+        payment.SetMethod(PaymentMethod.Pix);
+        Assert.Same(payment, await handler.HandleAsync(1, PaymentProvider.PagBank));
+    }
+
+    [Fact]
+    public async Task RejectsReusingActivePaymentFromAnotherProvider()
+    {
+        var store = new Store
+        {
+            Payment = new Payment(
+                1,
+                43.90m,
+                Guid.NewGuid().ToString("D"),
+                PaymentMethod.Unknown,
+                PaymentProvider.MercadoPago
+            )
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new PrepareCheckoutPaymentHandler(store, store)
+                .HandleAsync(1, PaymentProvider.PagBank));
+    }
+
+    [Fact]
     public async Task RejectsMissingOrder()
     {
         var store = new Store();

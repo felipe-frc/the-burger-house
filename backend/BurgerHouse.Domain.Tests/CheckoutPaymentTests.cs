@@ -52,6 +52,31 @@ public class CheckoutPaymentTests
     }
 
     [Fact]
+    public void HostedCheckoutIdentityIsProviderSpecificAndImmutable()
+    {
+        var mercadoPago = Create();
+        mercadoPago.SetExternalPreferenceId("pref-1");
+        Assert.True(mercadoPago.HasHostedCheckout());
+        Assert.Throws<InvalidOperationException>(() => mercadoPago.SetExternalCheckoutId("CHEC_1"));
+
+        var pagBank = new Payment(
+            1,
+            43.90m,
+            Guid.NewGuid().ToString("D"),
+            PaymentMethod.Unknown,
+            PaymentProvider.PagBank
+        );
+        pagBank.SetExternalCheckoutId("CHEC_1");
+        pagBank.SetExternalCheckoutId("CHEC_1");
+
+        Assert.True(pagBank.HasHostedCheckout());
+        Assert.Equal("CHEC_1", pagBank.ExternalCheckoutId);
+        Assert.Null(pagBank.ExternalPreferenceId);
+        Assert.Throws<InvalidOperationException>(() => pagBank.SetExternalCheckoutId("CHEC_2"));
+        Assert.Throws<InvalidOperationException>(() => pagBank.SetExternalPreferenceId("pref-2"));
+    }
+
+    [Fact]
     public void PartialThenFullRefundPreservesFinancialStateAndIsIdempotent()
     {
         var payment = Create();

@@ -117,7 +117,8 @@ beforeEach(() => {
   mocks.createOrder.mockResolvedValue({ orderId: 99, subtotal: 43.9, deliveryFee: 0, total: 43.9 });
   mocks.createCheckout.mockResolvedValue({
     paymentId: 17,
-    initPoint: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=test",
+    checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
+    initPoint: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
   });
   mocks.getPaymentStatus.mockResolvedValue({ paymentId: 17, orderId: 99, amount: 43.9, status: 2 });
 });

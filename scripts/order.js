@@ -320,12 +320,18 @@ export async function openPaymentStep() {
       saveCheckoutContext();
     }
     const checkout = await createCheckout(checkoutSession.orderId);
-    const url = new URL(checkout.initPoint);
+    const url = new URL(checkout.checkoutUrl ?? checkout.initPoint);
     if (
       url.protocol !== "https:" ||
       url.username ||
       url.password ||
-      !["www.mercadopago.com.br", "sandbox.mercadopago.com.br"].includes(url.hostname)
+      ![
+        "pagamento.pagbank.com.br",
+        "sandbox.pagseguro.uol.com.br",
+        "pagseguro.uol.com.br",
+        "www.mercadopago.com.br",
+        "sandbox.mercadopago.com.br",
+      ].includes(url.hostname)
     ) {
       throw new Error("O checkout retornou um endereço inválido.");
     }
