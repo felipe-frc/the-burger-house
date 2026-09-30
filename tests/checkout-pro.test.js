@@ -89,6 +89,30 @@ it("keeps the temporary Mercado Pago initPoint fallback", async () => {
   expect(JSON.parse(sessionStorage.getItem("burger-house-checkout")).paymentId).toBe(17);
 });
 
+it("accepts the current PagBank Sandbox checkout host", async () => {
+  mocks.createCheckout.mockResolvedValue({
+    paymentId: 17,
+    checkoutUrl: "https://pagamento.sandbox.pagbank.com.br/pagamento?code=teste",
+  });
+
+  await (await import("../scripts/order.js")).openPaymentStep();
+
+  expect(JSON.parse(sessionStorage.getItem("burger-house-checkout")).paymentId).toBe(17);
+  expect(mocks.toast).not.toHaveBeenCalled();
+});
+
+it("rejects a lookalike of the PagBank Sandbox checkout host", async () => {
+  mocks.createCheckout.mockResolvedValue({
+    paymentId: 17,
+    checkoutUrl: "https://pagamento.sandbox.pagbank.com.br.evil.example/pagamento?code=teste",
+  });
+
+  await (await import("../scripts/order.js")).openPaymentStep();
+
+  expect(mocks.toast).toHaveBeenCalledWith("Não foi possível abrir o checkout. Tente novamente.");
+  expect(JSON.parse(sessionStorage.getItem("burger-house-checkout")).paymentId).toBeNull();
+});
+
 it("does not create checkout if the order fails", async () => {
   mocks.createOrder.mockRejectedValue(new Error("offline"));
   await (await import("../scripts/order.js")).openPaymentStep();

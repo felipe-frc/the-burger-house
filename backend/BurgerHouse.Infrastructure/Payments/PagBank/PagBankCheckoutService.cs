@@ -90,7 +90,10 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
         Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
         uri.Scheme == Uri.UriSchemeHttps &&
         string.IsNullOrEmpty(uri.UserInfo) &&
-        uri.Host is "pagamento.pagbank.com.br" or "sandbox.pagseguro.uol.com.br" or "pagseguro.uol.com.br";
+        uri.Host is "pagamento.pagbank.com.br"
+            or "pagamento.sandbox.pagbank.com.br"
+            or "sandbox.pagseguro.uol.com.br"
+            or "pagseguro.uol.com.br";
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativePath)
     {

@@ -74,6 +74,51 @@ public class PagBankCheckoutServiceTests
         Assert.EndsWith("/checkouts/CHEC_1", captured.RequestUri!.ToString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("https://pagamento.pagbank.com.br/pagamento?code=teste", true)]
+    [InlineData("https://pagamento.sandbox.pagbank.com.br/pagamento?code=teste", true)]
+    [InlineData("https://sandbox.pagseguro.uol.com.br/v2/checkout/payment.html?code=teste", true)]
+    [InlineData("https://pagseguro.uol.com.br/v2/checkout/payment.html?code=teste", true)]
+    [InlineData("https://pagamento.sandbox.pagbank.com.br.evil.example/pagamento?code=teste", false)]
+    [InlineData("http://pagamento.sandbox.pagbank.com.br/pagamento?code=teste", false)]
+    [InlineData("https://usuario:senha@pagamento.sandbox.pagbank.com.br/pagamento?code=teste", false)]
+    public void AcceptsOnlyExactSecureCheckoutHosts(string url, bool expected)
+    {
+        Assert.Equal(expected, PagBankCheckoutService.IsCheckoutUrl(url));
+    }
+
+    [Fact]
+    public async Task AcceptsRealisticCurrentSandboxPayLink()
+    {
+        using var http = new HttpClient(new Stub(_ => Task.FromResult(Json(HttpStatusCode.OK, """
+            {
+              "id":"CHEC_TESTE",
+              "reference_id":"payment:17",
+              "status":"ACTIVE",
+              "links":[
+                {
+                  "rel":"SELF",
+                  "href":"https://sandbox.api.pagseguro.com/checkouts/CHEC_TESTE",
+                  "method":"GET"
+                },
+                {
+                  "rel":"PAY",
+                  "href":"https://pagamento.sandbox.pagbank.com.br/pagamento?code=teste",
+                  "method":"GET"
+                }
+              ]
+            }
+            """))));
+
+        var result = await Service(http).GetOrCreateAsync(NewPayment());
+
+        Assert.Equal("CHEC_TESTE", result.ExternalCheckoutId);
+        Assert.Equal(
+            "https://pagamento.sandbox.pagbank.com.br/pagamento?code=teste",
+            result.CheckoutUrl
+        );
+    }
+
     [Fact]
     public async Task RejectsResponseWithoutSingleValidPayLink()
     {

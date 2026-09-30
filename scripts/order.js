@@ -327,6 +327,7 @@ export async function openPaymentStep() {
       url.password ||
       ![
         "pagamento.pagbank.com.br",
+        "pagamento.sandbox.pagbank.com.br",
         "sandbox.pagseguro.uol.com.br",
         "pagseguro.uol.com.br",
         "www.mercadopago.com.br",
