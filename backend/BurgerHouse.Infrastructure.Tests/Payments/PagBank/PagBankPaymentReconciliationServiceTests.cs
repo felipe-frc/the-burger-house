@@ -54,6 +54,129 @@ public class PagBankPaymentReconciliationServiceTests
         Assert.Equal(OrderStatus.PendingPayment, await fixture.GetOrderStatus());
     }
 
+    [Theory]
+    [InlineData("DECLINED")]
+    [InlineData("CANCELED")]
+    [InlineData("WAITING")]
+    public async Task PaidChargeWinsOverEarlierAttempt(string earlierStatus)
+    {
+        using var fixture = new Fixture
+        {
+            Charges =
+            [
+                new ChargeSpec("CHAR_OLD", earlierStatus, "PIX"),
+                new ChargeSpec("CHAR_PAID", "PAID", "CREDIT_CARD")
+            ]
+        };
+
+        await fixture.Reconcile();
+
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.Equal(PaymentMethod.CreditCard, payment.Method);
+        Assert.Equal("CHAR_PAID", payment.ExternalPaymentId);
+        Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
+    }
+
+    [Fact]
+    public async Task MultiplePaidChargesRemainAmbiguous()
+    {
+        using var fixture = new Fixture
+        {
+            Charges =
+            [
+                new ChargeSpec("CHAR_PAID_1", "PAID", "CREDIT_CARD"),
+                new ChargeSpec("CHAR_PAID_2", "PAID", "CREDIT_CARD")
+            ]
+        };
+
+        await fixture.Reconcile();
+
+        await fixture.AssertUnchanged();
+    }
+
+    [Fact]
+    public async Task MultiplePendingChargesRemainAmbiguous()
+    {
+        using var fixture = new Fixture
+        {
+            Charges =
+            [
+                new ChargeSpec("CHAR_WAITING", "WAITING", "PIX"),
+                new ChargeSpec("CHAR_ANALYSIS", "IN_ANALYSIS", "CREDIT_CARD")
+            ]
+        };
+
+        await fixture.Reconcile();
+
+        await fixture.AssertUnchanged();
+    }
+
+    [Fact]
+    public async Task MultipleTerminalChargesRemainAmbiguous()
+    {
+        using var fixture = new Fixture
+        {
+            Charges =
+            [
+                new ChargeSpec("CHAR_DECLINED", "DECLINED", "CREDIT_CARD"),
+                new ChargeSpec("CHAR_CANCELED", "CANCELED", "CREDIT_CARD")
+            ]
+        };
+
+        await fixture.Reconcile();
+
+        await fixture.AssertUnchanged();
+    }
+
+    [Fact]
+    public async Task ExistingExternalPaymentIdSelectsExactCharge()
+    {
+        using var fixture = new Fixture
+        {
+            Charges =
+            [
+                new ChargeSpec("CHAR_OLD", "DECLINED", "CREDIT_CARD"),
+                new ChargeSpec("CHAR_BOUND", "PAID", "CREDIT_CARD")
+            ]
+        };
+        await fixture.SetExternalPaymentId("CHAR_BOUND");
+
+        await fixture.Reconcile();
+
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.Equal(PaymentMethod.CreditCard, payment.Method);
+        Assert.Equal("CHAR_BOUND", payment.ExternalPaymentId);
+    }
+
+    [Theory]
+    [InlineData("reference")]
+    [InlineData("amount")]
+    [InlineData("currency")]
+    public async Task InvalidChargeDoesNotBlockSingleStrongPaidCandidate(string mismatch)
+    {
+        using var fixture = new Fixture();
+        fixture.Charges =
+        [
+            new ChargeSpec(
+                "CHAR_INVALID",
+                "PAID",
+                "CREDIT_CARD",
+                mismatch == "amount" ? 100 : null,
+                mismatch == "currency" ? "USD" : null,
+                mismatch == "reference" ? "payment:999" : null
+            ),
+            new ChargeSpec("CHAR_VALID", "PAID", "CREDIT_CARD")
+        ];
+
+        await fixture.Reconcile();
+
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.Equal("CHAR_VALID", payment.ExternalPaymentId);
+    }
+
     [Fact]
     public async Task ApprovedPagBankPaymentDoesNotCallProvider()
     {
@@ -223,6 +346,15 @@ public class PagBankPaymentReconciliationServiceTests
         Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
     }
 
+    private sealed record ChargeSpec(
+        string Id,
+        string Status,
+        string Method,
+        int? AmountInCents = null,
+        string? Currency = null,
+        string? Reference = null
+    );
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _path = Path.Combine(
@@ -248,6 +380,7 @@ public class PagBankPaymentReconciliationServiceTests
         public string Currency = "BRL";
         public int AmountInCents = 4390;
         public int ChargeCount = 1;
+        public ChargeSpec[]? Charges;
 
         public Fixture(
             PaymentProvider provider = PaymentProvider.PagBank,
@@ -296,19 +429,30 @@ public class PagBankPaymentReconciliationServiceTests
                 if (Timeout)
                     throw new TaskCanceledException("simulated timeout");
 
-                var charges = Enumerable.Range(0, ChargeCount)
-                    .Select(index => new
+                var chargeDefinitions = Charges ?? Enumerable.Range(0, ChargeCount)
+                    .Select(index => new ChargeSpec(
+                        index == 0 ? "CHAR_1" : $"CHAR_{index + 1}",
+                        ProviderStatus,
+                        ProviderMethod
+                    ))
+                    .ToArray();
+                var charges = chargeDefinitions
+                    .Select(charge => new
                     {
-                        id = index == 0 ? "CHAR_1" : $"CHAR_{index + 1}",
-                        reference_id = ChargeReference,
-                        status = ProviderStatus,
+                        id = charge.Id,
+                        reference_id = charge.Reference ?? ChargeReference,
+                        status = charge.Status,
                         amount = new
                         {
-                            value = AmountInCents,
-                            currency = Currency,
-                            summary = new { total = AmountInCents, refunded = 0 }
+                            value = charge.AmountInCents ?? AmountInCents,
+                            currency = charge.Currency ?? Currency,
+                            summary = new
+                            {
+                                total = charge.AmountInCents ?? AmountInCents,
+                                refunded = 0
+                            }
                         },
-                        payment_method = new { type = ProviderMethod }
+                        payment_method = new { type = charge.Method }
                     })
                     .ToArray();
                 return Task.FromResult(new HttpResponseMessage(ResponseStatus)

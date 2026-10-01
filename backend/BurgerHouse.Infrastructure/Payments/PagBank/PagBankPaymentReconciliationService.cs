@@ -179,19 +179,64 @@ public sealed class PagBankPaymentReconciliationService(
             return false;
         }
 
-        var relevantCharges = checkout.Charges
-            .Where(candidate => string.Equals(candidate.ReferenceId, reference, StringComparison.Ordinal))
-            .ToArray();
-        if (relevantCharges.Length != 1)
+        if (!TryGetAmountInCents(payment.Amount, out var expectedAmount))
         {
-            reason = "ambiguous-charge";
+            reason = "amount-mismatch";
             return false;
         }
 
-        charge = relevantCharges[0];
-        if (!TryGetAmountInCents(payment.Amount, out var expectedAmount) ||
-            charge.TotalAmountInCents != expectedAmount ||
-            charge.Amount != payment.Amount)
+        if (payment.ExternalPaymentId is not null)
+        {
+            var identifiedCharges = checkout.Charges
+                .Where(candidate => string.Equals(
+                    candidate.Id,
+                    payment.ExternalPaymentId,
+                    StringComparison.Ordinal
+                ))
+                .ToArray();
+            if (identifiedCharges.Length == 0)
+            {
+                reason = "external-payment-id-not-found";
+                return false;
+            }
+            if (identifiedCharges.Length != 1)
+            {
+                reason = "ambiguous-charge";
+                return false;
+            }
+
+            charge = identifiedCharges[0];
+        }
+        else
+        {
+            var candidates = checkout.Charges
+                .Where(candidate =>
+                    string.Equals(candidate.ReferenceId, reference, StringComparison.Ordinal) &&
+                    candidate.TotalAmountInCents == expectedAmount &&
+                    candidate.Amount == payment.Amount &&
+                    string.Equals(candidate.Currency, "BRL", StringComparison.Ordinal))
+                .ToArray();
+
+            if (!TrySelectCharge(candidates, out charge))
+            {
+                reason = candidates.Length == 0
+                    ? "matching-charge-not-found"
+                    : "ambiguous-charge";
+                return false;
+            }
+        }
+
+        if (charge is null)
+        {
+            reason = "matching-charge-not-found";
+            return false;
+        }
+        if (!string.Equals(charge.ReferenceId, reference, StringComparison.Ordinal))
+        {
+            reason = "charge-reference-mismatch";
+            return false;
+        }
+        if (charge.TotalAmountInCents != expectedAmount || charge.Amount != payment.Amount)
         {
             reason = "amount-mismatch";
             return false;
@@ -207,16 +252,48 @@ public sealed class PagBankPaymentReconciliationService(
             reason = "unknown-paid-method";
             return false;
         }
-        if (payment.ExternalPaymentId is not null &&
-            !string.Equals(payment.ExternalPaymentId, charge.Id, StringComparison.Ordinal))
-        {
-            reason = "external-payment-id-mismatch";
-            return false;
-        }
-
         reason = string.Empty;
         return true;
     }
+
+    private static bool TrySelectCharge(
+        IReadOnlyCollection<PagBankPaymentSnapshot> candidates,
+        out PagBankPaymentSnapshot? charge)
+    {
+        charge = null;
+        var paid = candidates
+            .Where(candidate => HasProviderStatus(candidate, "PAID"))
+            .ToArray();
+        if (paid.Length > 0)
+            return TrySelectOnly(paid, out charge);
+
+        var pending = candidates
+            .Where(candidate =>
+                HasProviderStatus(candidate, "AUTHORIZED") ||
+                HasProviderStatus(candidate, "IN_ANALYSIS") ||
+                HasProviderStatus(candidate, "WAITING"))
+            .ToArray();
+        if (pending.Length > 0)
+            return TrySelectOnly(pending, out charge);
+
+        var terminal = candidates
+            .Where(candidate =>
+                HasProviderStatus(candidate, "DECLINED") ||
+                HasProviderStatus(candidate, "CANCELED"))
+            .ToArray();
+        return terminal.Length > 0 && TrySelectOnly(terminal, out charge);
+    }
+
+    private static bool TrySelectOnly(
+        IReadOnlyCollection<PagBankPaymentSnapshot> candidates,
+        out PagBankPaymentSnapshot? charge)
+    {
+        charge = candidates.Count == 1 ? candidates.Single() : null;
+        return charge is not null;
+    }
+
+    private static bool HasProviderStatus(PagBankPaymentSnapshot charge, string status) =>
+        string.Equals(charge.ProviderStatus, status, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsCurrentStateCompatible(
         Payment payment,
