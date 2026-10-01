@@ -1,6 +1,7 @@
 using System.Reflection;
 
 using BurgerHouse.Api.Controllers;
+using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Payments.GetPaymentStatus;
 using BurgerHouse.Domain.Entities;
@@ -162,7 +163,8 @@ public class GetPaymentStatusControllerTests
         );
     }
 
-    private static PaymentsController CreateController(IPaymentRepository repository) => new(new GetPaymentStatusHandler(repository));
+    private static PaymentsController CreateController(IPaymentRepository repository) =>
+        new(new GetPaymentStatusHandler(repository, new NoOpPaymentReconciliationService()));
 
     private static Payment CreatePayment(
         int id = 10,
@@ -288,6 +290,12 @@ public class GetPaymentStatusControllerTests
         {
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class NoOpPaymentReconciliationService : IPaymentReconciliationService
+    {
+        public Task ReconcileAsync(int paymentId, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 
 }

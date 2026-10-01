@@ -1,3 +1,4 @@
+using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
 
 namespace BurgerHouse.Application.Payments.GetPaymentStatus;
@@ -7,11 +8,18 @@ public sealed class GetPaymentStatusHandler
     private readonly IPaymentRepository
         _paymentRepository;
 
+    private readonly IPaymentReconciliationService
+        _paymentReconciliationService;
+
     public GetPaymentStatusHandler(
-        IPaymentRepository paymentRepository)
+        IPaymentRepository paymentRepository,
+        IPaymentReconciliationService paymentReconciliationService)
     {
         _paymentRepository =
             paymentRepository;
+
+        _paymentReconciliationService =
+            paymentReconciliationService;
     }
 
     public async Task<GetPaymentStatusResponse>
@@ -40,6 +48,22 @@ public sealed class GetPaymentStatusHandler
                 $"Payment '{paymentId}' was not found."
             );
         }
+
+        await _paymentReconciliationService
+            .ReconcileAsync(
+                paymentId,
+                cancellationToken
+            );
+
+        payment =
+            await _paymentRepository
+                .GetByIdAsync(
+                    paymentId,
+                    cancellationToken
+                )
+            ?? throw new KeyNotFoundException(
+                $"Payment '{paymentId}' was not found."
+            );
 
         return new GetPaymentStatusResponse
         {

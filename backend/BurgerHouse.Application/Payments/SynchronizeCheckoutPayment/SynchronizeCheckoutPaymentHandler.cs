@@ -25,11 +25,16 @@ public sealed class SynchronizeCheckoutPaymentHandler(IPaymentRepository payment
             throw new InvalidOperationException("Payment is not linked to a hosted checkout.");
         if (amount != payment.Amount || amount != order.Total || currency != "BRL")
             throw new InvalidOperationException("Payment amount or currency does not match the order.");
-        if (string.IsNullOrWhiteSpace(externalPaymentId) || method == PaymentMethod.Unknown || !Enum.IsDefined(method))
+        if (string.IsNullOrWhiteSpace(externalPaymentId) || !Enum.IsDefined(method))
             throw new InvalidOperationException("Payment identification or method is invalid.");
+        if ((status is PaymentGatewayStatus.Approved or PaymentGatewayStatus.Refunded or
+            PaymentGatewayStatus.PartiallyRefunded or PaymentGatewayStatus.ChargedBack) &&
+            method == PaymentMethod.Unknown)
+            throw new InvalidOperationException("A settled payment must have a known payment method.");
         if (payment.ExternalPaymentId is not null && payment.ExternalPaymentId != externalPaymentId)
             throw new InvalidOperationException("Payment is already linked to a different external payment.");
-        if (payment.Method != PaymentMethod.Unknown && payment.Method != method)
+        if (method != PaymentMethod.Unknown &&
+            payment.Method != PaymentMethod.Unknown && payment.Method != method)
             throw new InvalidOperationException("Payment method does not match the recorded method.");
 
         var target = status switch
@@ -48,7 +53,8 @@ public sealed class SynchronizeCheckoutPaymentHandler(IPaymentRepository payment
 
         var previousUpdate = payment.UpdatedAt;
         var previousOrderStatus = order.Status;
-        payment.SetMethod(method);
+        if (method != PaymentMethod.Unknown)
+            payment.SetMethod(method);
         payment.SetExternalPaymentId(externalPaymentId);
         if (payment.Status != target)
         {

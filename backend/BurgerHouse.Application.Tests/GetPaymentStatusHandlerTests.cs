@@ -1,5 +1,6 @@
 using System.Reflection;
 
+using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Payments.GetPaymentStatus;
 using BurgerHouse.Domain.Entities;
@@ -28,7 +29,8 @@ public class GetPaymentStatusHandlerTests
 
         var handler =
             new GetPaymentStatusHandler(
-                repository
+                repository,
+                new NoOpPaymentReconciliationService()
             );
 
         var response =
@@ -77,7 +79,8 @@ public class GetPaymentStatusHandlerTests
             new GetPaymentStatusHandler(
                 new FakePaymentRepository(
                     payment
-                )
+                ),
+                new NoOpPaymentReconciliationService()
             );
 
         var response =
@@ -100,7 +103,8 @@ public class GetPaymentStatusHandlerTests
     {
         var handler =
             new GetPaymentStatusHandler(
-                new FakePaymentRepository()
+                new FakePaymentRepository(),
+                new NoOpPaymentReconciliationService()
             );
 
         await Assert.ThrowsAsync<
@@ -116,7 +120,8 @@ public class GetPaymentStatusHandlerTests
     {
         var handler =
             new GetPaymentStatusHandler(
-                new FakePaymentRepository()
+                new FakePaymentRepository(),
+                new NoOpPaymentReconciliationService()
             );
 
         await Assert.ThrowsAsync<
@@ -245,5 +250,11 @@ public class GetPaymentStatusHandlerTests
         {
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class NoOpPaymentReconciliationService : IPaymentReconciliationService
+    {
+        public Task ReconcileAsync(int paymentId, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

@@ -149,6 +149,10 @@ builder.Services.AddScoped<
     GetPaymentStatusHandler>();
 
 builder.Services.AddScoped<
+    IPaymentReconciliationService,
+    PagBankPaymentReconciliationService>();
+
+builder.Services.AddScoped<
     MercadoPagoWebhookSignatureValidator>();
 
 builder.Services.AddHttpClient<MercadoPagoPreferenceService>(
@@ -173,6 +177,10 @@ builder.Services.AddScoped<IHostedCheckoutGateway>(provider =>
 );
 
 builder.Services.AddHttpClient<PagBankPaymentLookup>(
+    client => client.Timeout = TimeSpan.FromSeconds(15)
+);
+
+builder.Services.AddHttpClient<PagBankCheckoutLookup>(
     client => client.Timeout = TimeSpan.FromSeconds(15)
 );
 
