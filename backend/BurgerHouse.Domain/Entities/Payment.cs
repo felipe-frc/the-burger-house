@@ -14,13 +14,9 @@ public class Payment
 
     public PaymentMethod Method { get; private set; }
 
-    public PaymentProvider Provider { get; private set; }
-
     public string IdempotencyKey { get; private set; }
 
     public string? ExternalPaymentId { get; private set; }
-
-    public string? ExternalPreferenceId { get; private set; }
 
     public string? ExternalCheckoutId { get; private set; }
 
@@ -33,21 +29,6 @@ public class Payment
         decimal amount,
         string idempotencyKey,
         PaymentMethod method)
-        : this(
-            orderId,
-            amount,
-            idempotencyKey,
-            method,
-            PaymentProvider.MercadoPago)
-    {
-    }
-
-    public Payment(
-        int orderId,
-        decimal amount,
-        string idempotencyKey,
-        PaymentMethod method,
-        PaymentProvider provider)
     {
         if (orderId <= 0)
         {
@@ -77,13 +58,6 @@ public class Payment
             );
         }
 
-        if (!Enum.IsDefined(provider))
-        {
-            throw new ArgumentException(
-                "Payment provider is invalid."
-            );
-        }
-
         var normalizedKey = idempotencyKey.Trim();
 
         if (!Guid.TryParseExact(
@@ -99,7 +73,6 @@ public class Payment
         OrderId = orderId;
         Amount = amount;
         Method = method;
-        Provider = provider;
         IdempotencyKey = parsedKey.ToString("D");
         Status = PaymentStatus.Pending;
         CreatedAt = DateTime.UtcNow;
@@ -210,24 +183,8 @@ public class Payment
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void SetExternalPreferenceId(string preferenceId)
-    {
-        if (Provider != PaymentProvider.MercadoPago)
-            throw new InvalidOperationException("Only Mercado Pago payments can have a preference id.");
-        ArgumentException.ThrowIfNullOrWhiteSpace(preferenceId);
-        var normalized = preferenceId.Trim();
-        if (ExternalPreferenceId == normalized) return;
-        if (ExternalPreferenceId is not null)
-            throw new InvalidOperationException("Checkout preference has already been assigned.");
-        EnsurePending();
-        ExternalPreferenceId = normalized;
-        UpdatedAt = DateTime.UtcNow;
-    }
-
     public void SetExternalCheckoutId(string externalCheckoutId)
     {
-        if (Provider != PaymentProvider.PagBank)
-            throw new InvalidOperationException("Only PagBank payments can have an external checkout id.");
         ArgumentException.ThrowIfNullOrWhiteSpace(externalCheckoutId);
         var normalized = externalCheckoutId.Trim();
         if (ExternalCheckoutId == normalized) return;
@@ -238,13 +195,7 @@ public class Payment
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public bool HasHostedCheckout() =>
-        Provider switch
-        {
-            PaymentProvider.MercadoPago => ExternalPreferenceId is not null,
-            PaymentProvider.PagBank => ExternalCheckoutId is not null,
-            _ => false
-        };
+    public bool HasHostedCheckout() => ExternalCheckoutId is not null;
 
     public void ChargeBack()
     {

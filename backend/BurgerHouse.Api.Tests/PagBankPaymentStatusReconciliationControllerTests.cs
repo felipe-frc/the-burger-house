@@ -41,12 +41,12 @@ public class PagBankPaymentStatusReconciliationControllerTests
                     order.Id,
                     order.Total,
                     Guid.NewGuid().ToString("D"),
-                    PaymentMethod.Unknown,
-                    PaymentProvider.PagBank
+                    PaymentMethod.Unknown
                 );
                 setup.Payments.Add(payment);
                 await setup.SaveChangesAsync();
                 payment.SetExternalCheckoutId("CHEC_1");
+                payment.SetExternalPaymentId("CHAR_1");
                 await setup.SaveChangesAsync();
                 paymentId = payment.Id;
             }
@@ -57,24 +57,16 @@ public class PagBankPaymentStatusReconciliationControllerTests
                 {
                     Content = new StringContent(JsonSerializer.Serialize(new
                     {
-                        id = "CHEC_1",
+                        id = "CHAR_1",
                         reference_id = $"payment:{paymentId}",
-                        charges = new[]
+                        status = "PAID",
+                        amount = new
                         {
-                            new
-                            {
-                                id = "CHAR_1",
-                                reference_id = $"payment:{paymentId}",
-                                status = "PAID",
-                                amount = new
-                                {
-                                    value = 4390,
-                                    currency = "BRL",
-                                    summary = new { total = 4390, refunded = 0 }
-                                },
-                                payment_method = new { type = "CREDIT_CARD" }
-                            }
-                        }
+                            value = 4390,
+                            currency = "BRL",
+                            summary = new { total = 4390, refunded = 0 }
+                        },
+                        payment_method = new { type = "CREDIT_CARD" }
                     }))
                 }
             )));
@@ -86,7 +78,7 @@ public class PagBankPaymentStatusReconciliationControllerTests
             var paymentRepository = new PaymentRepository(db);
             var orderRepository = new OrderRepository(db);
             var reconciliation = new PagBankPaymentReconciliationService(
-                new PagBankCheckoutLookup(http, pagBankOptions),
+                new PagBankPaymentLookup(http, pagBankOptions),
                 new SynchronizeCheckoutPaymentHandler(paymentRepository, orderRepository),
                 db,
                 NullLogger<PagBankPaymentReconciliationService>.Instance

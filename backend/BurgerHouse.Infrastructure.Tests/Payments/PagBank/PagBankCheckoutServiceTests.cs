@@ -62,7 +62,7 @@ public class PagBankCheckoutServiceTests
         {
             captured = request;
             return Task.FromResult(Json(HttpStatusCode.OK, """
-                {"id":"CHEC_1","reference_id":"payment:17","status":"ACTIVE","links":[{"rel":"PAY","href":"https://sandbox.pagseguro.uol.com.br/v2/checkout/payment.html?code=CHEC_1"}]}
+                {"id":"CHEC_1","reference_id":"payment:17","status":"ACTIVE","links":[{"rel":"PAY","href":"https://pagamento.sandbox.pagbank.com.br/pagamento?code=CHEC_1"}]}
                 """));
         }));
         var payment = NewPayment();
@@ -77,8 +77,8 @@ public class PagBankCheckoutServiceTests
     [Theory]
     [InlineData("https://pagamento.pagbank.com.br/pagamento?code=teste", true)]
     [InlineData("https://pagamento.sandbox.pagbank.com.br/pagamento?code=teste", true)]
-    [InlineData("https://sandbox.pagseguro.uol.com.br/v2/checkout/payment.html?code=teste", true)]
-    [InlineData("https://pagseguro.uol.com.br/v2/checkout/payment.html?code=teste", true)]
+    [InlineData("https://sandbox.pagseguro.uol.com.br/v2/checkout/payment.html?code=teste", false)]
+    [InlineData("https://pagseguro.uol.com.br/v2/checkout/payment.html?code=teste", false)]
     [InlineData("https://pagamento.sandbox.pagbank.com.br.evil.example/pagamento?code=teste", false)]
     [InlineData("http://pagamento.sandbox.pagbank.com.br/pagamento?code=teste", false)]
     [InlineData("https://usuario:senha@pagamento.sandbox.pagbank.com.br/pagamento?code=teste", false)]
@@ -175,7 +175,7 @@ public class PagBankCheckoutServiceTests
 
     private static Payment NewPayment()
     {
-        var payment = new Payment(5, 43.90m, Guid.NewGuid().ToString("D"), PaymentMethod.Unknown, PaymentProvider.PagBank);
+        var payment = new Payment(5, 43.90m, Guid.NewGuid().ToString("D"), PaymentMethod.Unknown);
         typeof(Payment).GetProperty(nameof(Payment.Id))!.SetValue(payment, 17);
         return payment;
     }

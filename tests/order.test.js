@@ -118,7 +118,6 @@ beforeEach(() => {
   mocks.createCheckout.mockResolvedValue({
     paymentId: 17,
     checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
-    initPoint: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
   });
   mocks.getPaymentStatus.mockResolvedValue({ paymentId: 17, orderId: 99, amount: 43.9, status: 2 });
 });

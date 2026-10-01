@@ -21,7 +21,6 @@ public sealed class PrepareCheckoutPaymentHandler
 
     public async Task<Payment> HandleAsync(
         int orderId,
-        PaymentProvider provider,
         CancellationToken cancellationToken = default)
     {
         if (orderId <= 0)
@@ -31,9 +30,6 @@ public sealed class PrepareCheckoutPaymentHandler
                 nameof(orderId)
             );
         }
-
-        if (!Enum.IsDefined(provider))
-            throw new ArgumentException("Payment provider is invalid.", nameof(provider));
 
         var order =
             await _orderRepository.GetByIdAsync(
@@ -63,11 +59,6 @@ public sealed class PrepareCheckoutPaymentHandler
 
         if (activePayment is not null)
         {
-            if (activePayment.Provider != provider)
-                throw new InvalidOperationException(
-                    "This order already has an active payment from another provider."
-                );
-
             if (activePayment.Status != PaymentStatus.Pending ||
                 (activePayment.Method != PaymentMethod.Unknown &&
                  !activePayment.HasHostedCheckout()))
@@ -85,8 +76,7 @@ public sealed class PrepareCheckoutPaymentHandler
                 order.Id,
                 order.Total,
                 Guid.NewGuid().ToString("D"),
-                PaymentMethod.Unknown,
-                provider
+                PaymentMethod.Unknown
             );
 
         await _paymentRepository.AddAsync(
@@ -100,9 +90,4 @@ public sealed class PrepareCheckoutPaymentHandler
 
         return payment;
     }
-
-    public Task<Payment> HandleAsync(
-        int orderId,
-        CancellationToken cancellationToken = default) =>
-        HandleAsync(orderId, PaymentProvider.MercadoPago, cancellationToken);
 }

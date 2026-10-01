@@ -14,11 +14,9 @@ namespace BurgerHouse.Api.Tests;
 public class CheckoutControllerTests
 {
     [Fact]
-    public async Task ProviderFailureKeepsPersistedPagBankAttemptForRetry()
+    public async Task ProviderFailureKeepsPersistedAttemptForRetry()
     {
-        using var fixture = new MercadoPagoWebhooksControllerTests.Fixture();
-        await using (var db = fixture.Open())
-            await db.Database.ExecuteSqlRawAsync("DELETE FROM Payments");
+        using var fixture = new Fixture();
 
         for (var attempt = 0; attempt < 2; attempt++)
         {
@@ -27,14 +25,12 @@ public class CheckoutControllerTests
             var controller = CreateController(db, gateway);
 
             var result = Assert.IsType<ObjectResult>(
-                await controller.CreateCheckoutAsync(1, default)
+                await controller.CreateCheckoutAsync(fixture.OrderId, default)
             );
 
             Assert.Equal(502, result.StatusCode);
-            await using var stored = fixture.Open();
-            var payment = Assert.Single(await stored.Payments.ToListAsync());
+            var payment = await fixture.Payment();
             Assert.True(payment.Id > 0);
-            Assert.Equal(PaymentProvider.PagBank, payment.Provider);
             Assert.Equal(PaymentStatus.Pending, payment.Status);
             Assert.Equal(PaymentMethod.Unknown, payment.Method);
             Assert.Null(payment.ExternalCheckoutId);
@@ -42,12 +38,9 @@ public class CheckoutControllerTests
     }
 
     [Fact]
-    public async Task ConcurrentRequestsCreateOneCheckoutAndReusePersistedIdentity()
+    public async Task ConcurrentRequestsCreateOneCheckoutAndReturnFinalContract()
     {
-        using var fixture = new MercadoPagoWebhooksControllerTests.Fixture();
-        await using (var db = fixture.Open())
-            await db.Database.ExecuteSqlRawAsync("DELETE FROM Payments");
-
+        using var fixture = new Fixture();
         var creates = 0;
         var reuses = 0;
         var gateway = new StubGateway(async payment =>
@@ -56,7 +49,6 @@ public class CheckoutControllerTests
             {
                 Interlocked.Increment(ref creates);
                 Assert.True(payment.Id > 0);
-                Assert.Equal(PaymentProvider.PagBank, payment.Provider);
                 Assert.Equal(payment.Id, (await fixture.Payment()).Id);
                 payment.SetExternalCheckoutId("CHEC_1");
             }
@@ -75,23 +67,24 @@ public class CheckoutControllerTests
         async Task<IActionResult> Checkout()
         {
             await using var db = fixture.Open();
-            return await CreateController(db, gateway).CreateCheckoutAsync(1, default);
+            return await CreateController(db, gateway).CreateCheckoutAsync(fixture.OrderId, default);
         }
 
         var results = await Task.WhenAll(Task.Run(Checkout), Task.Run(Checkout));
 
         Assert.All(results, result =>
         {
-            var ok = Assert.IsType<OkObjectResult>(result);
-            var body = JsonSerializer.SerializeToElement(ok.Value);
-            Assert.Equal(body.GetProperty("checkoutUrl").GetString(), body.GetProperty("initPoint").GetString());
+            var body = JsonSerializer.SerializeToElement(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.True(body.GetProperty("paymentId").GetInt32() > 0);
+            Assert.Equal(
+                "https://pagamento.pagbank.com.br/checkout/CHEC_1",
+                body.GetProperty("checkoutUrl").GetString()
+            );
+            Assert.False(body.TryGetProperty("initPoint", out _));
         });
         Assert.Equal(1, creates);
         Assert.Equal(1, reuses);
-        var stored = await fixture.Payment();
-        Assert.Equal(PaymentProvider.PagBank, stored.Provider);
-        Assert.Equal("CHEC_1", stored.ExternalCheckoutId);
-        Assert.Null(stored.ExternalPreferenceId);
+        Assert.Equal("CHEC_1", (await fixture.Payment()).ExternalCheckoutId);
     }
 
     private static CheckoutController CreateController(
@@ -106,10 +99,43 @@ public class CheckoutControllerTests
     private sealed class StubGateway(
         Func<Payment, Task<HostedCheckoutSession>> getOrCreate) : IHostedCheckoutGateway
     {
-        public PaymentProvider Provider => PaymentProvider.PagBank;
-
         public Task<HostedCheckoutSession> GetOrCreateAsync(
             Payment payment,
             CancellationToken cancellationToken = default) => getOrCreate(payment);
+    }
+
+    private sealed class Fixture : IDisposable
+    {
+        private readonly string _path = Path.Combine(
+            Path.GetTempPath(),
+            $"burger-checkout-controller-{Guid.NewGuid()}.db"
+        );
+
+        public int OrderId { get; }
+
+        public Fixture()
+        {
+            using var db = Open();
+            db.Database.EnsureCreated();
+            var order = new Order(0);
+            order.AddItem(new OrderItem(1, 1, 43.90m));
+            db.Orders.Add(order);
+            db.SaveChanges();
+            OrderId = order.Id;
+        }
+
+        public BurgerHouseDbContext Open() => new(
+            new DbContextOptionsBuilder<BurgerHouseDbContext>()
+                .UseSqlite($"Data Source={_path};Pooling=False;Default Timeout=10")
+                .Options
+        );
+
+        public async Task<Payment> Payment()
+        {
+            await using var db = Open();
+            return await db.Payments.SingleAsync();
+        }
+
+        public void Dispose() => File.Delete(_path);
     }
 }

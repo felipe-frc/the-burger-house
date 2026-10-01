@@ -40,7 +40,6 @@ test.beforeEach(async ({ page }) => {
       json: {
         paymentId: 17,
         checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
-        initPoint: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
       },
     }),
   );

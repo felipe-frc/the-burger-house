@@ -29,8 +29,6 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
         ValidatePublicUrl(_options.NotificationUrl, "notification");
     }
 
-    public PaymentProvider Provider => PaymentProvider.PagBank;
-
     public async Task<HostedCheckoutSession> GetOrCreateAsync(
         Payment payment,
         CancellationToken cancellationToken = default)
@@ -38,9 +36,6 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
         ArgumentNullException.ThrowIfNull(payment);
         if (payment.Id <= 0)
             throw new InvalidOperationException("Payment must be persisted before creating checkout.");
-        if (payment.Provider != PaymentProvider.PagBank)
-            throw new InvalidOperationException("Payment does not belong to PagBank.");
-
         var reference = CreateReference(payment.Id);
         PagBankCheckoutResponse checkout;
 
@@ -91,9 +86,7 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
         uri.Scheme == Uri.UriSchemeHttps &&
         string.IsNullOrEmpty(uri.UserInfo) &&
         uri.Host is "pagamento.pagbank.com.br"
-            or "pagamento.sandbox.pagbank.com.br"
-            or "sandbox.pagseguro.uol.com.br"
-            or "pagseguro.uol.com.br";
+            or "pagamento.sandbox.pagbank.com.br";
 
     private HttpRequestMessage CreateRequest(HttpMethod method, string relativePath)
     {

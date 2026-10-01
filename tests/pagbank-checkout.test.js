@@ -60,7 +60,6 @@ beforeEach(() => {
   mocks.createCheckout.mockResolvedValue({
     paymentId: 17,
     checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
-    initPoint: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
   });
 });
 
@@ -77,16 +76,16 @@ it("creates an order and PagBank checkout, preserving return context without cho
   expect(context).not.toHaveProperty("paymentMethod");
 });
 
-it("keeps the temporary Mercado Pago initPoint fallback", async () => {
+it("requires the final checkoutUrl contract", async () => {
   mocks.createCheckout.mockResolvedValue({
     paymentId: 17,
-    initPoint: "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=test",
   });
 
   await (await import("../scripts/order.js")).openPaymentStep();
 
   expect(mocks.createCheckout).toHaveBeenCalledWith(99);
-  expect(JSON.parse(sessionStorage.getItem("burger-house-checkout")).paymentId).toBe(17);
+  expect(JSON.parse(sessionStorage.getItem("burger-house-checkout")).paymentId).toBeNull();
+  expect(mocks.toast).toHaveBeenCalledWith("Não foi possível abrir o checkout. Tente novamente.");
 });
 
 it("accepts the current PagBank Sandbox checkout host", async () => {

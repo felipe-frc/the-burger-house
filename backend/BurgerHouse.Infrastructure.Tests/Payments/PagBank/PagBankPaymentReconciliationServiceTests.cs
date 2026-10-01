@@ -15,11 +15,9 @@ namespace BurgerHouse.Infrastructure.Tests.Payments.PagBank;
 public class PagBankPaymentReconciliationServiceTests
 {
     [Fact]
-    public async Task PaidCheckoutApprovesPaymentStoresChargeAndUpdatesOrder()
+    public async Task PaidChargeApprovesPaymentAndUpdatesOrder()
     {
         using var fixture = new Fixture();
-        fixture.ProviderStatus = "PAID";
-        fixture.ProviderMethod = "CREDIT_CARD";
 
         await fixture.Reconcile();
 
@@ -28,14 +26,17 @@ public class PagBankPaymentReconciliationServiceTests
         Assert.Equal(PaymentMethod.CreditCard, payment.Method);
         Assert.Equal("CHAR_1", payment.ExternalPaymentId);
         Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
+        Assert.Equal(1, fixture.LookupCalls);
         Assert.False(fixture.TransactionObservedDuringLookup);
     }
 
     [Theory]
+    [InlineData("AUTHORIZED", "CREDIT_CARD", PaymentStatus.Pending)]
+    [InlineData("IN_ANALYSIS", "CREDIT_CARD", PaymentStatus.Pending)]
     [InlineData("WAITING", "BOLETO", PaymentStatus.Pending)]
     [InlineData("DECLINED", "PIX", PaymentStatus.Rejected)]
     [InlineData("CANCELED", "PIX", PaymentStatus.Cancelled)]
-    public async Task MapsNonSettledCheckoutStatuses(
+    public async Task MapsVerifiedChargeStatus(
         string providerStatus,
         string providerMethod,
         PaymentStatus expectedStatus)
@@ -48,277 +49,108 @@ public class PagBankPaymentReconciliationServiceTests
 
         await fixture.Reconcile();
 
-        var payment = await fixture.Payment();
-        Assert.Equal(expectedStatus, payment.Status);
-        Assert.Equal("CHAR_1", payment.ExternalPaymentId);
+        Assert.Equal(expectedStatus, (await fixture.Payment()).Status);
         Assert.Equal(OrderStatus.PendingPayment, await fixture.GetOrderStatus());
     }
 
-    [Theory]
-    [InlineData("DECLINED")]
-    [InlineData("CANCELED")]
-    [InlineData("WAITING")]
-    public async Task PaidChargeWinsOverEarlierAttempt(string earlierStatus)
-    {
-        using var fixture = new Fixture
-        {
-            Charges =
-            [
-                new ChargeSpec("CHAR_OLD", earlierStatus, "PIX"),
-                new ChargeSpec("CHAR_PAID", "PAID", "CREDIT_CARD")
-            ]
-        };
-
-        await fixture.Reconcile();
-
-        var payment = await fixture.Payment();
-        Assert.Equal(PaymentStatus.Approved, payment.Status);
-        Assert.Equal(PaymentMethod.CreditCard, payment.Method);
-        Assert.Equal("CHAR_PAID", payment.ExternalPaymentId);
-        Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
-    }
-
     [Fact]
-    public async Task MultiplePaidChargesRemainAmbiguous()
+    public async Task MissingExternalPaymentIdReturnsLocalStateWithoutCallingProvider()
     {
-        using var fixture = new Fixture
-        {
-            Charges =
-            [
-                new ChargeSpec("CHAR_PAID_1", "PAID", "CREDIT_CARD"),
-                new ChargeSpec("CHAR_PAID_2", "PAID", "CREDIT_CARD")
-            ]
-        };
+        using var fixture = new Fixture(setExternalPaymentId: false);
 
         await fixture.Reconcile();
 
-        await fixture.AssertUnchanged();
-    }
-
-    [Fact]
-    public async Task MultiplePendingChargesRemainAmbiguous()
-    {
-        using var fixture = new Fixture
-        {
-            Charges =
-            [
-                new ChargeSpec("CHAR_WAITING", "WAITING", "PIX"),
-                new ChargeSpec("CHAR_ANALYSIS", "IN_ANALYSIS", "CREDIT_CARD")
-            ]
-        };
-
-        await fixture.Reconcile();
-
-        await fixture.AssertUnchanged();
-    }
-
-    [Fact]
-    public async Task MultipleTerminalChargesRemainAmbiguous()
-    {
-        using var fixture = new Fixture
-        {
-            Charges =
-            [
-                new ChargeSpec("CHAR_DECLINED", "DECLINED", "CREDIT_CARD"),
-                new ChargeSpec("CHAR_CANCELED", "CANCELED", "CREDIT_CARD")
-            ]
-        };
-
-        await fixture.Reconcile();
-
-        await fixture.AssertUnchanged();
-    }
-
-    [Fact]
-    public async Task ExistingExternalPaymentIdSelectsExactCharge()
-    {
-        using var fixture = new Fixture
-        {
-            Charges =
-            [
-                new ChargeSpec("CHAR_OLD", "DECLINED", "CREDIT_CARD"),
-                new ChargeSpec("CHAR_BOUND", "PAID", "CREDIT_CARD")
-            ]
-        };
-        await fixture.SetExternalPaymentId("CHAR_BOUND");
-
-        await fixture.Reconcile();
-
-        var payment = await fixture.Payment();
-        Assert.Equal(PaymentStatus.Approved, payment.Status);
-        Assert.Equal(PaymentMethod.CreditCard, payment.Method);
-        Assert.Equal("CHAR_BOUND", payment.ExternalPaymentId);
+        Assert.Equal(0, fixture.LookupCalls);
+        await fixture.AssertPending();
     }
 
     [Theory]
-    [InlineData("reference")]
-    [InlineData("amount")]
-    [InlineData("currency")]
-    public async Task InvalidChargeDoesNotBlockSingleStrongPaidCandidate(string mismatch)
+    [InlineData(PaymentStatus.Rejected)]
+    [InlineData(PaymentStatus.Cancelled)]
+    [InlineData(PaymentStatus.Refunded)]
+    [InlineData(PaymentStatus.ChargedBack)]
+    public async Task FinalPaymentDoesNotCallProvider(PaymentStatus status)
     {
         using var fixture = new Fixture();
-        fixture.Charges =
-        [
-            new ChargeSpec(
-                "CHAR_INVALID",
-                "PAID",
-                "CREDIT_CARD",
-                mismatch == "amount" ? 100 : null,
-                mismatch == "currency" ? "USD" : null,
-                mismatch == "reference" ? "payment:999" : null
-            ),
-            new ChargeSpec("CHAR_VALID", "PAID", "CREDIT_CARD")
-        ];
+        await fixture.SetStatus(status);
 
         await fixture.Reconcile();
 
-        var payment = await fixture.Payment();
-        Assert.Equal(PaymentStatus.Approved, payment.Status);
-        Assert.Equal("CHAR_VALID", payment.ExternalPaymentId);
+        Assert.Equal(0, fixture.LookupCalls);
     }
 
-    [Fact]
-    public async Task ApprovedPagBankPaymentDoesNotCallProvider()
+    [Theory]
+    [InlineData(1000, PaymentStatus.PartiallyRefunded)]
+    [InlineData(4390, PaymentStatus.Refunded)]
+    public async Task ApprovedPaymentCanReconcileRefund(int refunded, PaymentStatus expected)
     {
-        using var fixture = new Fixture();
+        using var fixture = new Fixture { RefundedInCents = refunded };
         await fixture.ApproveLocally();
 
         await fixture.Reconcile();
 
-        Assert.Equal(0, fixture.LookupCalls);
-    }
-
-    [Fact]
-    public async Task MercadoPagoPaymentDoesNotCallPagBank()
-    {
-        using var fixture = new Fixture(PaymentProvider.MercadoPago);
-
-        await fixture.Reconcile();
-
-        Assert.Equal(0, fixture.LookupCalls);
-        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
-    }
-
-    [Fact]
-    public async Task MissingExternalCheckoutIdDoesNotCallProvider()
-    {
-        using var fixture = new Fixture(setCheckoutId: false);
-
-        await fixture.Reconcile();
-
-        Assert.Equal(0, fixture.LookupCalls);
-        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+        Assert.Equal(expected, (await fixture.Payment()).Status);
+        Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
     }
 
     [Theory]
-    [InlineData("checkout-id")]
-    [InlineData("checkout-reference")]
-    [InlineData("charge-reference")]
+    [InlineData("id")]
+    [InlineData("reference")]
     [InlineData("amount")]
     [InlineData("currency")]
-    [InlineData("missing-charge")]
-    [InlineData("duplicate-charge")]
     public async Task CorrelationMismatchDoesNotUpdate(string mismatch)
     {
         using var fixture = new Fixture();
-        if (mismatch == "checkout-id") fixture.ResponseCheckoutId = "CHEC_other";
-        if (mismatch == "checkout-reference") fixture.CheckoutReference = "payment:999";
-        if (mismatch == "charge-reference") fixture.ChargeReference = "payment:999";
+        if (mismatch == "id") fixture.ResponseChargeId = "CHAR_other";
+        if (mismatch == "reference") fixture.ChargeReference = "payment:999";
         if (mismatch == "amount") fixture.AmountInCents = 100;
         if (mismatch == "currency") fixture.Currency = "USD";
-        if (mismatch == "missing-charge") fixture.ChargeCount = 0;
-        if (mismatch == "duplicate-charge") fixture.ChargeCount = 2;
 
         await fixture.Reconcile();
 
-        await fixture.AssertUnchanged();
-    }
-
-    [Fact]
-    public async Task ExistingDifferentExternalPaymentIdIsNeverReplaced()
-    {
-        using var fixture = new Fixture();
-        await fixture.SetExternalPaymentId("CHAR_old");
-
-        await fixture.Reconcile();
-
-        var payment = await fixture.Payment();
-        Assert.Equal("CHAR_old", payment.ExternalPaymentId);
-        Assert.Equal(PaymentStatus.Pending, payment.Status);
-        Assert.Equal(PaymentMethod.Unknown, payment.Method);
-    }
-
-    [Fact]
-    public async Task UnknownProviderStatusDoesNotUpdate()
-    {
-        using var fixture = new Fixture { ProviderStatus = "UNKNOWN" };
-
-        await fixture.Reconcile();
-
-        await fixture.AssertUnchanged();
+        await fixture.AssertPending();
     }
 
     [Fact]
     public async Task UnknownMethodOnPaidChargeDoesNotApprove()
     {
-        using var fixture = new Fixture
-        {
-            ProviderStatus = "PAID",
-            ProviderMethod = "BOLETO"
-        };
+        using var fixture = new Fixture { ProviderMethod = "BOLETO" };
 
         await fixture.Reconcile();
 
-        await fixture.AssertUnchanged();
+        await fixture.AssertPending();
     }
 
-    [Fact]
-    public async Task ProviderErrorKeepsLocalState()
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task ProviderFailureKeepsLocalState(HttpStatusCode status)
     {
-        using var fixture = new Fixture { ResponseStatus = HttpStatusCode.InternalServerError };
+        using var fixture = new Fixture { ResponseStatus = status };
 
         await fixture.Reconcile();
 
-        await fixture.AssertUnchanged();
+        await fixture.AssertPending();
     }
 
     [Fact]
-    public async Task ProviderTimeoutKeepsLocalState()
+    public async Task TimeoutKeepsLocalState()
     {
         using var fixture = new Fixture { Timeout = true };
 
         await fixture.Reconcile();
 
-        await fixture.AssertUnchanged();
+        await fixture.AssertPending();
     }
 
     [Fact]
-    public async Task WebhookUpdateBeforeFallbackMakesFallbackANoOp()
+    public async Task InvalidJsonKeepsLocalState()
     {
-        using var fixture = new Fixture();
-        await fixture.ApproveLocally();
-        var updatedAt = (await fixture.Payment()).UpdatedAt;
+        using var fixture = new Fixture { InvalidJson = true };
 
         await fixture.Reconcile();
 
-        Assert.Equal(0, fixture.LookupCalls);
-        Assert.Equal(updatedAt, (await fixture.Payment()).UpdatedAt);
-        Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
-    }
-
-    [Fact]
-    public async Task WebhookAfterFallbackIsIdempotent()
-    {
-        using var fixture = new Fixture();
-        await fixture.Reconcile();
-        var updatedAt = (await fixture.Payment()).UpdatedAt;
-
-        Assert.False(await fixture.SynchronizeLikeWebhook());
-
-        var payment = await fixture.Payment();
-        Assert.Equal(PaymentStatus.Approved, payment.Status);
-        Assert.Equal(updatedAt, payment.UpdatedAt);
-        Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
+        await fixture.AssertPending();
     }
 
     [Fact]
@@ -329,11 +161,11 @@ public class PagBankPaymentReconciliationServiceTests
 
         await fixture.Reconcile();
 
-        await fixture.AssertUnchanged();
+        await fixture.AssertPending();
     }
 
     [Fact]
-    public async Task ConcurrentFallbacksLeaveOneConsistentResult()
+    public async Task ConcurrentReconciliationsLeaveOneConsistentResult()
     {
         using var fixture = new Fixture();
 
@@ -346,20 +178,11 @@ public class PagBankPaymentReconciliationServiceTests
         Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
     }
 
-    private sealed record ChargeSpec(
-        string Id,
-        string Status,
-        string Method,
-        int? AmountInCents = null,
-        string? Currency = null,
-        string? Reference = null
-    );
-
     private sealed class Fixture : IDisposable
     {
         private readonly string _path = Path.Combine(
             Path.GetTempPath(),
-            $"burger-pagbank-reconciliation-{Guid.NewGuid()}.db"
+            $"burger-pagbank-charge-reconciliation-{Guid.NewGuid()}.db"
         );
         private readonly IOptions<PagBankOptions> _options = Options.Create(new PagBankOptions
         {
@@ -371,20 +194,17 @@ public class PagBankPaymentReconciliationServiceTests
         public int LookupCalls;
         public bool TransactionObservedDuringLookup;
         public bool Timeout;
+        public bool InvalidJson;
         public HttpStatusCode ResponseStatus = HttpStatusCode.OK;
-        public string ResponseCheckoutId = "CHEC_1";
-        public string CheckoutReference { get; set; }
+        public string ResponseChargeId = "CHAR_1";
         public string ChargeReference { get; set; }
         public string ProviderStatus = "PAID";
         public string ProviderMethod = "CREDIT_CARD";
         public string Currency = "BRL";
         public int AmountInCents = 4390;
-        public int ChargeCount = 1;
-        public ChargeSpec[]? Charges;
+        public int RefundedInCents;
 
-        public Fixture(
-            PaymentProvider provider = PaymentProvider.PagBank,
-            bool setCheckoutId = true)
+        public Fixture(bool setExternalPaymentId = true)
         {
             using var db = Open();
             db.Database.EnsureCreated();
@@ -392,25 +212,19 @@ public class PagBankPaymentReconciliationServiceTests
             order.AddItem(new OrderItem(1, 1, 43.90m));
             db.Orders.Add(order);
             db.SaveChanges();
-
             var payment = new Payment(
                 order.Id,
                 order.Total,
                 Guid.NewGuid().ToString("D"),
-                PaymentMethod.Unknown,
-                provider
+                PaymentMethod.Unknown
             );
+            payment.SetExternalCheckoutId("CHEC_1");
+            if (setExternalPaymentId)
+                payment.SetExternalPaymentId("CHAR_1");
             db.Payments.Add(payment);
             db.SaveChanges();
-            if (provider == PaymentProvider.PagBank && setCheckoutId)
-                payment.SetExternalCheckoutId("CHEC_1");
-            if (provider == PaymentProvider.MercadoPago)
-                payment.SetExternalPreferenceId("PREF_1");
-            db.SaveChanges();
-
             PaymentId = payment.Id;
-            CheckoutReference = $"payment:{PaymentId}";
-            ChargeReference = CheckoutReference;
+            ChargeReference = $"payment:{PaymentId}";
         }
 
         public BurgerHouseDbContext Open() => new(
@@ -428,45 +242,31 @@ public class PagBankPaymentReconciliationServiceTests
                 TransactionObservedDuringLookup = db.Database.CurrentTransaction is not null;
                 if (Timeout)
                     throw new TaskCanceledException("simulated timeout");
-
-                var chargeDefinitions = Charges ?? Enumerable.Range(0, ChargeCount)
-                    .Select(index => new ChargeSpec(
-                        index == 0 ? "CHAR_1" : $"CHAR_{index + 1}",
-                        ProviderStatus,
-                        ProviderMethod
-                    ))
-                    .ToArray();
-                var charges = chargeDefinitions
-                    .Select(charge => new
-                    {
-                        id = charge.Id,
-                        reference_id = charge.Reference ?? ChargeReference,
-                        status = charge.Status,
-                        amount = new
-                        {
-                            value = charge.AmountInCents ?? AmountInCents,
-                            currency = charge.Currency ?? Currency,
-                            summary = new
-                            {
-                                total = charge.AmountInCents ?? AmountInCents,
-                                refunded = 0
-                            }
-                        },
-                        payment_method = new { type = charge.Method }
-                    })
-                    .ToArray();
                 return Task.FromResult(new HttpResponseMessage(ResponseStatus)
                 {
-                    Content = new StringContent(JsonSerializer.Serialize(new
-                    {
-                        id = ResponseCheckoutId,
-                        reference_id = CheckoutReference,
-                        charges
-                    }))
+                    Content = new StringContent(InvalidJson
+                        ? "not-json"
+                        : JsonSerializer.Serialize(new
+                        {
+                            id = ResponseChargeId,
+                            reference_id = ChargeReference,
+                            status = ProviderStatus,
+                            amount = new
+                            {
+                                value = AmountInCents,
+                                currency = Currency,
+                                summary = new
+                                {
+                                    total = AmountInCents,
+                                    refunded = RefundedInCents
+                                }
+                            },
+                            payment_method = new { type = ProviderMethod }
+                        }))
                 });
             }));
             var service = new PagBankPaymentReconciliationService(
-                new PagBankCheckoutLookup(http, _options),
+                new PagBankPaymentLookup(http, _options),
                 new SynchronizeCheckoutPaymentHandler(
                     new PaymentRepository(db),
                     new OrderRepository(db)
@@ -490,21 +290,12 @@ public class PagBankPaymentReconciliationServiceTests
             return (await db.Orders.SingleAsync()).Status;
         }
 
-        public async Task AssertUnchanged()
+        public async Task AssertPending()
         {
             var payment = await Payment();
             Assert.Equal(PaymentStatus.Pending, payment.Status);
             Assert.Equal(PaymentMethod.Unknown, payment.Method);
-            Assert.Null(payment.ExternalPaymentId);
             Assert.Equal(OrderStatus.PendingPayment, await GetOrderStatus());
-        }
-
-        public async Task SetExternalPaymentId(string id)
-        {
-            await using var db = Open();
-            var payment = await db.Payments.SingleAsync(item => item.Id == PaymentId);
-            payment.SetExternalPaymentId(id);
-            await db.SaveChangesAsync();
         }
 
         public async Task ApproveLocally()
@@ -513,28 +304,25 @@ public class PagBankPaymentReconciliationServiceTests
             var payment = await db.Payments.SingleAsync(item => item.Id == PaymentId);
             var order = await db.Orders.Include(item => item.Items).SingleAsync();
             payment.SetMethod(PaymentMethod.CreditCard);
-            payment.SetExternalPaymentId("CHAR_1");
             payment.Approve();
             order.MarkAsReceived();
             await db.SaveChangesAsync();
         }
 
-        public async Task<bool> SynchronizeLikeWebhook()
+        public async Task SetStatus(PaymentStatus status)
         {
+            if (status is PaymentStatus.Refunded or PaymentStatus.ChargedBack)
+            {
+                await ApproveLocally();
+            }
+
             await using var db = Open();
-            var handler = new SynchronizeCheckoutPaymentHandler(
-                new PaymentRepository(db),
-                new OrderRepository(db)
-            );
-            return await handler.HandleAsync(
-                PaymentId,
-                PaymentProvider.PagBank,
-                "CHAR_1",
-                43.90m,
-                "BRL",
-                PaymentMethod.CreditCard,
-                BurgerHouse.Application.Abstractions.Payments.PaymentGatewayStatus.Approved
-            );
+            var payment = await db.Payments.SingleAsync(item => item.Id == PaymentId);
+            if (status == PaymentStatus.Rejected) payment.Reject();
+            if (status == PaymentStatus.Cancelled) payment.Cancel();
+            if (status == PaymentStatus.Refunded) payment.Refund();
+            if (status == PaymentStatus.ChargedBack) payment.ChargeBack();
+            await db.SaveChangesAsync();
         }
 
         public async Task AddFailingOrderTrigger()
@@ -546,10 +334,7 @@ public class PagBankPaymentReconciliationServiceTests
             );
         }
 
-        public void Dispose()
-        {
-            File.Delete(_path);
-        }
+        public void Dispose() => File.Delete(_path);
 
         private sealed class Stub(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler
         {

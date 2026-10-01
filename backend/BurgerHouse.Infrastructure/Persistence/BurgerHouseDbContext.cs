@@ -219,9 +219,6 @@ public class BurgerHouseDbContext : DbContext
             entity.Property(payment => payment.Method)
                 .IsRequired();
 
-            entity.Property(payment => payment.Provider)
-                .IsRequired();
-
             entity.Property(payment => payment.IdempotencyKey)
                 .IsRequired()
                 .HasMaxLength(36);
@@ -232,20 +229,10 @@ public class BurgerHouseDbContext : DbContext
             entity.Property(payment => payment.ExternalPaymentId)
                 .HasMaxLength(100);
 
-            entity.Property(payment => payment.ExternalPreferenceId)
-                .HasMaxLength(100);
-
             entity.Property(payment => payment.ExternalCheckoutId)
                 .HasMaxLength(100);
 
-            entity.HasIndex(payment => payment.ExternalPreferenceId)
-                .IsUnique();
-
-            entity.HasIndex(payment => new
-                {
-                    payment.Provider,
-                    payment.ExternalCheckoutId
-                })
+            entity.HasIndex(payment => payment.ExternalCheckoutId)
                 .IsUnique();
 
             entity.HasIndex(payment => payment.ExternalPaymentId)

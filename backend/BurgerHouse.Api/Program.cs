@@ -6,7 +6,6 @@ using BurgerHouse.Application.Orders.CreateOrder;
 using BurgerHouse.Application.Payments.GetPaymentStatus;
 using BurgerHouse.Application.Payments.PrepareCheckoutPayment;
 
-using BurgerHouse.Infrastructure.Payments.MercadoPago;
 using BurgerHouse.Infrastructure.Payments.PagBank;
 using BurgerHouse.Infrastructure.Persistence;
 using BurgerHouse.Infrastructure.Repositories;
@@ -76,39 +75,6 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services
-    .AddOptions<MercadoPagoOptions>()
-    .Bind(
-        builder.Configuration
-            .GetSection(
-                MercadoPagoOptions.SectionName
-            )
-    )
-    .Validate(
-        options =>
-            !string.IsNullOrWhiteSpace(
-                options.AccessToken
-            ),
-        "Mercado Pago access token was not configured."
-    )
-    .Validate(
-        options =>
-            !string.Equals(
-                options.AccessToken.Trim(),
-                "SEU_ACCESS_TOKEN",
-                StringComparison.OrdinalIgnoreCase
-            ),
-        "Mercado Pago access token is still using the placeholder value."
-    )
-    .Validate(
-        options =>
-            !string.IsNullOrWhiteSpace(
-                options.WebhookSecret
-            ),
-        "Mercado Pago webhook secret was not configured."
-    )
-    .ValidateOnStart();
-
-builder.Services
     .AddOptions<PagBankOptions>()
     .Bind(builder.Configuration.GetSection(PagBankOptions.SectionName))
     .Validate(options =>
@@ -153,20 +119,7 @@ builder.Services.AddScoped<
     PagBankPaymentReconciliationService>();
 
 builder.Services.AddScoped<
-    MercadoPagoWebhookSignatureValidator>();
-
-builder.Services.AddHttpClient<MercadoPagoPreferenceService>(
-    client =>
-        client.Timeout = TimeSpan.FromSeconds(15)
-);
-
-builder.Services.AddScoped<
     SynchronizeCheckoutPaymentHandler>();
-
-builder.Services.AddHttpClient<MercadoPagoPaymentLookup>(
-    client =>
-        client.Timeout = TimeSpan.FromSeconds(15)
-);
 
 builder.Services.AddHttpClient<PagBankCheckoutService>(
     client => client.Timeout = TimeSpan.FromSeconds(15)
@@ -177,10 +130,6 @@ builder.Services.AddScoped<IHostedCheckoutGateway>(provider =>
 );
 
 builder.Services.AddHttpClient<PagBankPaymentLookup>(
-    client => client.Timeout = TimeSpan.FromSeconds(15)
-);
-
-builder.Services.AddHttpClient<PagBankCheckoutLookup>(
     client => client.Timeout = TimeSpan.FromSeconds(15)
 );
 

@@ -39,6 +39,7 @@ public class PagBankWebhooksControllerTests
 
     [Theory]
     [InlineData("AUTHORIZED", PaymentStatus.Pending, OrderStatus.PendingPayment)]
+    [InlineData("IN_ANALYSIS", PaymentStatus.Pending, OrderStatus.PendingPayment)]
     [InlineData("WAITING", PaymentStatus.Pending, OrderStatus.PendingPayment)]
     [InlineData("DECLINED", PaymentStatus.Rejected, OrderStatus.PendingPayment)]
     [InlineData("CANCELED", PaymentStatus.Cancelled, OrderStatus.PendingPayment)]
@@ -87,6 +88,81 @@ public class PagBankWebhooksControllerTests
 
         Assert.Equal(0, fixture.LookupCalls);
         Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+    }
+
+    [Fact]
+    public async Task SelectsSinglePaidChargeFromMultipleAttempts()
+    {
+        using var fixture = new Fixture
+        {
+            LookupChargeId = "CHAR_paid",
+            WebhookCharges =
+            [
+                new("CHAR_declined", "DECLINED"),
+                new("CHAR_paid", "PAID")
+            ]
+        };
+
+        Assert.True(Synchronized(await fixture.Receive()));
+
+        var payment = await fixture.Payment();
+        Assert.Equal("CHAR_paid", payment.ExternalPaymentId);
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.Equal(OrderStatus.Received, await fixture.OrderStatus());
+    }
+
+    [Fact]
+    public async Task RejectsTwoValidPaidChargesAsAmbiguous()
+    {
+        using var fixture = new Fixture
+        {
+            WebhookCharges =
+            [
+                new("CHAR_paid_1", "PAID"),
+                new("CHAR_paid_2", "PAID")
+            ]
+        };
+
+        Assert.IsType<ConflictObjectResult>(await fixture.Receive());
+
+        Assert.Equal(0, fixture.LookupCalls);
+        Assert.Null((await fixture.Payment()).ExternalPaymentId);
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+    }
+
+    [Fact]
+    public async Task ExistingExternalPaymentIdSelectsOnlyExactCharge()
+    {
+        using var fixture = new Fixture
+        {
+            ChargeStatus = "WAITING",
+            LookupChargeId = "CHAR_bound",
+            WebhookCharges =
+            [
+                new("CHAR_other", "PAID"),
+                new("CHAR_bound", "WAITING")
+            ]
+        };
+        await fixture.SetExternalPaymentId("CHAR_bound");
+
+        Assert.IsType<OkObjectResult>(await fixture.Receive());
+
+        var payment = await fixture.Payment();
+        Assert.Equal("CHAR_bound", payment.ExternalPaymentId);
+        Assert.Equal(PaymentStatus.Pending, payment.Status);
+        Assert.Equal(1, fixture.LookupCalls);
+    }
+
+    [Fact]
+    public async Task RejectsUnknownMethodForPaidChargeWithoutLookup()
+    {
+        using var fixture = new Fixture { PaymentMethodType = "BOLETO" };
+
+        Assert.IsType<ConflictObjectResult>(await fixture.Receive());
+
+        Assert.Equal(0, fixture.LookupCalls);
+        Assert.Null((await fixture.Payment()).ExternalPaymentId);
+        Assert.Equal(PaymentMethod.Unknown, (await fixture.Payment()).Method);
     }
 
     [Fact]
@@ -188,6 +264,9 @@ public class PagBankWebhooksControllerTests
         public string WebhookResourceId = "ORDE_1";
         public string Currency = "BRL";
         public int AmountInCents = 4390;
+        public string PaymentMethodType = "PIX";
+        public string LookupChargeId = "CHAR_1";
+        public ChargeSpec[]? WebhookCharges;
         public HttpStatusCode LookupStatus = HttpStatusCode.OK;
         public bool InvalidLookupJson;
         public int LookupCalls;
@@ -205,8 +284,7 @@ public class PagBankWebhooksControllerTests
                 order.Id,
                 order.Total,
                 Guid.NewGuid().ToString("D"),
-                PaymentMethod.Unknown,
-                PaymentProvider.PagBank);
+                PaymentMethod.Unknown);
             payment.SetExternalCheckoutId("CHEC_1");
             db.Payments.Add(payment);
             db.SaveChanges();
@@ -240,7 +318,7 @@ public class PagBankWebhooksControllerTests
                         ? "not-json"
                         : JsonSerializer.Serialize(new
                         {
-                            id = "CHAR_1",
+                            id = LookupChargeId,
                             reference_id = ChargeReference,
                             status = ChargeStatus,
                             amount = new
@@ -249,7 +327,7 @@ public class PagBankWebhooksControllerTests
                                 currency = Currency,
                                 summary = new { total = AmountInCents, refunded = 0 }
                             },
-                            payment_method = new { type = "PIX" }
+                            payment_method = new { type = PaymentMethodType }
                         }))
                 });
             }));
@@ -264,11 +342,28 @@ public class PagBankWebhooksControllerTests
                 new SynchronizeCheckoutPaymentHandler(new PaymentRepository(db), new OrderRepository(db)),
                 db,
                 NullLogger<PagBankWebhooksController>.Instance);
+            var charges = WebhookCharges ?? [new ChargeSpec("CHAR_1", ChargeStatus)];
             var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
             {
                 id = WebhookResourceId,
                 reference_id = WebhookReference,
-                charges = new[] { new { id = "CHAR_1" } }
+                charges = charges.Select(charge => new
+                {
+                    id = charge.Id,
+                    reference_id = charge.Reference ?? ChargeReference,
+                    status = charge.Status,
+                    amount = new
+                    {
+                        value = charge.AmountInCents ?? AmountInCents,
+                        currency = charge.Currency ?? Currency,
+                        summary = new
+                        {
+                            total = charge.AmountInCents ?? AmountInCents,
+                            refunded = 0
+                        }
+                    },
+                    payment_method = new { type = charge.Method ?? PaymentMethodType }
+                })
             }));
             var signature = Convert.ToBase64String(_signer.SignData(
                 body,
@@ -320,6 +415,14 @@ public class PagBankWebhooksControllerTests
             _signer.Dispose();
             File.Delete(_path);
         }
+
+        public sealed record ChargeSpec(
+            string Id,
+            string Status,
+            string? Reference = null,
+            int? AmountInCents = null,
+            string? Currency = null,
+            string? Method = null);
 
         private sealed class Stub(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler
         {

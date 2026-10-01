@@ -52,28 +52,15 @@ public class CheckoutPaymentTests
     }
 
     [Fact]
-    public void HostedCheckoutIdentityIsProviderSpecificAndImmutable()
+    public void HostedCheckoutIdentityIsImmutable()
     {
-        var mercadoPago = Create();
-        mercadoPago.SetExternalPreferenceId("pref-1");
-        Assert.True(mercadoPago.HasHostedCheckout());
-        Assert.Throws<InvalidOperationException>(() => mercadoPago.SetExternalCheckoutId("CHEC_1"));
+        var payment = Create();
+        payment.SetExternalCheckoutId("CHEC_1");
+        payment.SetExternalCheckoutId("CHEC_1");
 
-        var pagBank = new Payment(
-            1,
-            43.90m,
-            Guid.NewGuid().ToString("D"),
-            PaymentMethod.Unknown,
-            PaymentProvider.PagBank
-        );
-        pagBank.SetExternalCheckoutId("CHEC_1");
-        pagBank.SetExternalCheckoutId("CHEC_1");
-
-        Assert.True(pagBank.HasHostedCheckout());
-        Assert.Equal("CHEC_1", pagBank.ExternalCheckoutId);
-        Assert.Null(pagBank.ExternalPreferenceId);
-        Assert.Throws<InvalidOperationException>(() => pagBank.SetExternalCheckoutId("CHEC_2"));
-        Assert.Throws<InvalidOperationException>(() => pagBank.SetExternalPreferenceId("pref-2"));
+        Assert.True(payment.HasHostedCheckout());
+        Assert.Equal("CHEC_1", payment.ExternalCheckoutId);
+        Assert.Throws<InvalidOperationException>(() => payment.SetExternalCheckoutId("CHEC_2"));
     }
 
     [Fact]

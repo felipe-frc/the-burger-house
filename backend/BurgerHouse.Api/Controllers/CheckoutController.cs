@@ -26,7 +26,6 @@ public sealed class CheckoutController(
             {
                 var prepared = await prepareCheckoutPaymentHandler.HandleAsync(
                     orderId,
-                    hostedCheckoutGateway.Provider,
                     cancellationToken
                 );
                 paymentId = prepared.Id;
@@ -44,8 +43,7 @@ public sealed class CheckoutController(
             return Ok(new
             {
                 paymentId = payment.Id,
-                checkoutUrl = checkout.CheckoutUrl,
-                initPoint = checkout.CheckoutUrl
+                checkoutUrl = checkout.CheckoutUrl
             });
         }
         catch (KeyNotFoundException) { return NotFound(new { error = "Order was not found." }); }

@@ -7,20 +7,13 @@ namespace BurgerHouse.Application.Payments.SynchronizeCheckoutPayment;
 public sealed class SynchronizeCheckoutPaymentHandler(IPaymentRepository payments, IOrderRepository orders)
 {
     public async Task<bool> HandleAsync(int paymentId, string externalPaymentId, decimal amount,
-        string? currency, PaymentMethod method, PaymentGatewayStatus status, CancellationToken ct = default) =>
-        await HandleAsync(paymentId, PaymentProvider.MercadoPago, externalPaymentId, amount,
-            currency, method, status, ct);
-
-    public async Task<bool> HandleAsync(int paymentId, PaymentProvider provider,
-        string externalPaymentId, decimal amount, string? currency, PaymentMethod method,
+        string? currency, PaymentMethod method,
         PaymentGatewayStatus status, CancellationToken ct = default)
     {
         var payment = await payments.GetByIdAsync(paymentId, ct)
             ?? throw new KeyNotFoundException("Local payment was not found.");
         var order = await orders.GetByIdAsync(payment.OrderId, ct)
             ?? throw new KeyNotFoundException("Payment order was not found.");
-        if (payment.Provider != provider)
-            throw new InvalidOperationException("Payment provider does not match the notification provider.");
         if (!payment.HasHostedCheckout())
             throw new InvalidOperationException("Payment is not linked to a hosted checkout.");
         if (amount != payment.Amount || amount != order.Total || currency != "BRL")
