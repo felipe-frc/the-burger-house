@@ -6,6 +6,8 @@ public sealed class PagBankOptions
 
     public string BaseUrl { get; init; } = string.Empty;
 
+    public bool AllowUnsignedSandboxWebhooks { get; init; } = false;
+
     public string Token { get; init; } = string.Empty;
 
     public string RedirectUrl { get; init; } = string.Empty;

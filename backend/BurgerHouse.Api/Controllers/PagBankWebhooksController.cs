@@ -10,6 +10,7 @@ using BurgerHouse.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace BurgerHouse.Api.Controllers;
 
@@ -20,7 +21,8 @@ public sealed class PagBankWebhooksController(
     PagBankPaymentLookup paymentLookup,
     SynchronizeCheckoutPaymentHandler synchronizer,
     BurgerHouseDbContext dbContext,
-    ILogger<PagBankWebhooksController>? logger = null) : ControllerBase
+    ILogger<PagBankWebhooksController>? logger = null,
+    IOptions<PagBankOptions>? pagBankOptions = null) : ControllerBase
 {
     private const int MaximumPayloadBytes = 256 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -35,7 +37,19 @@ public sealed class PagBankWebhooksController(
             var signatures = Request.Headers["x-payload-signature"].ToArray();
             try
             {
-                if (!await signatureValidator.IsValidAsync(rawBody, signatures, ct))
+                // An explicitly configured Sandbox endpoint permits this opt-in on hosted
+                // test environments too. A present (even empty) header never bypasses validation.
+                var options = pagBankOptions?.Value;
+                var allowUnsigned = !Request.Headers.ContainsKey("x-payload-signature") &&
+                    signatures.Length == 0 &&
+                    options?.AllowUnsignedSandboxWebhooks == true &&
+                    (string.Equals(options.BaseUrl, "https://sandbox.api.pagseguro.com/", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(options.BaseUrl, "https://sandbox.api.pagseguro.com", StringComparison.OrdinalIgnoreCase));
+                if (allowUnsigned)
+                {
+                    logger?.LogWarning("PagBank unsigned sandbox webhook accepted by explicit development override.");
+                }
+                else if (!await signatureValidator.IsValidAsync(rawBody, signatures, ct))
                 {
                     logger?.LogWarning("PagBank webhook signature validation failed.");
                     return Unauthorized(new { error = "Invalid webhook signature." });

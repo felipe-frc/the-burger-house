@@ -12,7 +12,7 @@ using BurgerHouse.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace BurgerHouse.Api.Tests;
@@ -269,6 +269,85 @@ public class PagBankWebhooksControllerTests
         Assert.IsType<OkObjectResult>(await fixture.Receive());
     }
 
+    [Fact]
+    public void UnsignedSandboxOverrideDefaultsToDisabled()
+    {
+        Assert.False(new PagBankOptions().AllowUnsignedSandboxWebhooks);
+    }
+
+    [Theory]
+    [InlineData("https://sandbox.api.pagseguro.com", false, "missing", false, false)]
+    [InlineData("https://sandbox.api.pagseguro.com", true, "missing", true, true)]
+    [InlineData("https://sandbox.api.pagseguro.com/", true, "missing", true, true)]
+    [InlineData("https://sandbox.api.pagseguro.com", true, "invalid", false, false)]
+    [InlineData("https://sandbox.api.pagseguro.com", true, "empty", false, false)]
+    [InlineData("https://sandbox.api.pagseguro.com", true, "whitespace", false, false)]
+    [InlineData("https://api.pagseguro.com", true, "missing", false, false)]
+    [InlineData("https://api.pagseguro.com", true, "valid", true, false)]
+    [InlineData("https://sandbox.api.pagseguro.com", true, "valid", true, false)]
+    [InlineData("https://sandbox.api.pagseguro.com", false, "valid", true, false)]
+    [InlineData("https://sandbox.api.pagseguro.com.example.com", true, "missing", false, false)]
+    [InlineData("https://sandbox.api.pagseguro.com/path", true, "missing", false, false)]
+    [InlineData("https://sandbox.api.pagseguro.com/?test=1", true, "missing", false, false)]
+    [InlineData("https://sandbox.api.pagseguro.com/#test", true, "missing", false, false)]
+    [InlineData("https://sandbox.api.pagseguro.com:8443", true, "missing", false, false)]
+    public async Task UnsignedOverrideRequiresExplicitSandboxAndAbsentHeader(
+        string baseUrl, bool allowUnsigned, string header, bool accepted, bool overridden)
+    {
+        using var fixture = new Fixture
+        {
+            BaseUrl = baseUrl,
+            AllowUnsigned = allowUnsigned,
+            SignatureHeader = header
+        };
+        var result = await fixture.Receive();
+        if (accepted)
+        {
+            Assert.True(Synchronized(result));
+            Assert.Equal(1, fixture.LookupCalls);
+        }
+        else
+        {
+            Assert.IsType<UnauthorizedObjectResult>(result);
+            Assert.Equal(0, fixture.LookupCalls);
+            Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+        }
+        Assert.Equal(header == "valid" ? 1 : header == "invalid" ? 2 : 0, fixture.PublicKeyCalls);
+        var warnings = fixture.Logger.Entries.Where(entry =>
+            entry.Message == "PagBank unsigned sandbox webhook accepted by explicit development override.").ToArray();
+        Assert.Equal(overridden ? 1 : 0, warnings.Length);
+        Assert.All(warnings, entry =>
+        {
+            Assert.Equal(LogLevel.Warning, entry.Level);
+            Assert.Null(entry.Exception);
+        });
+    }
+
+    [Fact]
+    public async Task UnsignedOverrideStillRequiresSuccessfulProviderVerification()
+    {
+        using var fixture = new Fixture
+        {
+            AllowUnsigned = true,
+            SignatureHeader = "missing",
+            LookupStatus = HttpStatusCode.InternalServerError
+        };
+        Assert.Equal(502, Assert.IsType<ObjectResult>(await fixture.Receive()).StatusCode);
+        Assert.Equal(0, fixture.PublicKeyCalls);
+        Assert.Equal(1, fixture.LookupCalls);
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+    }
+
+    private sealed class CaptureLogger : ILogger<PagBankWebhooksController>
+    {
+        public System.Collections.Concurrent.ConcurrentQueue<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Entries.Enqueue((logLevel, formatter(state, exception), exception));
+    }
+
     private static bool Synchronized(IActionResult result)
     {
         var body = JsonSerializer.SerializeToElement(Assert.IsType<OkObjectResult>(result).Value);
@@ -295,6 +374,11 @@ public class PagBankWebhooksControllerTests
         public bool InvalidLookupJson;
         public string? PublicKeyFailure;
         public bool MultipleSignatures;
+        public string BaseUrl = "https://sandbox.api.pagseguro.com";
+        public bool AllowUnsigned;
+        public string? SignatureHeader;
+        public int PublicKeyCalls;
+        public CaptureLogger Logger { get; } = new();
         public int LookupCalls;
         public bool TransactionObservedDuringLookup;
 
@@ -329,6 +413,7 @@ public class PagBankWebhooksControllerTests
             await using var db = Open();
             using var signatureHttp = new HttpClient(new Stub(_ =>
             {
+                Interlocked.Increment(ref PublicKeyCalls);
                 if (PublicKeyFailure == "timeout") throw new TaskCanceledException();
                 if (int.TryParse(PublicKeyFailure, out var status))
                     return Task.FromResult(new HttpResponseMessage((HttpStatusCode)status));
@@ -371,7 +456,8 @@ public class PagBankWebhooksControllerTests
             }));
             var options = Options.Create(new PagBankOptions
             {
-                BaseUrl = "https://sandbox.api.pagseguro.com",
+                BaseUrl = BaseUrl,
+                AllowUnsignedSandboxWebhooks = AllowUnsigned,
                 Token = "local-test-token"
             });
             var controller = new PagBankWebhooksController(
@@ -379,7 +465,8 @@ public class PagBankWebhooksControllerTests
                 new PagBankPaymentLookup(lookupHttp, options),
                 new SynchronizeCheckoutPaymentHandler(new PaymentRepository(db), new OrderRepository(db)),
                 db,
-                NullLogger<PagBankWebhooksController>.Instance);
+                Logger,
+                options);
             var charges = WebhookCharges ?? [new ChargeSpec("CHAR_1", ChargeStatus)];
             var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
             {
@@ -412,6 +499,10 @@ public class PagBankWebhooksControllerTests
             context.Request.ContentLength = body.Length;
             context.Request.ContentType = "application/json";
             context.Request.Headers["x-payload-signature"] = validSignature ? signature : "invalid";
+            if (SignatureHeader == "missing") context.Request.Headers.Remove("x-payload-signature");
+            if (SignatureHeader == "invalid") context.Request.Headers["x-payload-signature"] = "invalid";
+            if (SignatureHeader == "empty") context.Request.Headers["x-payload-signature"] = "";
+            if (SignatureHeader == "whitespace") context.Request.Headers["x-payload-signature"] = " ";
             if (MultipleSignatures)
                 context.Request.Headers.Append("x-payload-signature", "invalid");
             controller.ControllerContext = new ControllerContext { HttpContext = context };
