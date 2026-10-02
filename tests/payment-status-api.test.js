@@ -74,6 +74,7 @@ it("preserves API error status and safe message for checkout retries", async () 
     name: "ApiError",
     status: 409,
     message: "Checkout unavailable",
+    data: { error: "Checkout unavailable" },
   });
   fetch.mockResolvedValue({ ok: false, status: 502, headers: { get: () => null } });
   await expect(createCheckout(99)).rejects.toMatchObject({

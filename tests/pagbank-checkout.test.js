@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createOrder: vi.fn(),
   createCheckout: vi.fn(),
@@ -10,7 +10,10 @@ const mocks = vi.hoisted(() => ({
   validAddress: true,
   orderType: "pickup",
 }));
-vi.mock("../scripts/api.js", () => mocks);
+vi.mock("../scripts/api.js", async (importOriginal) => ({
+  ...(await importOriginal()),
+  ...mocks,
+}));
 vi.mock("../scripts/cart.js", () => ({
   getCartSubtotal: () => 43.9,
   getCartTotalWithDelivery: () => 43.9,
@@ -50,6 +53,7 @@ vi.mock("../scripts/ui.js", () => ({
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  vi.spyOn(console, "error").mockImplementation(() => {});
   sessionStorage.clear();
   mocks.validAddress = true;
   mocks.orderType = "pickup";
@@ -61,6 +65,11 @@ beforeEach(() => {
     paymentId: 17,
     checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
   });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 it("creates an order and PagBank checkout, preserving return context without choosing a method", async () => {
@@ -85,7 +94,7 @@ it("requires the final checkoutUrl contract", async () => {
 
   expect(mocks.createCheckout).toHaveBeenCalledWith(99);
   expect(JSON.parse(sessionStorage.getItem("burger-house-checkout")).paymentId).toBeNull();
-  expect(mocks.toast).toHaveBeenCalledWith("Não foi possível abrir o checkout. Tente novamente.");
+  expect(mocks.toast).toHaveBeenCalledWith("Invalid URL");
 });
 
 it("accepts the current PagBank Sandbox checkout host", async () => {
@@ -108,7 +117,7 @@ it("rejects a lookalike of the PagBank Sandbox checkout host", async () => {
 
   await (await import("../scripts/order.js")).openPaymentStep();
 
-  expect(mocks.toast).toHaveBeenCalledWith("Não foi possível abrir o checkout. Tente novamente.");
+  expect(mocks.toast).toHaveBeenCalledWith("O checkout retornou um endereço inválido.");
   expect(JSON.parse(sessionStorage.getItem("burger-house-checkout")).paymentId).toBeNull();
 });
 
@@ -137,6 +146,87 @@ it("preserves delivery selection and blocks invalid addresses", async () => {
   mocks.validAddress = true;
   await openPaymentStep();
   expect(mocks.createOrder.mock.calls[0][0]).toBe("delivery");
+});
+
+
+it.each(["createOrder", "createCheckout"])("shows safe API errors from %s", async (operation) => {
+  const { ApiError } = await import("../scripts/api.js");
+  mocks[operation].mockRejectedValue(new ApiError("Fallback error", 409, {
+    error: "Não foi possível preparar o pedido neste momento.",
+    token: "do-not-log-token",
+    customer: { cpf: "12345678900", address: "private-address" },
+  }));
+  await (await import("../scripts/order.js")).openPaymentStep();
+  expect(mocks.toast).toHaveBeenCalledWith("Não foi possível preparar o pedido neste momento.");
+  expect(console.error).toHaveBeenCalledWith("Checkout preparation failed", {
+    name: "ApiError",
+    message: "Fallback error",
+    status: 409,
+    data: { error: "Não foi possível preparar o pedido neste momento." },
+  });
+  const logs = JSON.stringify(console.error.mock.calls);
+  expect(logs).not.toContain("do-not-log-token");
+  expect(logs).not.toContain("12345678900");
+  expect(logs).not.toContain("private-address");
+  if (operation === "createOrder") expect(mocks.createCheckout).not.toHaveBeenCalled();
+});
+
+it.each([
+  "Bearer super-secret",
+  "token=private-credential",
+  "Falha em https://internal.example/api?key=private-credential",
+  "Erro\n at checkout (internal.js:10:1)",
+  "CPF 123.456.789-00",
+])("does not expose unsafe error text: %s", async (message) => {
+  const { ApiError } = await import("../scripts/api.js");
+  const error = new ApiError(message, 502, { error: message, secret: "hidden-secret" });
+  error.name = "private-name";
+  mocks.createCheckout.mockRejectedValue(error);
+  await (await import("../scripts/order.js")).openPaymentStep();
+  expect(mocks.toast).toHaveBeenCalledWith("Não foi possível abrir o checkout. Tente novamente.");
+  const logs = JSON.stringify(console.error.mock.calls);
+  expect(logs).not.toContain(message);
+  expect(logs).not.toContain("hidden-secret");
+  expect(logs).not.toContain("private-name");
+});
+
+it("shows a safe Error message without logging its stack or custom properties", async () => {
+  const error = new Error("Falha de conexão. Tente novamente.");
+  error.token = "private-token";
+  error.stack = "private-stack";
+  mocks.createOrder.mockRejectedValue(error);
+  await (await import("../scripts/order.js")).openPaymentStep();
+  expect(mocks.toast).toHaveBeenCalledWith(error.message);
+  expect(JSON.stringify(console.error.mock.calls)).not.toContain("private-");
+});
+
+it.each([
+  [undefined, false],
+  ["https://evil.example/payment", false],
+  ["https://pagamento.pagbank.com.br/checkout/CHEC_test", true],
+  ["https://pagamento.sandbox.pagbank.com.br/pagamento?code=teste", true],
+])("preserves redirect behavior for %s", async (checkoutUrl, allowed) => {
+  mocks.createCheckout.mockResolvedValue({ paymentId: 17, checkoutUrl });
+  const { openPaymentStep } = await import("../scripts/order.js");
+  const location = { href: "https://shop.example/" };
+  vi.stubGlobal("window", { location });
+  await openPaymentStep();
+  expect(location.href).toBe(allowed ? checkoutUrl : "https://shop.example/");
+});
+
+
+it("preserves a safe HTTP status message when the API has no error field", async () => {
+  const { ApiError } = await import("../scripts/api.js");
+  mocks.createCheckout.mockRejectedValue(new ApiError("A API retornou o status 502.", 502));
+  await (await import("../scripts/order.js")).openPaymentStep();
+  expect(mocks.toast).toHaveBeenCalledWith("A API retornou o status 502.");
+});
+
+it("uses the fallback without logging arbitrary thrown objects", async () => {
+  mocks.createOrder.mockRejectedValue({ message: "private-value", token: "private-token" });
+  await (await import("../scripts/order.js")).openPaymentStep();
+  expect(mocks.toast).toHaveBeenCalledWith("Não foi possível abrir o checkout. Tente novamente.");
+  expect(console.error).not.toHaveBeenCalled();
 });
 
 function savedContext() {

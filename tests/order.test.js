@@ -5,7 +5,10 @@ const mocks = vi.hoisted(() => ({
   createCheckout: vi.fn(),
   getPaymentStatus: vi.fn(),
 }));
-vi.mock("../scripts/api.js", () => mocks);
+vi.mock("../scripts/api.js", async (importOriginal) => ({
+  ...(await importOriginal()),
+  ...mocks,
+}));
 function setupOrderDom() {
   document.body.innerHTML = `
     <div id="cart-modal" class="hidden"></div>

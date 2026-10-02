@@ -1,4 +1,4 @@
-import { createOrder, createCheckout, getPaymentStatus } from "./api.js";
+import { ApiError, createOrder, createCheckout, getPaymentStatus } from "./api.js";
 import { WHATSAPP_PHONE_NUMBER } from "./config.js";
 import { getCartSubtotal, getCartTotalWithDelivery, getDeliveryFee, updateCart } from "./cart.js";
 import {
@@ -290,6 +290,18 @@ function buildWhatsAppMessage() {
   return message;
 }
 
+function safeCheckoutErrorMessage(value) {
+  if (typeof value !== "string") return undefined;
+  const message = value.trim();
+  // Do not expose URLs, credentials, personal/payment data or stack details.
+  if (
+    !message ||
+    message.length > 240 ||
+    /[\r\n<>]|https?:|www\.|localhost|[a-z0-9-]+\.[a-z]{2,}\b|[/\\]|@|(?:\d[ .-]?){9,}|[a-z0-9_-]{24,}|\b(?:tokens?|secrets?|password|senha|authorization|bearer|api[_ -]?key|cpf|cvv|card|cartão|stack)\b/i.test(message)
+  ) return undefined;
+  return message;
+}
+
 export async function openPaymentStep() {
   if (preparingCheckout) return;
   const cart = getCart();
@@ -343,8 +355,24 @@ export async function openPaymentStep() {
     );
     saveCheckoutContext();
     window.location.href = url.href;
-  } catch {
-    showToast("Não foi possível abrir o checkout. Tente novamente.");
+  } catch (error) {
+    const fallback = "Não foi possível abrir o checkout. Tente novamente.";
+    let message = fallback;
+    if (error instanceof Error) {
+      const apiMessage = error instanceof ApiError
+        ? safeCheckoutErrorMessage(error.data?.error)
+        : undefined;
+      const errorMessage = safeCheckoutErrorMessage(error.message);
+      message = apiMessage || errorMessage || fallback;
+      console.error("Checkout preparation failed", {
+        name: error instanceof ApiError ? "ApiError" : "Error",
+        message: errorMessage || fallback,
+        status: error instanceof ApiError && Number.isInteger(error.status) &&
+          error.status >= 100 && error.status <= 599 ? error.status : undefined,
+        data: apiMessage ? { error: apiMessage } : undefined,
+      });
+    }
+    showToast(message);
   } finally {
     preparingCheckout = false;
     setGoToPaymentLoading(false);
