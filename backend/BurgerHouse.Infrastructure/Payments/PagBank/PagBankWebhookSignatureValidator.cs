@@ -49,6 +49,7 @@ public sealed class PagBankWebhookSignatureValidator
         var cachedValidation = "not-attempted";
         var refreshedValidation = "not-attempted";
         var refreshExecuted = false;
+        var validatedFormat = "none";
         try
         {
             if (rawBody.IsEmpty || signatures.Length == 0)
@@ -58,50 +59,74 @@ public sealed class PagBankWebhookSignatureValidator
             }
             var publicKey = await GetPublicKeyAsync(false, cancellationToken);
             fingerprint = HashPrefix(publicKey);
-            var valid = Verify(rawBody, signatures, publicKey);
+            var valid = Verify(rawBody, signatures, publicKey, out validatedFormat);
             cachedValidation = valid ? "success" : "failure";
             if (valid) return true;
 
             refreshExecuted = true;
             publicKey = await GetPublicKeyAsync(true, cancellationToken);
             fingerprint = HashPrefix(publicKey);
-            valid = Verify(rawBody, signatures, publicKey);
+            valid = Verify(rawBody, signatures, publicKey, out validatedFormat);
             refreshedValidation = valid ? "success" : "failure";
             return valid;
         }
         finally
         {
             _logger?.LogInformation(
-                "PagBank webhook signature validation. bodyLength: {bodyLength}, signatureCount: {signatureCount}, bodySha256Prefix: {bodySha256Prefix}, publicKeyFingerprint: {publicKeyFingerprint}, cacheValidation: {cacheValidation}, refreshExecuted: {refreshExecuted}, refreshValidation: {refreshValidation}.",
+                "PagBank webhook signature validation. bodyLength: {bodyLength}, signatureCount: {signatureCount}, bodySha256Prefix: {bodySha256Prefix}, publicKeyFingerprint: {publicKeyFingerprint}, cacheValidation: {cacheValidation}, refreshExecuted: {refreshExecuted}, refreshValidation: {refreshValidation}, validatedFormat: {validatedFormat}.",
                 rawBody.Length, signatures.Length, HashPrefix(rawBody.Span), fingerprint,
-                cachedValidation, refreshExecuted, refreshedValidation);
+                cachedValidation, refreshExecuted, refreshedValidation, validatedFormat);
         }
     }
 
     private static string HashPrefix(ReadOnlySpan<byte> value) =>
         Convert.ToHexString(SHA256.HashData(value))[..12];
 
-    private static bool Verify(ReadOnlyMemory<byte> rawBody, string[] signatures, byte[] publicKey)
+    private static bool Verify(ReadOnlyMemory<byte> rawBody, string[] signatures, byte[] publicKey,
+        out string validatedFormat)
     {
+        validatedFormat = "none";
         using var ecdsa = ECDsa.Create();
         ecdsa.ImportSubjectPublicKeyInfo(publicKey, out _);
         foreach (var signature in signatures)
         {
+            byte[] signatureBytes;
             try
             {
-                if (ecdsa.VerifyData(
-                        rawBody.Span,
-                        Convert.FromBase64String(signature),
-                        HashAlgorithmName.SHA256,
-                        DSASignatureFormat.Rfc3279DerSequence))
-                    return true;
+                signatureBytes = Convert.FromBase64String(signature);
             }
-            catch (Exception exception) when (exception is FormatException or CryptographicException)
+            catch (FormatException)
             {
-                // The key was already imported; malformed Base64/DER is an invalid signature.
+                continue;
+            }
+
+            // Try both encodings against the same, unmodified signature and payload.
+            if (VerifyFormat(ecdsa, rawBody.Span, signatureBytes, DSASignatureFormat.Rfc3279DerSequence))
+            {
+                validatedFormat = "DER";
+                return true;
+            }
+            if (VerifyFormat(ecdsa, rawBody.Span, signatureBytes, DSASignatureFormat.IeeeP1363FixedFieldConcatenation))
+            {
+                validatedFormat = "P1363";
+                return true;
             }
         }
         return false;
+    }
+
+    private static bool VerifyFormat(ECDsa ecdsa, ReadOnlySpan<byte> rawBody,
+        ReadOnlySpan<byte> signature, DSASignatureFormat format)
+    {
+        try
+        {
+            return ecdsa.VerifyData(rawBody, signature, HashAlgorithmName.SHA256, format);
+        }
+        catch (CryptographicException)
+        {
+            // A malformed encoding must not prevent trying the next format.
+            return false;
+        }
     }
 
     private async Task<byte[]> GetPublicKeyAsync(bool forceRefresh, CancellationToken cancellationToken)

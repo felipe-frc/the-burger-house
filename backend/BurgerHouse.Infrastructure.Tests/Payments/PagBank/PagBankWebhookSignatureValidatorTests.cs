@@ -68,8 +68,10 @@ public class PagBankWebhookSignatureValidatorTests
     }
 
 
-    [Fact]
-    public async Task RefreshesStaleCacheOnceAndRetriesAllSignatures()
+    [Theory]
+    [InlineData(DSASignatureFormat.Rfc3279DerSequence)]
+    [InlineData(DSASignatureFormat.IeeeP1363FixedFieldConcatenation)]
+    public async Task RefreshesStaleCacheOnceAndRetriesAllSignatures(DSASignatureFormat format)
     {
         using var oldKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var newKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -79,8 +81,8 @@ public class PagBankWebhookSignatureValidatorTests
         var validator = Create(http);
         var body = Encoding.UTF8.GetBytes(" {\n \"message\": \"ação\" }\n");
         Assert.True(await validator.IsValidAsync(body, [Sign(oldKey, body)]));
-        Assert.True(await validator.IsValidAsync(body, ["invalid", Sign(newKey, body)]));
-        Assert.True(await validator.IsValidAsync(body, [Sign(newKey, body)]));
+        Assert.True(await validator.IsValidAsync(body, ["invalid", Sign(newKey, body, format)]));
+        Assert.True(await validator.IsValidAsync(body, [Sign(newKey, body, format)]));
         Assert.Equal(2, calls);
     }
 
@@ -238,10 +240,14 @@ public class PagBankWebhookSignatureValidatorTests
 
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public async Task LogsOnlySafeDiagnostics(bool refresh, bool reject)
+    [InlineData(false, false, DSASignatureFormat.Rfc3279DerSequence, "DER")]
+    [InlineData(true, false, DSASignatureFormat.Rfc3279DerSequence, "DER")]
+    [InlineData(true, true, DSASignatureFormat.Rfc3279DerSequence, "none")]
+    [InlineData(false, false, DSASignatureFormat.IeeeP1363FixedFieldConcatenation, "P1363")]
+    [InlineData(true, false, DSASignatureFormat.IeeeP1363FixedFieldConcatenation, "P1363")]
+    [InlineData(true, true, DSASignatureFormat.IeeeP1363FixedFieldConcatenation, "none")]
+    public async Task LogsOnlySafeDiagnostics(bool refresh, bool reject,
+        DSASignatureFormat format, string expectedFormat)
     {
         using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var other = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -255,7 +261,7 @@ public class PagBankWebhookSignatureValidatorTests
             Token = "secret-test-token"
         }), logger);
         var body = Encoding.UTF8.GetBytes("{ \"private\": \"never-log-this\" }");
-        var signature = Sign(key, body);
+        var signature = Sign(key, body, format);
         Assert.Equal(!reject, await validator.IsValidAsync(body, [signature]));
         var entry = Assert.Single(logger.Entries);
         Assert.Null(entry.Exception);
@@ -267,12 +273,50 @@ public class PagBankWebhookSignatureValidatorTests
         Assert.Equal(refresh, entry.Fields["refreshExecuted"]);
         Assert.Equal(refresh ? "failure" : "success", entry.Fields["cacheValidation"]);
         Assert.Equal(refresh ? (reject ? "failure" : "success") : "not-attempted", entry.Fields["refreshValidation"]);
-        Assert.Equal(8, entry.Fields.Count); // Seven fields plus the logging template.
+        Assert.Equal(expectedFormat, entry.Fields["validatedFormat"]);
+        Assert.Equal(9, entry.Fields.Count); // Eight fields plus the logging template.
         Assert.DoesNotContain(signature, entry.Message);
         Assert.DoesNotContain("secret-test-token", entry.Message);
         Assert.DoesNotContain("never-log-this", entry.Message);
         Assert.DoesNotContain(Convert.ToBase64String(key.ExportSubjectPublicKeyInfo()), entry.Message);
     }
+
+
+    [Theory]
+    [InlineData(DSASignatureFormat.Rfc3279DerSequence, "valid")]
+    [InlineData(DSASignatureFormat.IeeeP1363FixedFieldConcatenation, "valid")]
+    [InlineData(DSASignatureFormat.Rfc3279DerSequence, "changed-body")]
+    [InlineData(DSASignatureFormat.IeeeP1363FixedFieldConcatenation, "changed-body")]
+    [InlineData(DSASignatureFormat.Rfc3279DerSequence, "wrong-key")]
+    [InlineData(DSASignatureFormat.IeeeP1363FixedFieldConcatenation, "wrong-key")]
+    [InlineData(DSASignatureFormat.Rfc3279DerSequence, "multiple")]
+    [InlineData(DSASignatureFormat.IeeeP1363FixedFieldConcatenation, "multiple")]
+    public async Task VerifiesBothFormatsWithoutChangingSignedBytes(DSASignatureFormat format, string scenario)
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var other = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var calls = 0;
+        using var http = new HttpClient(new Stub(_ =>
+        {
+            calls++;
+            return Task.FromResult(KeyResponse(key));
+        }));
+        var validator = Create(http);
+        var body = Encoding.UTF8.GetBytes(" {\r\n \"x\": 1 }\n");
+        var signature = Sign(scenario == "wrong-key" ? other : key, body, format);
+        if (scenario == "changed-body") body[0] = (byte)'\t';
+        var original = body.ToArray();
+        var signatures = scenario == "multiple"
+            ? new[] { "invalid-base64", Sign(other, body, format), signature }
+            : new[] { signature };
+        var expected = scenario is "valid" or "multiple";
+
+        Assert.Equal(expected, await validator.IsValidAsync(body, signatures));
+        Assert.Equal(expected, await validator.IsValidAsync(body, signatures));
+        Assert.Equal(original, body);
+        Assert.Equal(expected ? 1 : 3, calls);
+    }
+
 
     private sealed class CaptureLogger : Microsoft.Extensions.Logging.ILogger<PagBankWebhookSignatureValidator>
     {
@@ -287,8 +331,9 @@ public class PagBankWebhookSignatureValidatorTests
     }
 
 
-    private static string Sign(ECDsa key, byte[] body) => Convert.ToBase64String(
-        key.SignData(body, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence));
+    private static string Sign(ECDsa key, byte[] body,
+        DSASignatureFormat format = DSASignatureFormat.Rfc3279DerSequence) => Convert.ToBase64String(
+        key.SignData(body, HashAlgorithmName.SHA256, format));
 
     private static HttpResponseMessage KeyResponse(ECDsa key) => new(HttpStatusCode.OK)
     {
