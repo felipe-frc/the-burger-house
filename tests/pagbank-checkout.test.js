@@ -148,14 +148,15 @@ it("preserves delivery selection and blocks invalid addresses", async () => {
   expect(mocks.createOrder.mock.calls[0][0]).toBe("delivery");
 });
 
-
 it.each(["createOrder", "createCheckout"])("shows safe API errors from %s", async (operation) => {
   const { ApiError } = await import("../scripts/api.js");
-  mocks[operation].mockRejectedValue(new ApiError("Fallback error", 409, {
-    error: "Não foi possível preparar o pedido neste momento.",
-    token: "do-not-log-token",
-    customer: { cpf: "12345678900", address: "private-address" },
-  }));
+  mocks[operation].mockRejectedValue(
+    new ApiError("Fallback error", 409, {
+      error: "Não foi possível preparar o pedido neste momento.",
+      token: "do-not-log-token",
+      customer: { cpf: "12345678900", address: "private-address" },
+    }),
+  );
   await (await import("../scripts/order.js")).openPaymentStep();
   expect(mocks.toast).toHaveBeenCalledWith("Não foi possível preparar o pedido neste momento.");
   expect(console.error).toHaveBeenCalledWith("Checkout preparation failed", {
@@ -213,7 +214,6 @@ it.each([
   await openPaymentStep();
   expect(location.href).toBe(allowed ? checkoutUrl : "https://shop.example/");
 });
-
 
 it("preserves a safe HTTP status message when the API has no error field", async () => {
   const { ApiError } = await import("../scripts/api.js");

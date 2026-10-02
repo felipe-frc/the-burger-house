@@ -297,8 +297,11 @@ function safeCheckoutErrorMessage(value) {
   if (
     !message ||
     message.length > 240 ||
-    /[\r\n<>]|https?:|www\.|localhost|[a-z0-9-]+\.[a-z]{2,}\b|[/\\]|@|(?:\d[ .-]?){9,}|[a-z0-9_-]{24,}|\b(?:tokens?|secrets?|password|senha|authorization|bearer|api[_ -]?key|cpf|cvv|card|cartão|stack)\b/i.test(message)
-  ) return undefined;
+    /[\r\n<>]|https?:|www\.|localhost|[a-z0-9-]+\.[a-z]{2,}\b|[/\\]|@|(?:\d[ .-]?){9,}|[a-z0-9_-]{24,}|\b(?:tokens?|secrets?|password|senha|authorization|bearer|api[_ -]?key|cpf|cvv|card|cartão|stack)\b/i.test(
+      message,
+    )
+  )
+    return undefined;
   return message;
 }
 
@@ -337,10 +340,7 @@ export async function openPaymentStep() {
       url.protocol !== "https:" ||
       url.username ||
       url.password ||
-      ![
-        "pagamento.pagbank.com.br",
-        "pagamento.sandbox.pagbank.com.br",
-      ].includes(url.hostname)
+      !["pagamento.pagbank.com.br", "pagamento.sandbox.pagbank.com.br"].includes(url.hostname)
     ) {
       throw new Error("O checkout retornou um endereço inválido.");
     }
@@ -359,16 +359,20 @@ export async function openPaymentStep() {
     const fallback = "Não foi possível abrir o checkout. Tente novamente.";
     let message = fallback;
     if (error instanceof Error) {
-      const apiMessage = error instanceof ApiError
-        ? safeCheckoutErrorMessage(error.data?.error)
-        : undefined;
+      const apiMessage =
+        error instanceof ApiError ? safeCheckoutErrorMessage(error.data?.error) : undefined;
       const errorMessage = safeCheckoutErrorMessage(error.message);
       message = apiMessage || errorMessage || fallback;
       console.error("Checkout preparation failed", {
         name: error instanceof ApiError ? "ApiError" : "Error",
         message: errorMessage || fallback,
-        status: error instanceof ApiError && Number.isInteger(error.status) &&
-          error.status >= 100 && error.status <= 599 ? error.status : undefined,
+        status:
+          error instanceof ApiError &&
+          Number.isInteger(error.status) &&
+          error.status >= 100 &&
+          error.status <= 599
+            ? error.status
+            : undefined,
         data: apiMessage ? { error: apiMessage } : undefined,
       });
     }

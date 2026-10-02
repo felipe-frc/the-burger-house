@@ -139,7 +139,14 @@ test("deve simular o fluxo completo de compra com entrega", async ({ page }) => 
   expect(whatsapp.searchParams.get("text")).toBe(originalMessage);
   expect(whatsappUrl.split("&text=")[1]).toBe(encodeURIComponent(originalMessage));
   expect(originalMessage.startsWith("🍔 *Novo Pedido - The Burger House*\n\n")).toBe(true);
-  for (const text of ["Itens do pedido", "Resumo", "Endereço", "Observações", "Uberlândia", "Pão, açúcar, ç, 🍔, 🥤, € + & # %"]) {
+  for (const text of [
+    "Itens do pedido",
+    "Resumo",
+    "Endereço",
+    "Observações",
+    "Uberlândia",
+    "Pão, açúcar, ç, 🍔, 🥤, € + & # %",
+  ]) {
     expect(originalMessage).toContain(text);
   }
   expect(originalMessage).not.toContain("\uFFFD");
