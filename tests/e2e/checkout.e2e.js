@@ -117,7 +117,7 @@ test("deve simular o fluxo completo de compra com entrega", async ({ page }) => 
   await expect(page.locator("#review-address")).toContainText("123");
   await expect(page.locator("#review-total")).toContainText("R$");
 
-  await page.locator("#order-notes").fill("Sem cebola.");
+  await page.locator("#order-notes").fill("Sem cebola. Pão, açúcar, ç, 🍔, 🥤, € + & # %");
 
   await page.locator("#go-to-payment-btn").click();
   await expect(page.locator("#confirm-whatsapp-btn")).toBeVisible();
@@ -131,6 +131,19 @@ test("deve simular o fluxo completo de compra com entrega", async ({ page }) => 
 
   const whatsappUrl = await page.evaluate(() => window.__openedUrls[0]);
   const decodedUrl = decodeURIComponent(whatsappUrl);
+  const originalMessage = await page.evaluate(
+    () => JSON.parse(sessionStorage.getItem("burger-house-checkout")).message,
+  );
+  const whatsapp = new URL(whatsappUrl);
+  expect(whatsapp.origin + whatsapp.pathname).toBe("https://api.whatsapp.com/send/");
+  expect(whatsapp.searchParams.get("text")).toBe(originalMessage);
+  expect(whatsappUrl.split("&text=")[1]).toBe(encodeURIComponent(originalMessage));
+  expect(originalMessage.startsWith("🍔 *Novo Pedido - The Burger House*\n\n")).toBe(true);
+  for (const text of ["Itens do pedido", "Resumo", "Endereço", "Observações", "Uberlândia", "Pão, açúcar, ç, 🍔, 🥤, € + & # %"]) {
+    expect(originalMessage).toContain(text);
+  }
+  expect(originalMessage).not.toContain("\uFFFD");
+  expect(whatsappUrl).not.toContain("%EF%BF%BD");
 
   expect(whatsappUrl).toMatch(/whatsapp|wa\.me/i);
   expect(decodedUrl).toContain("O Praiano");

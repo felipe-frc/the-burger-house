@@ -436,7 +436,8 @@ async function confirmWhatsApp() {
   if (payment?.status !== 2 || checkoutSession.confirmationDispatched) return;
   checkoutSession.confirmationDispatched = true;
   saveCheckoutContext();
-  const url = `https://wa.me/${WHATSAPP_PHONE_NUMBER}?text=${encodeURIComponent(checkoutSession.message)}`;
+  // Avoid wa.me's redirect, which can replace non-BMP emoji with U+FFFD.
+  const url = `https://api.whatsapp.com/send/?phone=${WHATSAPP_PHONE_NUMBER}&text=${encodeURIComponent(checkoutSession.message)}`;
   // Preserve a different cart assembled while the previous purchase was in progress.
   if (getCheckoutFingerprint(getCart()) === checkoutSession.fingerprint) {
     clearCart();

@@ -167,6 +167,45 @@ it("reviews a pickup order, confirms through backend and sends the preserved mes
   await vi.advanceTimersByTimeAsync(20);
   expect(window.open).toHaveBeenCalledTimes(1);
 });
+
+it.each(["pickup", "delivery"])("preserves Unicode through stored %s order and WhatsApp URL", async (type) => {
+  let { order } = await setup(type);
+  const notes = "Observações: pão, açúcar, ação, ç, 🍔, 🥤, € + & # %";
+  document.getElementById("order-notes").value = notes;
+  if (type === "delivery") {
+    const fields = { cep: "38400-000", street: "Rua São João", neighborhood: "São José",
+      city: "Uberlândia", "house-number": "123" };
+    for (const [id, value] of Object.entries(fields)) document.getElementById(id).value = value;
+  }
+  await order.openPaymentStep();
+  const original = JSON.parse(sessionStorage.getItem("burger-house-checkout")).message;
+  expect(original.startsWith("🍔 *Novo Pedido - The Burger House*\n\n")).toBe(true);
+  for (const text of ["Itens do pedido", "Resumo", "Observações", notes,
+    type === "pickup" ? "Retirada no local" : "Endereço de entrega"]) {
+    expect(original).toContain(text);
+  }
+  expect(original).not.toContain("\uFFFD");
+
+  // Simulate returning from payment: read the message from sessionStorage again.
+  vi.resetModules();
+  order = (await setup(type)).order;
+  order.bindOrderEvents();
+  await vi.advanceTimersByTimeAsync(20);
+  document.getElementById("confirm-whatsapp-btn").click();
+  await vi.advanceTimersByTimeAsync(20);
+  expect(window.open).toHaveBeenCalledOnce();
+  const [openedUrl, target] = window.open.mock.calls[0];
+  const url = new URL(openedUrl);
+  expect(target).toBe("_blank");
+  expect(url.origin + url.pathname).toBe("https://api.whatsapp.com/send/");
+  expect(url.searchParams.get("phone")).toMatch(/^\d+$/);
+  expect(openedUrl.split("&text=")[1]).toBe(encodeURIComponent(original));
+  expect(openedUrl).toContain("%F0%9F%8D%94");
+  expect(openedUrl).not.toContain("%EF%BF%BD");
+  expect(url.searchParams.get("text")).toBe(original);
+  expect(decodeURIComponent(openedUrl.split("&text=")[1])).toBe(original);
+});
+
 it("restores delivery fields and notes when returning in the same tab", async () => {
   let { order } = await setup("delivery");
   const fields = {
