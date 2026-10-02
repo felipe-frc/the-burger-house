@@ -1,0 +1,61 @@
+# Git and editor metadata
+.git
+.github
+.vscode
+.idea
+.codex
+
+# Frontend dependencies and generated artifacts
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+**/coverage
+test-results
+**/test-results
+
+# .NET build and test artifacts
+**/bin
+**/obj
+**/TestResults
+backend/*Tests
+
+# Local configuration, secrets and databases
+.env
+.env.*
+**/appsettings.Development.json
+**/Properties/launchSettings.json
+*.db
+*.db-shm
+*.db-wal
+
+# Logs, caches and temporary files
+*.log
+*.cache
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Files used only by the frontend or local tooling
+assets
+docs
+public
+scripts
+styles
+tests
+index.html
+output.css
+package.json
+package-lock.json
+playwright.config.js
+tailwind.config.js
+vite-env.d.ts
+vitest.config.js
+eslint.config.js
+jsconfig.json
+vercel.json

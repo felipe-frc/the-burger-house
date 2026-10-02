@@ -1,37 +1,20 @@
 // @vitest-environment jsdom
-
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const localStorageMock = (() => {
-  let store = {};
-
-  return {
-    getItem(key) {
-      return store[key] || null;
-    },
-    setItem(key, value) {
-      store[key] = String(value);
-    },
-    removeItem(key) {
-      delete store[key];
-    },
-    clear() {
-      store = {};
-    },
-  };
-})();
-
-vi.stubGlobal("localStorage", localStorageMock);
-
-function normalizeCurrency(value) {
-  return value.replace(/\u00A0/g, " ");
-}
-
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+const mocks = vi.hoisted(() => ({
+  createOrder: vi.fn(),
+  createCheckout: vi.fn(),
+  getPaymentStatus: vi.fn(),
+}));
+vi.mock("../scripts/api.js", async (importOriginal) => ({
+  ...(await importOriginal()),
+  ...mocks,
+}));
 function setupOrderDom() {
   document.body.innerHTML = `
     <div id="cart-modal" class="hidden"></div>
     <div id="address-modal" class="hidden"></div>
     <div id="review-modal" class="hidden"></div>
+    <div id="payment-modal" class="hidden"></div>
 
     <button id="cart-btn"></button>
     <button id="close-modal-btn"></button>
@@ -39,7 +22,14 @@ function setupOrderDom() {
     <button id="back-to-cart-btn"></button>
     <button id="go-to-review-btn"></button>
     <button id="back-to-address-btn"></button>
-    <button id="finish-order-btn"><span>Finalizar</span></button>
+
+    <button id="go-to-payment-btn">
+      <span>Ir para pagamento</span>
+    </button>
+
+    <button id="back-to-review-btn">
+      <span>Voltar</span>
+    </button>
 
     <div id="cart-items"></div>
     <div id="cart-total"></div>
@@ -51,9 +41,21 @@ function setupOrderDom() {
     <div id="review-total"></div>
 
     <div id="delivery-fields"></div>
-    <div id="pickup-info" class="hidden"></div>
-    <p id="address-warn" class="hidden"></p>
-    <span id="cep-loading" class="hidden"></span>
+
+    <div
+      id="pickup-info"
+      class="hidden"
+    ></div>
+
+    <p
+      id="address-warn"
+      class="hidden"
+    ></p>
+
+    <span
+      id="cep-loading"
+      class="hidden"
+    ></span>
 
     <input id="cep" />
     <input id="street" />
@@ -61,111 +63,195 @@ function setupOrderDom() {
     <input id="city" />
     <input id="house-number" />
     <input id="complement" />
+
     <textarea id="order-notes"></textarea>
 
-    <input type="radio" id="order-type-delivery" name="order-type" value="delivery" checked />
-    <input type="radio" id="order-type-pickup" name="order-type" value="pickup" />
+
+
+    <div id="payment-total"></div>
+
+    <p
+      id="payment-error"
+      class="hidden"
+    ></p>
+
+    <progress
+      id="payment-progress"
+      class="hidden"
+      value="0"
+      max="100"
+    ></progress>
+
+    <input
+      type="radio"
+      id="order-type-delivery"
+      name="order-type"
+      value="delivery"
+      checked
+    />
+
+    <input
+      type="radio"
+      id="order-type-pickup"
+      name="order-type"
+      value="pickup"
+    />
   `;
 }
 
-async function loadOrderModules() {
-  vi.resetModules();
-  const order = await import("../scripts/order.js");
-  const state = await import("../scripts/state.js");
-  return { order, state };
-}
-
 beforeEach(() => {
+  vi.resetModules();
+  vi.clearAllMocks();
   vi.useFakeTimers();
+  vi.stubEnv("VITE_FORCE_STORE_OPEN", "false");
   vi.setSystemTime(new Date("2026-01-01T20:00:00"));
-  vi.restoreAllMocks();
   localStorage.clear();
+  sessionStorage.clear();
   setupOrderDom();
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    '<p id="checkout-status"></p><button id="check-payment-btn"></button><button id="confirm-whatsapp-btn"></button>',
+  );
   vi.stubGlobal(
     "Toastify",
-    vi.fn(() => ({
-      showToast: vi.fn(),
-    })),
+    vi.fn(() => ({ showToast: vi.fn() })),
   );
-  window.open = vi.fn();
+  window.open = vi.fn(() => ({}));
+  mocks.createOrder.mockResolvedValue({ orderId: 99, subtotal: 43.9, deliveryFee: 0, total: 43.9 });
+  mocks.createCheckout.mockResolvedValue({
+    paymentId: 17,
+    checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
+  });
+  mocks.getPaymentStatus.mockResolvedValue({ paymentId: 17, orderId: 99, amount: 43.9, status: 2 });
 });
-
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+async function setup(type = "pickup") {
+  const state = await import("../scripts/state.js");
+  state.setCart([{ id: "burger-praiano", name: "O Praiano", price: 43.9, quantity: 1 }]);
+  state.setOrderType(type);
+  const order = await import("../scripts/order.js");
+  return { state, order };
+}
+it("reviews a pickup order, confirms through backend and sends the preserved message once", async () => {
+  const { state, order } = await setup();
+  order.bindOrderEvents();
+  document.getElementById("order-notes").value = "Sem cebola.";
+  for (const id of [
+    "cart-btn",
+    "go-to-address-btn",
+    "back-to-cart-btn",
+    "go-to-review-btn",
+    "back-to-address-btn",
+    "go-to-review-btn",
+    "back-to-review-btn",
+  ])
+    document.getElementById(id).click();
+  expect(document.getElementById("review-items").textContent).toContain("O Praiano");
+  expect(document.getElementById("review-total").textContent.replaceAll("\u00a0", " ")).toContain(
+    "43,90",
+  );
+  await order.openPaymentStep();
+  expect(window.open).not.toHaveBeenCalled();
+  document.getElementById("confirm-whatsapp-btn").click();
+  await vi.advanceTimersByTimeAsync(20);
+  const message = new URL(window.open.mock.calls[0][0]).searchParams.get("text");
+  expect(message).toContain("O Praiano");
+  expect(message).toContain("Sem cebola.");
+  expect(state.getCart()).toEqual([]);
+  expect(document.getElementById("order-notes").value).toBe("");
+  document.getElementById("confirm-whatsapp-btn").click();
+  await vi.advanceTimersByTimeAsync(20);
+  expect(window.open).toHaveBeenCalledTimes(1);
 });
 
-describe("order", () => {
-  it("builds the WhatsApp message with delivery total and notes", async () => {
-    const { order, state } = await loadOrderModules();
+it.each(["pickup", "delivery"])("preserves Unicode through stored %s order and WhatsApp URL", async (type) => {
+  let { order } = await setup(type);
+  const notes = "Observações: pão, açúcar, ação, ç, 🍔, 🥤, € + & # %";
+  document.getElementById("order-notes").value = notes;
+  if (type === "delivery") {
+    const fields = { cep: "38400-000", street: "Rua São João", neighborhood: "São José",
+      city: "Uberlândia", "house-number": "123" };
+    for (const [id, value] of Object.entries(fields)) document.getElementById(id).value = value;
+  }
+  await order.openPaymentStep();
+  const original = JSON.parse(sessionStorage.getItem("burger-house-checkout")).message;
+  expect(original.startsWith("🍔 *Novo Pedido - The Burger House*\n\n")).toBe(true);
+  for (const text of ["Itens do pedido", "Resumo", "Observações", notes,
+    type === "pickup" ? "Retirada no local" : "Endereço de entrega"]) {
+    expect(original).toContain(text);
+  }
+  expect(original).not.toContain("\uFFFD");
 
-    state.setCart([
-      {
-        id: "burger-praiano",
-        name: "O Praiano",
-        price: 43.9,
-        quantity: 1,
-      },
-    ]);
-    state.setOrderType(state.ORDER_TYPES.DELIVERY);
+  // Simulate returning from payment: read the message from sessionStorage again.
+  vi.resetModules();
+  order = (await setup(type)).order;
+  order.bindOrderEvents();
+  await vi.advanceTimersByTimeAsync(20);
+  document.getElementById("confirm-whatsapp-btn").click();
+  await vi.advanceTimersByTimeAsync(20);
+  expect(window.open).toHaveBeenCalledOnce();
+  const [openedUrl, target] = window.open.mock.calls[0];
+  const url = new URL(openedUrl);
+  expect(target).toBe("_blank");
+  expect(url.origin + url.pathname).toBe("https://api.whatsapp.com/send/");
+  expect(url.searchParams.get("phone")).toMatch(/^\d+$/);
+  expect(openedUrl.split("&text=")[1]).toBe(encodeURIComponent(original));
+  expect(openedUrl).toContain("%F0%9F%8D%94");
+  expect(openedUrl).not.toContain("%EF%BF%BD");
+  expect(url.searchParams.get("text")).toBe(original);
+  expect(decodeURIComponent(openedUrl.split("&text=")[1])).toBe(original);
+});
 
-    document.getElementById("cep").value = "38400-000";
-    document.getElementById("street").value = "Rua dos Testes";
-    document.getElementById("neighborhood").value = "Centro";
-    document.getElementById("city").value = "Uberlândia";
-    document.getElementById("house-number").value = "123";
-    document.getElementById("complement").value = "Apto 101";
-    document.getElementById("order-notes").value = "Sem cebola.";
-
-    order.bindOrderEvents();
-    document.getElementById("finish-order-btn").click();
-
-    expect(window.open).toHaveBeenCalledOnce();
-
-    const [url, target] = window.open.mock.calls[0];
-    const decoded = normalizeCurrency(decodeURIComponent(url));
-
-    expect(target).toBe("_blank");
-    expect(decoded).toContain("Novo Pedido - The Burger House");
-    expect(decoded).toContain("O Praiano");
-    expect(decoded).toContain("Subtotal: R$ 43,90");
-    expect(decoded).toContain("Taxa de entrega: R$ 5,00");
-    expect(decoded).toContain("Total: R$ 48,90");
-    expect(decoded).toContain("Rua dos Testes, 123 - Centro, Uberlândia");
-    expect(decoded).toContain("Complemento: Apto 101");
-    expect(decoded).toContain("Sem cebola.");
-
-    await vi.advanceTimersByTimeAsync(900);
-
-    expect(state.getCart()).toEqual([]);
-    expect(document.getElementById("order-notes").value).toBe("");
-  });
-
-  it("builds the WhatsApp message for pickup without delivery fee", async () => {
-    const { order, state } = await loadOrderModules();
-
-    state.setCart([
-      {
-        id: "burger-praiano",
-        name: "O Praiano",
-        price: 43.9,
-        quantity: 1,
-      },
-    ]);
-    state.setOrderType(state.ORDER_TYPES.PICKUP);
-
-    order.bindOrderEvents();
-    document.getElementById("finish-order-btn").click();
-
-    expect(window.open).toHaveBeenCalledOnce();
-
-    const [url] = window.open.mock.calls[0];
-    const decoded = normalizeCurrency(decodeURIComponent(url));
-
-    expect(decoded).toContain("Tipo de pedido");
-    expect(decoded).toContain("Retirada no local");
-    expect(decoded).toContain("Taxa de entrega: R$ 0,00");
-    expect(decoded).toContain("Total: R$ 43,90");
-    expect(decoded).toContain("Rua Dev 25");
-    expect(decoded).not.toContain("Observações do pedido");
-  });
+it("restores delivery fields and notes when returning in the same tab", async () => {
+  let { order } = await setup("delivery");
+  const fields = {
+    cep: "38400-000",
+    street: "Rua dos Testes",
+    neighborhood: "Centro",
+    city: "Uberlandia",
+    "house-number": "123",
+    complement: "Apto 1",
+    "order-notes": "Sem cebola",
+  };
+  for (const [id, value] of Object.entries(fields)) document.getElementById(id).value = value;
+  await order.openPaymentStep();
+  for (const id of Object.keys(fields)) document.getElementById(id).value = "";
+  vi.resetModules();
+  order = (await setup("delivery")).order;
+  order.bindOrderEvents();
+  await vi.advanceTimersByTimeAsync(20);
+  for (const [id, value] of Object.entries(fields))
+    expect(document.getElementById(id).value).toBe(value);
+  document.getElementById("go-to-review-btn").click();
+  expect(document.getElementById("review-address").textContent).toContain("123");
+});
+it("preserves a new cart when confirming the previous purchase", async () => {
+  const { state, order } = await setup();
+  order.bindOrderEvents();
+  await order.openPaymentStep();
+  state.setCart([{ id: "burger-praiano", name: "O Praiano", price: 43.9, quantity: 2 }]);
+  document.getElementById("confirm-whatsapp-btn").click();
+  await vi.advanceTimersByTimeAsync(20);
+  expect(state.getCart()[0].quantity).toBe(2);
+  expect(window.open).toHaveBeenCalledOnce();
+});
+it("blocks checkout for an empty cart or closed restaurant", async () => {
+  const { state, order } = await setup();
+  order.bindOrderEvents();
+  state.clearCart();
+  document.getElementById("go-to-address-btn").click();
+  await order.openPaymentStep();
+  document.getElementById("back-to-review-btn").click();
+  expect(document.getElementById("review-total").textContent).toContain("0,00");
+  state.setCart([{ id: "burger-praiano", quantity: 1, price: 43.9 }]);
+  vi.setSystemTime(new Date("2026-01-01T10:00:00"));
+  document.getElementById("go-to-address-btn").click();
+  document.getElementById("go-to-review-btn").click();
+  await order.openPaymentStep();
+  document.getElementById("close-modal-btn").click();
+  expect(mocks.createOrder).not.toHaveBeenCalled();
 });

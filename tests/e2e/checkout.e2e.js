@@ -24,9 +24,34 @@ test.beforeEach(async ({ page }) => {
     window.__openedUrls = [];
     window.open = (url) => {
       window.__openedUrls.push(String(url));
-      return null;
+      return {};
     };
   });
+
+  await page.route("**/api/orders", async (route) => {
+    const body = route.request().postDataJSON();
+    const deliveryFee = body.orderType === "pickup" ? 0 : 5;
+    await route.fulfill({
+      json: { orderId: 99, subtotal: 43.9, deliveryFee, total: 43.9 + deliveryFee },
+    });
+  });
+  await page.route("**/api/checkout/99", (route) =>
+    route.fulfill({
+      json: {
+        paymentId: 17,
+        checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
+      },
+    }),
+  );
+  await page.route("https://pagamento.pagbank.com.br/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: '<script>location.replace("http://127.0.0.1:4173/?status=approved")</script>',
+    }),
+  );
+  await page.route("**/api/payments/17", (route) =>
+    route.fulfill({ json: { paymentId: 17, orderId: 99, amount: 48.9, status: 2 } }),
+  );
 
   await page.route("**/ws/38400000/json/**", async (route) => {
     await route.fulfill({
@@ -92,9 +117,11 @@ test("deve simular o fluxo completo de compra com entrega", async ({ page }) => 
   await expect(page.locator("#review-address")).toContainText("123");
   await expect(page.locator("#review-total")).toContainText("R$");
 
-  await page.locator("#order-notes").fill("Sem cebola.");
+  await page.locator("#order-notes").fill("Sem cebola. Pão, açúcar, ç, 🍔, 🥤, € + & # %");
 
-  await page.locator("#finish-order-btn").click();
+  await page.locator("#go-to-payment-btn").click();
+  await expect(page.locator("#confirm-whatsapp-btn")).toBeVisible();
+  await page.locator("#confirm-whatsapp-btn").click();
 
   await expect
     .poll(async () => {
@@ -104,6 +131,19 @@ test("deve simular o fluxo completo de compra com entrega", async ({ page }) => 
 
   const whatsappUrl = await page.evaluate(() => window.__openedUrls[0]);
   const decodedUrl = decodeURIComponent(whatsappUrl);
+  const originalMessage = await page.evaluate(
+    () => JSON.parse(sessionStorage.getItem("burger-house-checkout")).message,
+  );
+  const whatsapp = new URL(whatsappUrl);
+  expect(whatsapp.origin + whatsapp.pathname).toBe("https://api.whatsapp.com/send/");
+  expect(whatsapp.searchParams.get("text")).toBe(originalMessage);
+  expect(whatsappUrl.split("&text=")[1]).toBe(encodeURIComponent(originalMessage));
+  expect(originalMessage.startsWith("🍔 *Novo Pedido - The Burger House*\n\n")).toBe(true);
+  for (const text of ["Itens do pedido", "Resumo", "Endereço", "Observações", "Uberlândia", "Pão, açúcar, ç, 🍔, 🥤, € + & # %"]) {
+    expect(originalMessage).toContain(text);
+  }
+  expect(originalMessage).not.toContain("\uFFFD");
+  expect(whatsappUrl).not.toContain("%EF%BF%BD");
 
   expect(whatsappUrl).toMatch(/whatsapp|wa\.me/i);
   expect(decodedUrl).toContain("O Praiano");
@@ -205,7 +245,9 @@ test("deve enviar observações longas no pedido final", async ({ page }) => {
   await page.locator("#house-number").fill("123");
   await page.locator("#go-to-review-btn").click();
   await page.locator("#order-notes").fill(longNotes);
-  await page.locator("#finish-order-btn").click();
+  await page.locator("#go-to-payment-btn").click();
+  await expect(page.locator("#confirm-whatsapp-btn")).toBeVisible();
+  await page.locator("#confirm-whatsapp-btn").click();
 
   await expect
     .poll(async () => {

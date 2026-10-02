@@ -52,6 +52,8 @@ export const elements = {
 
   reviewModal: /** @type {HTMLElement | null} */ (document.getElementById("review-modal")),
 
+  paymentModal: /** @type {HTMLElement | null} */ (document.getElementById("payment-modal")),
+
   cartBtn: /** @type {HTMLButtonElement | null} */ (document.getElementById("cart-btn")),
 
   cartFooter: /** @type {HTMLElement | null} */ (document.querySelector(".cart-footer")),
@@ -76,9 +78,15 @@ export const elements = {
     document.getElementById("back-to-address-btn")
   ),
 
-  finishOrderBtn: /** @type {HTMLButtonElement | null} */ (
-    document.getElementById("finish-order-btn")
+  goToPaymentBtn: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById("go-to-payment-btn")
   ),
+
+  backToReviewBtn: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById("back-to-review-btn")
+  ),
+
+  paymentError: /** @type {HTMLElement | null} */ (document.getElementById("payment-error")),
 
   cartItemsContainer: /** @type {HTMLElement | null} */ (document.getElementById("cart-items")),
 
@@ -246,6 +254,10 @@ export function closeAllModals(restoreFocus = true) {
     elements.reviewModal.classList.add("hidden");
   }
 
+  if (elements.paymentModal) {
+    elements.paymentModal.classList.add("hidden");
+  }
+
   document.body.style.overflow = "";
 
   activeModal = null;
@@ -275,15 +287,17 @@ export function bindModalCloseEvents() {
     trapFocus(event);
   });
 
-  [elements.cartModal, elements.addressModal, elements.reviewModal].forEach((modal) => {
-    if (!modal) return;
+  [elements.cartModal, elements.addressModal, elements.reviewModal, elements.paymentModal].forEach(
+    (modal) => {
+      if (!modal) return;
 
-    modal.addEventListener("click", (event) => {
-      if (event.target === modal) {
-        closeAllModals();
-      }
-    });
-  });
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          closeAllModals();
+        }
+      });
+    },
+  );
 }
 
 /**
@@ -335,37 +349,22 @@ export function hideAddressWarning() {
 }
 
 /**
- * @param {boolean} isLoading
+ * @param {string} message
  */
-export function setFinishButtonLoading(isLoading) {
-  const button = elements.finishOrderBtn;
+export function showPaymentError(message) {
+  if (!elements.paymentError) return;
 
-  if (!button) return;
+  elements.paymentError.textContent = message;
 
-  if (isLoading) {
-    button.disabled = true;
+  elements.paymentError.classList.remove("hidden");
+}
 
-    button.dataset.originalHtml = button.innerHTML;
+export function hidePaymentError() {
+  if (!elements.paymentError) return;
 
-    button.classList.add("opacity-80", "cursor-not-allowed");
+  elements.paymentError.textContent = "";
 
-    button.innerHTML = `
-      <span class="inline-flex items-center gap-2">
-        <span class="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
-        ${translate("order.sending")}
-      </span>
-    `;
-
-    return;
-  }
-
-  button.disabled = false;
-
-  button.classList.remove("opacity-80", "cursor-not-allowed");
-
-  if (button.dataset.originalHtml) {
-    button.innerHTML = button.dataset.originalHtml;
-  }
+  elements.paymentError.classList.add("hidden");
 }
 
 export function renderMenu() {
