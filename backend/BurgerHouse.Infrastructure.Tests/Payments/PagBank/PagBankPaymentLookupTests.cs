@@ -54,9 +54,10 @@ public class PagBankPaymentLookupTests
         Assert.Equal("BRL", snapshot.Currency);
         Assert.Equal("payment:17", snapshot.ReferenceId);
         Assert.Equal(HttpMethod.Get, captured!.Method);
-        Assert.EndsWith("/charges/CHAR_1", captured.RequestUri!.ToString(), StringComparison.Ordinal);
+        Assert.Equal("https://sandbox.api.pagseguro.com/charges/CHAR_1", captured.RequestUri!.ToString());
         Assert.Equal("Bearer", captured.Headers.Authorization!.Scheme);
         Assert.Equal("local-test-token", captured.Headers.Authorization.Parameter);
+        Assert.Equal("*/*", Assert.Single(captured.Headers.Accept).ToString());
     }
 
     [Fact]
@@ -69,6 +70,7 @@ public class PagBankPaymentLookupTests
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized)]
     [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.NotAcceptable)]
     [InlineData(HttpStatusCode.TooManyRequests)]
     [InlineData(HttpStatusCode.InternalServerError)]
     public async Task RejectsProviderErrors(HttpStatusCode status)

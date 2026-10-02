@@ -39,7 +39,7 @@ public sealed class PagBankPaymentLookup
             new Uri(_baseUri, $"charges/{Uri.EscapeDataString(externalPaymentId.Trim())}")
         );
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
         using var response = await _httpClient.SendAsync(
             request,
             HttpCompletionOption.ResponseHeadersRead,
