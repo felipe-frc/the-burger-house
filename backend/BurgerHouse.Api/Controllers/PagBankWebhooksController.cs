@@ -33,8 +33,19 @@ public sealed class PagBankWebhooksController(
         {
             var rawBody = await ReadBodyAsync(ct);
             var signatures = Request.Headers["x-payload-signature"].ToArray();
-            if (!await signatureValidator.IsValidAsync(rawBody, signatures, ct))
-                return Unauthorized(new { error = "Invalid webhook signature." });
+            try
+            {
+                if (!await signatureValidator.IsValidAsync(rawBody, signatures, ct))
+                {
+                    logger?.LogWarning("PagBank webhook signature validation failed.");
+                    return Unauthorized(new { error = "Invalid webhook signature." });
+                }
+            }
+            catch (HttpRequestException)
+            {
+                logger?.LogError("PagBank webhook public key verification unavailable.");
+                return StatusCode(502, new { error = "PagBank verification failed." });
+            }
 
             var webhook = JsonSerializer.Deserialize<PagBankWebhookRequest>(rawBody.Span, JsonOptions)
                 ?? throw new JsonException("Webhook body is empty.");

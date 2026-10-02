@@ -245,6 +245,30 @@ public class PagBankWebhooksControllerTests
         Assert.Equal(OrderStatus.PendingPayment, await fixture.OrderStatus());
     }
 
+    [Theory]
+    [InlineData("401")]
+    [InlineData("403")]
+    [InlineData("404")]
+    [InlineData("500")]
+    [InlineData("timeout")]
+    [InlineData("json")]
+    [InlineData("base64")]
+    [InlineData("x509")]
+    public async Task PublicKeyFailuresReturn502WithoutCallingChargeApi(string failure)
+    {
+        using var fixture = new Fixture { PublicKeyFailure = failure };
+        Assert.Equal(502, Assert.IsType<ObjectResult>(await fixture.Receive()).StatusCode);
+        Assert.Equal(0, fixture.LookupCalls);
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+    }
+
+    [Fact]
+    public async Task MultipleHeaderOccurrencesAcceptOneValidSignature()
+    {
+        using var fixture = new Fixture { MultipleSignatures = true };
+        Assert.IsType<OkObjectResult>(await fixture.Receive());
+    }
+
     private static bool Synchronized(IActionResult result)
     {
         var body = JsonSerializer.SerializeToElement(Assert.IsType<OkObjectResult>(result).Value);
@@ -269,6 +293,8 @@ public class PagBankWebhooksControllerTests
         public ChargeSpec[]? WebhookCharges;
         public HttpStatusCode LookupStatus = HttpStatusCode.OK;
         public bool InvalidLookupJson;
+        public string? PublicKeyFailure;
+        public bool MultipleSignatures;
         public int LookupCalls;
         public bool TransactionObservedDuringLookup;
 
@@ -301,13 +327,25 @@ public class PagBankWebhooksControllerTests
         public async Task<IActionResult> Receive(bool validSignature = true)
         {
             await using var db = Open();
-            using var signatureHttp = new HttpClient(new Stub(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            using var signatureHttp = new HttpClient(new Stub(_ =>
             {
-                Content = new StringContent(JsonSerializer.Serialize(new
+                if (PublicKeyFailure == "timeout") throw new TaskCanceledException();
+                if (int.TryParse(PublicKeyFailure, out var status))
+                    return Task.FromResult(new HttpResponseMessage((HttpStatusCode)status));
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    public_key = Convert.ToBase64String(_signer.ExportSubjectPublicKeyInfo())
-                }))
-            })));
+                    Content = new StringContent(PublicKeyFailure == "json" ? "not-json" :
+                        JsonSerializer.Serialize(new
+                        {
+                            public_key = PublicKeyFailure switch
+                            {
+                                "base64" => "not-base64",
+                                "x509" => "AA==",
+                                _ => Convert.ToBase64String(_signer.ExportSubjectPublicKeyInfo())
+                            }
+                        }))
+                });
+            }));
             using var lookupHttp = new HttpClient(new Stub(_ =>
             {
                 Interlocked.Increment(ref LookupCalls);
@@ -374,6 +412,8 @@ public class PagBankWebhooksControllerTests
             context.Request.ContentLength = body.Length;
             context.Request.ContentType = "application/json";
             context.Request.Headers["x-payload-signature"] = validSignature ? signature : "invalid";
+            if (MultipleSignatures)
+                context.Request.Headers.Append("x-payload-signature", "invalid");
             controller.ControllerContext = new ControllerContext { HttpContext = context };
             return await controller.Receive(default);
         }

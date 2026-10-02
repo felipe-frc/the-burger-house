@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 
 namespace BurgerHouse.Infrastructure.Payments.PagBank;
 
@@ -15,12 +16,15 @@ public sealed class PagBankWebhookSignatureValidator
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
     private byte[]? _cachedPublicKey;
     private DateTime _cacheExpiresAt;
+    private readonly ILogger<PagBankWebhookSignatureValidator>? _logger;
 
-    public PagBankWebhookSignatureValidator(HttpClient httpClient, IOptions<PagBankOptions> options)
+    public PagBankWebhookSignatureValidator(HttpClient httpClient, IOptions<PagBankOptions> options,
+        ILogger<PagBankWebhookSignatureValidator>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(options);
         _httpClient = httpClient;
+        _logger = logger;
         _token = options.Value.Token;
         if (string.IsNullOrWhiteSpace(_token))
             throw new InvalidOperationException("PagBank token was not configured.");
@@ -35,16 +39,50 @@ public sealed class PagBankWebhookSignatureValidator
         IEnumerable<string?> signatureHeaders,
         CancellationToken cancellationToken = default)
     {
-        if (rawBody.IsEmpty) return false;
         var signatures = signatureHeaders
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value!)
             .SelectMany(value => value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToArray();
-        if (signatures.Length == 0) return false;
+        var fingerprint = "unavailable";
+        var cachedValidation = "not-attempted";
+        var refreshedValidation = "not-attempted";
+        var refreshExecuted = false;
+        try
+        {
+            if (rawBody.IsEmpty || signatures.Length == 0)
+            {
+                cachedValidation = "failure";
+                return false;
+            }
+            var publicKey = await GetPublicKeyAsync(false, cancellationToken);
+            fingerprint = HashPrefix(publicKey);
+            var valid = Verify(rawBody, signatures, publicKey);
+            cachedValidation = valid ? "success" : "failure";
+            if (valid) return true;
 
-        var publicKey = await GetPublicKeyAsync(cancellationToken);
+            refreshExecuted = true;
+            publicKey = await GetPublicKeyAsync(true, cancellationToken);
+            fingerprint = HashPrefix(publicKey);
+            valid = Verify(rawBody, signatures, publicKey);
+            refreshedValidation = valid ? "success" : "failure";
+            return valid;
+        }
+        finally
+        {
+            _logger?.LogInformation(
+                "PagBank webhook signature validation. bodyLength: {bodyLength}, signatureCount: {signatureCount}, bodySha256Prefix: {bodySha256Prefix}, publicKeyFingerprint: {publicKeyFingerprint}, cacheValidation: {cacheValidation}, refreshExecuted: {refreshExecuted}, refreshValidation: {refreshValidation}.",
+                rawBody.Length, signatures.Length, HashPrefix(rawBody.Span), fingerprint,
+                cachedValidation, refreshExecuted, refreshedValidation);
+        }
+    }
+
+    private static string HashPrefix(ReadOnlySpan<byte> value) =>
+        Convert.ToHexString(SHA256.HashData(value))[..12];
+
+    private static bool Verify(ReadOnlyMemory<byte> rawBody, string[] signatures, byte[] publicKey)
+    {
         using var ecdsa = ECDsa.Create();
         ecdsa.ImportSubjectPublicKeyInfo(publicKey, out _);
         foreach (var signature in signatures)
@@ -58,21 +96,21 @@ public sealed class PagBankWebhookSignatureValidator
                         DSASignatureFormat.Rfc3279DerSequence))
                     return true;
             }
-            catch (FormatException)
+            catch (Exception exception) when (exception is FormatException or CryptographicException)
             {
-                // Invalid Base64 is an invalid signature, not an application failure.
+                // The key was already imported; malformed Base64/DER is an invalid signature.
             }
         }
         return false;
     }
 
-    private async Task<byte[]> GetPublicKeyAsync(CancellationToken cancellationToken)
+    private async Task<byte[]> GetPublicKeyAsync(bool forceRefresh, CancellationToken cancellationToken)
     {
-        if (_cachedPublicKey is not null && _cacheExpiresAt > DateTime.UtcNow)
-            return _cachedPublicKey;
         await _cacheLock.WaitAsync(cancellationToken);
         try
         {
+            // All cache reads, invalidations and publications share the same lock.
+            if (forceRefresh) _cachedPublicKey = null;
             if (_cachedPublicKey is not null && _cacheExpiresAt > DateTime.UtcNow)
                 return _cachedPublicKey;
             using var request = new HttpRequestMessage(
@@ -97,14 +135,23 @@ public sealed class PagBankWebhookSignatureValidator
                 );
                 if (string.IsNullOrWhiteSpace(payload?.PublicKey))
                     throw new JsonException("PagBank returned no webhook public key.");
-                _cachedPublicKey = Convert.FromBase64String(payload.PublicKey);
+                var publicKey = Convert.FromBase64String(payload.PublicKey);
+                using var ecdsa = ECDsa.Create();
+                ecdsa.ImportSubjectPublicKeyInfo(publicKey, out var bytesRead);
+                if (bytesRead != publicKey.Length)
+                    throw new CryptographicException("Trailing bytes in webhook public key.");
+                _cachedPublicKey = publicKey;
             }
-            catch (Exception exception) when (exception is JsonException or FormatException)
+            catch (Exception exception) when (exception is JsonException or FormatException or CryptographicException)
             {
                 throw new HttpRequestException("PagBank returned an invalid webhook public key.", exception);
             }
             _cacheExpiresAt = DateTime.UtcNow.Add(CacheDuration);
             return _cachedPublicKey;
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new HttpRequestException("PagBank webhook public key request timed out.", exception);
         }
         finally
         {
