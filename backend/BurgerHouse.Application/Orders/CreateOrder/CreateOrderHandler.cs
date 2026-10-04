@@ -32,7 +32,7 @@ public class CreateOrderHandler
         }
 
         var normalizedOrderType =
-            request.OrderType
+            (request.OrderType ?? string.Empty)
                 .Trim()
                 .ToLowerInvariant();
 
@@ -47,7 +47,9 @@ public class CreateOrderHandler
         };
 
         var order = new Order(
-            deliveryFee: deliveryFee
+            deliveryFee, normalizedOrderType, request.CustomerName, request.CustomerPhone,
+            request.ZipCode, request.Street, request.HouseNumber, request.Neighborhood,
+            request.City, request.Complement, request.Observation
         );
 
         foreach (var requestedItem in request.Items)

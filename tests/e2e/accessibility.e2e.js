@@ -49,6 +49,8 @@ async function openAddressModal(page) {
 }
 
 async function openReviewModal(page) {
+  await page.locator("#customer-name").fill("Cliente Teste");
+  await page.locator("#customer-phone").fill("11999990000");
   await page.evaluate(() => {
     const pickupInput = document.querySelector("#order-type-pickup");
 

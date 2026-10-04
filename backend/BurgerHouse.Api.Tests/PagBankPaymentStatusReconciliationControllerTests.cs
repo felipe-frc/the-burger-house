@@ -33,7 +33,7 @@ public class PagBankPaymentStatusReconciliationControllerTests
             await using (var setup = new BurgerHouseDbContext(dbOptions))
             {
                 await setup.Database.EnsureCreatedAsync();
-                var order = new Order(0);
+                var order = new Order(0, "pickup", "Cliente Teste", "11999990000");
                 order.AddItem(new OrderItem(1, 1, 43.90m));
                 setup.Orders.Add(order);
                 await setup.SaveChangesAsync();

@@ -30,6 +30,22 @@ test.beforeEach(async ({ page }) => {
 
   await page.route("**/api/orders", async (route) => {
     const body = route.request().postDataJSON();
+    expect(body.customerName).toBe("Cliente Teste");
+    expect(body.customerPhone).toBe("11999990000");
+    if (body.orderType === "pickup") {
+      for (const field of [
+        "zipCode",
+        "street",
+        "houseNumber",
+        "neighborhood",
+        "city",
+        "complement",
+      ])
+        expect(body[field]).toBeNull();
+    } else {
+      for (const field of ["zipCode", "street", "houseNumber", "neighborhood", "city"])
+        expect(body[field]).toBeTruthy();
+    }
     const deliveryFee = body.orderType === "pickup" ? 0 : 5;
     await route.fulfill({
       json: { orderId: 99, subtotal: 43.9, deliveryFee, total: 43.9 + deliveryFee },
@@ -97,6 +113,8 @@ test("deve simular o fluxo completo de compra com entrega", async ({ page }) => 
   await expect(page.locator("#cart-items")).toContainText("O Praiano");
 
   await page.locator("#go-to-address-btn").click();
+  await page.locator("#customer-name").fill("Cliente Teste");
+  await page.locator("#customer-phone").fill("11999990000");
 
   await expect(page.locator("#address-modal")).toBeVisible();
 
@@ -167,6 +185,8 @@ test("deve permitir retirada no local sem preencher endereço", async ({ page })
   await openCart(page);
 
   await page.locator("#go-to-address-btn").click();
+  await page.locator("#customer-name").fill("Cliente Teste");
+  await page.locator("#customer-phone").fill("11999990000");
 
   await expect(page.locator("#address-modal")).toBeVisible();
 
@@ -205,6 +225,8 @@ test("deve exibir aviso para CEP inválido", async ({ page }) => {
   await addFirstProductToCart(page);
   await openCart(page);
   await page.locator("#go-to-address-btn").click();
+  await page.locator("#customer-name").fill("Cliente Teste");
+  await page.locator("#customer-phone").fill("11999990000");
   await page.locator("#cep").fill("00000000");
 
   await expect(page.locator("#address-warn")).toContainText(/CEP n.o encontrado/i);
@@ -248,6 +270,8 @@ test("deve enviar observações longas no pedido final", async ({ page }) => {
   await addFirstProductToCart(page);
   await openCart(page);
   await page.locator("#go-to-address-btn").click();
+  await page.locator("#customer-name").fill("Cliente Teste");
+  await page.locator("#customer-phone").fill("11999990000");
   await page.locator("#cep").fill("38400000");
   await page.locator("#house-number").fill("123");
   await page.locator("#go-to-review-btn").click();
@@ -289,6 +313,8 @@ test("deve permitir remover item antes da revisão e seguir com o item restante"
   await expect(page.locator("#cart-items")).toContainText("O Famoso Onion Ring");
 
   await page.locator("#go-to-address-btn").click();
+  await page.locator("#customer-name").fill("Cliente Teste");
+  await page.locator("#customer-phone").fill("11999990000");
   await page.locator("#cep").fill("38400000");
   await page.locator("#house-number").fill("123");
   await page.locator("#go-to-review-btn").click();

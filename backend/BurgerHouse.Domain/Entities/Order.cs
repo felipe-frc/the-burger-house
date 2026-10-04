@@ -13,14 +13,55 @@ public class Order
     public OrderStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    public string OrderType { get; private set; } = string.Empty;
+    public string CustomerName { get; private set; } = string.Empty;
+    public string CustomerPhone { get; private set; } = string.Empty;
+    public string? ZipCode { get; private set; }
+    public string? Street { get; private set; }
+    public string? HouseNumber { get; private set; }
+    public string? Neighborhood { get; private set; }
+    public string? City { get; private set; }
+    public string? Complement { get; private set; }
+    public string? Observation { get; private set; }
+
     public IReadOnlyCollection<OrderItem> Items => _items.AsReadOnly();
 
-    public Order(decimal deliveryFee)
+    private Order() { } // EF Core can materialize historical orders without fulfillment data.
+
+    public Order(decimal deliveryFee, string orderType, string customerName, string customerPhone,
+        string? zipCode = null, string? street = null, string? houseNumber = null,
+        string? neighborhood = null, string? city = null, string? complement = null,
+        string? observation = null)
     {
         if (deliveryFee < 0)
             throw new ArgumentException("Delivery fee cannot be negative.");
 
         DeliveryFee = deliveryFee;
+        OrderType = Required(orderType, 10, nameof(OrderType)).ToLowerInvariant();
+        if (OrderType is not ("delivery" or "pickup"))
+            throw new ArgumentException("Order type must be 'delivery' or 'pickup'.");
+        CustomerName = Required(customerName, 120, nameof(CustomerName));
+        CustomerPhone = Required(customerPhone, 25, nameof(CustomerPhone));
+        var digits = CustomerPhone.Count(char.IsAsciiDigit);
+        if (digits is < 10 or > 15 || CustomerPhone.Any(c => !char.IsAsciiDigit(c) && !" +-()".Contains(c)))
+            throw new ArgumentException("Customer phone must contain a valid phone number.");
+        ZipCode = Optional(zipCode, 10, nameof(ZipCode));
+        Street = Optional(street, 200, nameof(Street));
+        HouseNumber = Optional(houseNumber, 20, nameof(HouseNumber));
+        Neighborhood = Optional(neighborhood, 120, nameof(Neighborhood));
+        City = Optional(city, 120, nameof(City));
+        Complement = Optional(complement, 200, nameof(Complement));
+        Observation = Optional(observation, 2000, nameof(Observation));
+        if (OrderType == "delivery")
+        {
+            ZipCode = Required(ZipCode, 10, nameof(ZipCode));
+            if (!System.Text.RegularExpressions.Regex.IsMatch(ZipCode, @"^[0-9]{5}-?[0-9]{3}$"))
+                throw new ArgumentException("Delivery zip code is invalid.");
+            Street = Required(Street, 200, nameof(Street));
+            HouseNumber = Required(HouseNumber, 20, nameof(HouseNumber));
+            Neighborhood = Required(Neighborhood, 120, nameof(Neighborhood));
+            City = Required(City, 120, nameof(City));
+        }
         Status = OrderStatus.PendingPayment;
         CreatedAt = DateTime.UtcNow;
     }
@@ -35,6 +76,17 @@ public class Order
             );
 
         _items.Add(item);
+    }
+
+    private static string Required(string? value, int limit, string field) =>
+        Optional(value, limit, field) ?? throw new ArgumentException($"{field} is required.");
+
+    private static string? Optional(string? value, int limit, string field)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text)) return null;
+        if (text.Length > limit) throw new ArgumentException($"{field} exceeds the maximum length.");
+        return text;
     }
 
     public void MarkAsReceived()

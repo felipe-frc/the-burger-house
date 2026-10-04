@@ -55,10 +55,25 @@ describe("payment status API", () => {
 it("posts the order and obtains hosted checkout without payment data", async () => {
   const { createOrder, createCheckout } = await import("../scripts/api.js");
   const items = [{ productCode: "burger-praiano", quantity: 1, observation: null }];
-  await createOrder("pickup", items);
+  const fulfillment = {
+    customerName: "Cliente Teste",
+    customerPhone: "11999990000",
+    zipCode: null,
+    street: null,
+    houseNumber: null,
+    neighborhood: null,
+    city: null,
+    complement: null,
+    observation: "Sem cebola",
+  };
+  await createOrder({ orderType: "pickup", items, ...fulfillment });
   await createCheckout(99);
   expect(fetch.mock.calls[0][0]).toContain("/api/orders");
-  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ orderType: "pickup", items });
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+    orderType: "pickup",
+    items,
+    ...fulfillment,
+  });
   expect(fetch.mock.calls[1][0]).toContain("/api/checkout/99");
   expect(fetch.mock.calls[1][1].method).toBe("POST");
   expect(fetch.mock.calls[1][1].body).toBeUndefined();

@@ -36,14 +36,11 @@ async function request(path, options = {}) {
   return data;
 }
 
-export async function createOrder(orderType, items) {
+export async function createOrder(orderPayload) {
   return request("/api/orders", {
     method: "POST",
 
-    body: JSON.stringify({
-      orderType,
-      items,
-    }),
+    body: JSON.stringify(orderPayload),
   });
 }
 

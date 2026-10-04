@@ -106,6 +106,9 @@ const translations = {
     "review.subtotal": "Subtotal",
     "review.deliveryFee": "Taxa de entrega",
 
+    "address.customerName": "Nome*",
+    "address.customerPhone": "Telefone com DDD*",
+    "address.customerRequired": "Informe seu nome e um telefone válido com DDD.",
     "whatsapp.newOrder": "Novo Pedido - The Burger House",
     "whatsapp.orderType": "Tipo de pedido",
     "whatsapp.items": "Itens do pedido",
@@ -225,6 +228,9 @@ const translations = {
     "review.subtotal": "Subtotal",
     "review.deliveryFee": "Delivery fee",
 
+    "address.customerName": "Name*",
+    "address.customerPhone": "Phone with area code*",
+    "address.customerRequired": "Enter your name and a valid phone number with area code.",
     "whatsapp.newOrder": "New Order - The Burger House",
     "whatsapp.orderType": "Order type",
     "whatsapp.items": "Order items",

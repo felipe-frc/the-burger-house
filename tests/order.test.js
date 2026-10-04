@@ -57,7 +57,7 @@ function setupOrderDom() {
       class="hidden"
     ></span>
 
-    <input id="cep" />
+    <input id="customer-name" value="Cliente Teste" /><input id="customer-phone" value="11999990000" /><input id="cep" />
     <input id="street" />
     <input id="neighborhood" />
     <input id="city" />
@@ -222,6 +222,8 @@ it.each(["pickup", "delivery"])(
 it("restores delivery fields and notes when returning in the same tab", async () => {
   let { order } = await setup("delivery");
   const fields = {
+    "customer-name": "Cliente Teste",
+    "customer-phone": "11999990000",
     cep: "38400-000",
     street: "Rua dos Testes",
     neighborhood: "Centro",

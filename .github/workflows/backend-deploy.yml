@@ -1,12 +1,19 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
+# Docs for the Azure Web Apps Deploy action:
+# https://github.com/Azure/webapps-deploy
+#
+# More GitHub Actions for Azure:
+# https://github.com/Azure/actions
 
-name: Build and deploy ASP.Net Core app to Azure Web App - the-burger-house-api
+name: Build and deploy ASP.NET Core app to Azure Web App - the-burger-house-api
 
 on:
   push:
     branches:
-      - feat/backend-foundation
+      - main
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-deploy.yml"
+
   workflow_dispatch:
 
 jobs:
@@ -20,16 +27,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up .NET Core
+      - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "9.x"
 
       - name: Restore dependencies
-        run: dotnet restore backend/BurgerHouse.Api/BurgerHouse.Api.csproj
+        run: dotnet restore backend/BurgerHouse.sln
 
       - name: Build
-        run: dotnet build backend/BurgerHouse.Api/BurgerHouse.Api.csproj --configuration Release --no-restore
+        run: dotnet build backend/BurgerHouse.sln --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test backend/BurgerHouse.sln --configuration Release --no-build
 
       - name: Publish
         run: dotnet publish backend/BurgerHouse.Api/BurgerHouse.Api.csproj --configuration Release --no-build --output ${{ env.DOTNET_ROOT }}/myapp /p:UseAppHost=false

@@ -59,7 +59,7 @@ beforeEach(() => {
   mocks.orderType = "pickup";
   mocks.cart = [{ id: "burger-praiano", quantity: 1, price: 43.9 }];
   document.body.innerHTML =
-    '<p id="checkout-status"></p><button id="check-payment-btn"></button><button id="confirm-whatsapp-btn" class="hidden"></button>';
+    '<input id="customer-name" value="Cliente Teste" /><input id="customer-phone" value="11999990000" /><p id="checkout-status"></p><button id="check-payment-btn"></button><button id="confirm-whatsapp-btn" class="hidden"></button>';
   mocks.createOrder.mockResolvedValue({ orderId: 99, subtotal: 43.9, deliveryFee: 0, total: 43.9 });
   mocks.createCheckout.mockResolvedValue({
     paymentId: 17,
@@ -75,9 +75,19 @@ afterEach(() => {
 it("creates an order and PagBank checkout, preserving return context without choosing a method", async () => {
   const { openPaymentStep } = await import("../scripts/order.js");
   await openPaymentStep();
-  expect(mocks.createOrder).toHaveBeenCalledWith("pickup", [
-    { productCode: "burger-praiano", quantity: 1, observation: null },
-  ]);
+  expect(mocks.createOrder).toHaveBeenCalledWith({
+    orderType: "pickup",
+    items: [{ productCode: "burger-praiano", quantity: 1, observation: null }],
+    customerName: "Cliente Teste",
+    customerPhone: "11999990000",
+    zipCode: null,
+    street: null,
+    houseNumber: null,
+    neighborhood: null,
+    city: null,
+    complement: null,
+    observation: null,
+  });
   expect(mocks.createCheckout).toHaveBeenCalledWith(99);
   const context = JSON.parse(sessionStorage.getItem("burger-house-checkout"));
   expect(context.paymentId).toBe(17);
@@ -145,7 +155,7 @@ it("preserves delivery selection and blocks invalid addresses", async () => {
   expect(mocks.createOrder).not.toHaveBeenCalled();
   mocks.validAddress = true;
   await openPaymentStep();
-  expect(mocks.createOrder.mock.calls[0][0]).toBe("delivery");
+  expect(mocks.createOrder.mock.calls[0][0].orderType).toBe("delivery");
 });
 
 it.each(["createOrder", "createCheckout"])("shows safe API errors from %s", async (operation) => {
@@ -226,6 +236,280 @@ it("uses the fallback without logging arbitrary thrown objects", async () => {
   mocks.createOrder.mockRejectedValue({ message: "private-value", token: "private-token" });
   await (await import("../scripts/order.js")).openPaymentStep();
   expect(mocks.toast).toHaveBeenCalledWith("Não foi possível abrir o checkout. Tente novamente.");
+  expect(console.error).not.toHaveBeenCalled();
+});
+
+it.each(["delivery", "pickup"])(
+  "sends complete %s fulfillment before creating checkout",
+  async (type) => {
+    mocks.orderType = type;
+    const values = {
+      "customer-name": " Cliente Teste ",
+      "customer-phone": " 11999990000 ",
+      cep: " 38400-000 ",
+      street: " Rua Teste ",
+      "house-number": " 10 ",
+      neighborhood: " Centro ",
+      city: " Cidade ",
+      complement: " Apto ",
+      "order-notes": " Sem cebola ",
+    };
+    for (const [id, value] of Object.entries(values)) {
+      let input = document.getElementById(id);
+      if (!input) {
+        input = document.createElement("input");
+        input.id = id;
+        document.body.append(input);
+      }
+      input.value = value;
+    }
+    await (await import("../scripts/order.js")).openPaymentStep();
+    const details = mocks.createOrder.mock.calls[0][0];
+    expect(details).toEqual({
+      orderType: type,
+      items: [{ productCode: "burger-praiano", quantity: 1, observation: null }],
+      customerName: "Cliente Teste",
+      customerPhone: "11999990000",
+      zipCode: type === "delivery" ? "38400-000" : null,
+      street: type === "delivery" ? "Rua Teste" : null,
+      houseNumber: type === "delivery" ? "10" : null,
+      neighborhood: type === "delivery" ? "Centro" : null,
+      city: type === "delivery" ? "Cidade" : null,
+      complement: type === "delivery" ? "Apto" : null,
+      observation: "Sem cebola",
+    });
+    expect(mocks.createOrder.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.createCheckout.mock.invocationCallOrder[0],
+    );
+    expect(details.items[0].observation).toBeNull();
+    expect(JSON.parse(sessionStorage.getItem("burger-house-checkout")).fingerprint).toBe(
+      "v2:" + JSON.stringify(details),
+    );
+  },
+);
+
+it.each([
+  ["customer-name", " "],
+  ["customer-phone", ""],
+  ["customer-phone", "123"],
+])("blocks missing or invalid customer field %s", async (id, value) => {
+  document.getElementById(id).value = value;
+  await (await import("../scripts/order.js")).openPaymentStep();
+  expect(mocks.createOrder).not.toHaveBeenCalled();
+  expect(mocks.createCheckout).not.toHaveBeenCalled();
+  expect(console.error).not.toHaveBeenCalled();
+});
+
+it("creates a new order after fulfillment edits instead of paying stale customer details", async () => {
+  mocks.createCheckout.mockRejectedValue(new Error("offline"));
+  const { openPaymentStep } = await import("../scripts/order.js");
+  await openPaymentStep();
+  document.getElementById("customer-phone").value = "11888880000";
+  await openPaymentStep();
+  expect(mocks.createOrder).toHaveBeenCalledTimes(2);
+  expect(mocks.createOrder.mock.calls[1][0].customerPhone).toBe("11888880000");
+});
+
+function fillFulfillment(overrides = {}) {
+  const fields = {
+    "customer-name": "Cliente Teste",
+    "customer-phone": "11999990000",
+    cep: "38400-000",
+    street: "Rua Teste",
+    "house-number": "10",
+    neighborhood: "Centro",
+    city: "Cidade",
+    complement: "Apto",
+    "order-notes": "Sem cebola",
+    ...overrides,
+  };
+  for (const [id, value] of Object.entries(fields)) {
+    let input = document.getElementById(id);
+    if (!input) {
+      input = document.createElement("input");
+      input.id = id;
+      document.body.append(input);
+    }
+    input.value = value;
+  }
+  return fields;
+}
+
+function currentSession() {
+  return JSON.parse(sessionStorage.getItem("burger-house-checkout"));
+}
+
+it.each([
+  ["customer-name", "Outro Cliente"],
+  ["customer-phone", "11888880000"],
+  ["cep", "38401-000"],
+  ["street", "Outra Rua"],
+  ["house-number", "20"],
+  ["neighborhood", "Outro Bairro"],
+  ["city", "Outra Cidade"],
+  ["complement", "Casa"],
+  ["order-notes", "Sem picles"],
+  ["order-notes", ""],
+])("does not restore or reuse an old order when %s changes", async (field, value) => {
+  mocks.orderType = "delivery";
+  fillFulfillment();
+  mocks.createCheckout.mockRejectedValue(new Error("Checkout unavailable"));
+  let order = await import("../scripts/order.js");
+  await order.openPaymentStep();
+  const previous = currentSession();
+  document.getElementById(field).value = value;
+
+  // Reload the module to exercise stored session recovery, not only in-memory retries.
+  vi.resetModules();
+  order = await import("../scripts/order.js");
+  order.bindOrderEvents();
+  expect(document.getElementById(field).value).toBe(value);
+  mocks.createOrder.mockResolvedValue({
+    orderId: 100,
+    subtotal: 43.9,
+    deliveryFee: 5,
+    total: 48.9,
+  });
+  await order.openPaymentStep();
+
+  expect(mocks.createOrder).toHaveBeenCalledTimes(2);
+  expect(mocks.createCheckout).toHaveBeenLastCalledWith(100);
+  expect(currentSession().fingerprint).not.toBe(previous.fingerprint);
+  expect(currentSession().fingerprint).toBe(
+    "v2:" + JSON.stringify(mocks.createOrder.mock.calls[1][0]),
+  );
+});
+
+it("reuses identical normalized fulfillment after recovery and whitespace edits", async () => {
+  mocks.orderType = "delivery";
+  const fields = fillFulfillment({ complement: "", "order-notes": "" });
+  mocks.createCheckout.mockRejectedValue(new Error("Checkout unavailable"));
+  let order = await import("../scripts/order.js");
+  await order.openPaymentStep();
+  const identity = currentSession().fingerprint;
+  for (const [id, value] of Object.entries(fields))
+    document.getElementById(id).value = " " + value + " ";
+  vi.resetModules();
+  order = await import("../scripts/order.js");
+  order.bindOrderEvents();
+  await order.openPaymentStep();
+  expect(mocks.createOrder).toHaveBeenCalledTimes(1);
+  expect(mocks.createCheckout).toHaveBeenCalledTimes(2);
+  expect(currentSession().fingerprint).toBe(identity);
+});
+
+it("ignores pickup address leftovers in both payload and identity", async () => {
+  fillFulfillment();
+  mocks.createCheckout.mockRejectedValue(new Error("Checkout unavailable"));
+  const order = await import("../scripts/order.js");
+  await order.openPaymentStep();
+  const identity = currentSession().fingerprint;
+  for (const id of ["cep", "street", "house-number", "neighborhood", "city", "complement"])
+    document.getElementById(id).value = "changed unused address";
+  await order.openPaymentStep();
+  expect(mocks.createOrder).toHaveBeenCalledTimes(1);
+  expect(currentSession().fingerprint).toBe(identity);
+  const payload = mocks.createOrder.mock.calls[0][0];
+  for (const key of ["zipCode", "street", "houseNumber", "neighborhood", "city", "complement"])
+    expect(payload[key]).toBeNull();
+});
+
+it("never reuses a legacy cart-only identity for a new checkout", async () => {
+  const fields = fillFulfillment();
+  sessionStorage.setItem(
+    "burger-house-checkout",
+    JSON.stringify({
+      orderId: 44,
+      total: 43.9,
+      fields,
+      fingerprint: JSON.stringify({
+        orderType: "pickup",
+        items: [{ productCode: "burger-praiano", quantity: 1, observation: null }],
+      }),
+    }),
+  );
+  mocks.createCheckout.mockRejectedValue(new Error("Checkout unavailable"));
+  const order = await import("../scripts/order.js");
+  order.bindOrderEvents();
+  await order.openPaymentStep();
+  expect(mocks.createOrder).toHaveBeenCalledOnce();
+  expect(mocks.createCheckout).toHaveBeenCalledWith(99);
+  expect(currentSession().orderId).toBe(99);
+});
+
+it("restores a blank return form only when the stored full identity matches", async () => {
+  mocks.orderType = "delivery";
+  const fields = fillFulfillment();
+  mocks.createCheckout.mockRejectedValue(new Error("Checkout unavailable"));
+  let order = await import("../scripts/order.js");
+  await order.openPaymentStep();
+  for (const id of Object.keys(fields)) document.getElementById(id).value = "";
+  vi.resetModules();
+  order = await import("../scripts/order.js");
+  order.bindOrderEvents();
+  for (const [id, value] of Object.entries(fields))
+    expect(document.getElementById(id).value).toBe(value);
+  await order.openPaymentStep();
+  expect(mocks.createOrder).toHaveBeenCalledOnce();
+});
+
+it("does not restore saved fulfillment over a different cart", async () => {
+  const fields = fillFulfillment();
+  mocks.createCheckout.mockRejectedValue(new Error("Checkout unavailable"));
+  let order = await import("../scripts/order.js");
+  await order.openPaymentStep();
+  for (const id of Object.keys(fields)) document.getElementById(id).value = "";
+  mocks.cart = [{ ...mocks.cart[0], quantity: 2 }];
+  vi.resetModules();
+  order = await import("../scripts/order.js");
+  order.bindOrderEvents();
+  expect(document.getElementById("customer-name").value).toBe("");
+});
+
+it("keeps identity and saved fields tied to the submitted snapshot during async creation", async () => {
+  fillFulfillment();
+  let resolveOrder;
+  mocks.createOrder.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveOrder = resolve;
+      }),
+  );
+  mocks.createCheckout.mockRejectedValue(new Error("Checkout unavailable"));
+  const order = await import("../scripts/order.js");
+  const pending = order.openPaymentStep();
+  const payload = mocks.createOrder.mock.calls[0][0];
+  document.getElementById("customer-name").value = "Edited While Waiting";
+  resolveOrder({ orderId: 99, subtotal: 43.9, deliveryFee: 0, total: 43.9 });
+  await pending;
+  expect(currentSession().fields["customer-name"]).toBe(payload.customerName);
+  expect(currentSession().fingerprint).toBe("v2:" + JSON.stringify(payload));
+  await order.openPaymentStep();
+  expect(mocks.createOrder).toHaveBeenCalledTimes(2);
+  expect(mocks.createOrder.mock.calls[1][0].customerName).toBe("Edited While Waiting");
+});
+
+it("does not overwrite the snapshot or message while checkout is pending", async () => {
+  fillFulfillment({ "order-notes": "Original observation" });
+  let resolveCheckout;
+  mocks.createCheckout.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveCheckout = resolve;
+      }),
+  );
+  const order = await import("../scripts/order.js");
+  const pending = order.openPaymentStep();
+  await vi.waitFor(() => expect(mocks.createCheckout).toHaveBeenCalledOnce());
+  document.getElementById("order-notes").value = "Edited observation";
+  resolveCheckout({
+    paymentId: 17,
+    checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
+  });
+  await pending;
+  expect(currentSession().fields["order-notes"]).toBe("Original observation");
+  expect(currentSession().message).toContain("Original observation");
+  expect(currentSession().message).not.toContain("Edited observation");
   expect(console.error).not.toHaveBeenCalled();
 });
 

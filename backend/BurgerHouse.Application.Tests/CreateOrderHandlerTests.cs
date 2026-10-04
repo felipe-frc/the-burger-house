@@ -31,7 +31,7 @@ public class CreateOrderHandlerTests
 
         var request = new CreateOrderRequest
         {
-            OrderType = OrderTypes.Pickup,
+            OrderType = OrderTypes.Pickup, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ", Observation = " Sem cebola ",
 
             Items =
             [
@@ -51,6 +51,11 @@ public class CreateOrderHandlerTests
         Assert.Equal(87.80m, response.Subtotal);
         Assert.Equal(0m, response.DeliveryFee);
         Assert.Equal(87.80m, response.Total);
+        Assert.Equal("pickup", orderRepository.AddedOrder!.OrderType);
+        Assert.Equal("Cliente Teste", orderRepository.AddedOrder.CustomerName);
+        Assert.Equal("11999990000", orderRepository.AddedOrder.CustomerPhone);
+        Assert.Equal("Sem cebola", orderRepository.AddedOrder.Observation);
+        Assert.Null(orderRepository.AddedOrder.Street);
 
         Assert.NotNull(
             orderRepository.AddedOrder
@@ -96,7 +101,7 @@ public class CreateOrderHandlerTests
 
         var request = new CreateOrderRequest
         {
-            OrderType = OrderTypes.Delivery,
+            OrderType = OrderTypes.Delivery, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ", ZipCode = " 38400-000 ", Street = " Rua Teste ", HouseNumber = " 10 ", Neighborhood = " Centro ", City = " Cidade ", Complement = " Apto ", Observation = " Sem cebola ",
 
             Items =
             [
@@ -114,6 +119,17 @@ public class CreateOrderHandlerTests
         Assert.Equal(43.90m, response.Subtotal);
         Assert.Equal(5m, response.DeliveryFee);
         Assert.Equal(48.90m, response.Total);
+        var saved = orderRepository.AddedOrder!;
+        Assert.Equal("delivery", saved.OrderType);
+        Assert.Equal("Cliente Teste", saved.CustomerName);
+        Assert.Equal("11999990000", saved.CustomerPhone);
+        Assert.Equal("38400-000", saved.ZipCode);
+        Assert.Equal("Rua Teste", saved.Street);
+        Assert.Equal("10", saved.HouseNumber);
+        Assert.Equal("Centro", saved.Neighborhood);
+        Assert.Equal("Cidade", saved.City);
+        Assert.Equal("Apto", saved.Complement);
+        Assert.Equal("Sem cebola", saved.Observation);
 
         Assert.NotNull(
             orderRepository.AddedOrder
@@ -178,7 +194,7 @@ public class CreateOrderHandlerTests
 
         var request = new CreateOrderRequest
         {
-            OrderType = OrderTypes.Pickup,
+            OrderType = OrderTypes.Pickup, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ", Observation = " Sem cebola ",
             Items = []
         };
 
@@ -203,7 +219,7 @@ public class CreateOrderHandlerTests
 
         var request = new CreateOrderRequest
         {
-            OrderType = OrderTypes.Pickup,
+            OrderType = OrderTypes.Pickup, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ", Observation = " Sem cebola ",
 
             Items =
             [
@@ -249,7 +265,7 @@ public class CreateOrderHandlerTests
 
         var request = new CreateOrderRequest
         {
-            OrderType = OrderTypes.Pickup,
+            OrderType = OrderTypes.Pickup, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ", Observation = " Sem cebola ",
 
             Items =
             [
@@ -271,6 +287,38 @@ public class CreateOrderHandlerTests
             orderRepository.AddedOrder
         );
     }
+
+
+    [Theory]
+    [InlineData("delivery")]
+    [InlineData("pickup")]
+    public async Task RejectsMissingCustomerBeforePersisting(string type)
+    {
+        var repository = new FakeOrderRepository();
+        var handler = new CreateOrderHandler(new FakeProductRepository(), repository);
+        var request = new CreateOrderRequest
+        {
+            OrderType = type,
+            Items = [new() { ProductCode = "burger-praiano", Quantity = 1 }]
+        };
+        await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(request));
+        Assert.Null(repository.AddedOrder);
+    }
+
+    [Fact]
+    public async Task RejectsDeliveryWithoutAddressBeforePersisting()
+    {
+        var repository = new FakeOrderRepository();
+        var handler = new CreateOrderHandler(new FakeProductRepository(), repository);
+        var request = new CreateOrderRequest
+        {
+            OrderType = "delivery", CustomerName = "Cliente Teste", CustomerPhone = "11999990000",
+            Items = [new() { ProductCode = "burger-praiano", Quantity = 1 }]
+        };
+        await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(request));
+        Assert.Null(repository.AddedOrder);
+    }
+
 
     private static Product CreateProduct(
         int id,

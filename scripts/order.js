@@ -25,6 +25,8 @@ import {
 
 const CHECKOUT_STORAGE_KEY = "burger-house-checkout";
 const RETURN_FIELDS = [
+  "customer-name",
+  "customer-phone",
   "cep",
   "street",
   "house-number",
@@ -59,14 +61,6 @@ function readCheckoutContext() {
   return null;
 }
 
-function getOrderNotes() {
-  if (!elements.orderNotesInput) {
-    return "";
-  }
-
-  return elements.orderNotesInput.value.trim();
-}
-
 function clearOrderNotes() {
   if (!elements.orderNotesInput) {
     return;
@@ -98,17 +92,62 @@ function getOrderTypeLabel() {
 
 function mapCartToApiItems(cart) {
   return cart.map((item) => ({
-    productCode: item.id,
+    productCode: item.id.trim(),
     quantity: item.quantity,
     observation: null,
   }));
 }
 
-function getCheckoutFingerprint(cart) {
-  return JSON.stringify({
-    orderType: getOrderType(),
+function getCheckoutFingerprint(orderPayload) {
+  // Local session identity only; never sent as an idempotency key or logged.
+  return "v2:" + JSON.stringify(orderPayload);
+}
+
+function getReturnFields() {
+  return Object.fromEntries(
+    RETURN_FIELDS.map((id) => [
+      id,
+      /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (document.getElementById(id))
+        ?.value || "",
+    ]),
+  );
+}
+
+function buildOrderPayload(cart, fields = getReturnFields()) {
+  const text = (value) => (typeof value === "string" ? value.trim() : "");
+  const optional = (value) => text(value) || null;
+  const orderType = getOrderType().trim().toLowerCase();
+  const delivery = orderType !== ORDER_TYPES.PICKUP;
+  return {
+    orderType,
     items: mapCartToApiItems(cart),
-  });
+    customerName: text(fields["customer-name"]),
+    customerPhone: text(fields["customer-phone"]),
+    zipCode: delivery ? optional(fields.cep) : null,
+    street: delivery ? optional(fields.street) : null,
+    houseNumber: delivery ? optional(fields["house-number"]) : null,
+    neighborhood: delivery ? optional(fields.neighborhood) : null,
+    city: delivery ? optional(fields.city) : null,
+    complement: delivery ? optional(fields.complement) : null,
+    observation: optional(fields["order-notes"]),
+  };
+}
+
+function validateCustomerFields(details = buildOrderPayload(getCart())) {
+  const digits = details.customerPhone.replace(/\D/g, "");
+  if (
+    !details.customerName ||
+    details.customerName.length > 120 ||
+    details.customerPhone.length > 25 ||
+    digits.length < 10 ||
+    digits.length > 15 ||
+    !/^[0-9 +()-]+$/.test(details.customerPhone)
+  ) {
+    showAddressWarning(translate("address.customerRequired"));
+    openModal(elements.addressModal);
+    return false;
+  }
+  return true;
 }
 
 function setGoToPaymentLoading(isLoading) {
@@ -245,20 +284,14 @@ function loadReview() {
   elements.reviewTotal.textContent = formatPrice(totalWithDelivery);
 }
 
-function buildWhatsAppMessage() {
+function buildWhatsAppMessage(cart, addressText, orderNotes, orderType) {
   if (!checkoutSession) {
     throw new Error("Não existe pedido confirmado.");
   }
 
-  const cart = getCart();
-
-  const addressText = getAddressText();
-
-  const orderNotes = getOrderNotes();
-
   let message = `\u{1F354} *${translate("whatsapp.newOrder")}*\n\n`;
 
-  message += `*${translate("whatsapp.orderType")}:* ${getOrderTypeLabel()}\n\n`;
+  message += `*${translate("whatsapp.orderType")}:* ${translate(orderType === ORDER_TYPES.PICKUP ? "orderType.pickup" : "orderType.delivery")}\n\n`;
 
   message += `*${translate("whatsapp.items")}:*\n`;
 
@@ -279,9 +312,10 @@ function buildWhatsAppMessage() {
 
   message += `${translate("whatsapp.total")}: ${formatPrice(checkoutSession.total)}\n`;
 
-  message += isPickupOrder()
-    ? `\n*${translate("whatsapp.pickupAddress")}:*\n${addressText}\n`
-    : `\n*${translate("whatsapp.deliveryAddress")}:*\n${addressText}\n`;
+  message +=
+    orderType === ORDER_TYPES.PICKUP
+      ? `\n*${translate("whatsapp.pickupAddress")}:*\n${addressText}\n`
+      : `\n*${translate("whatsapp.deliveryAddress")}:*\n${addressText}\n`;
 
   if (orderNotes) {
     message += `\n*${translate("whatsapp.notes")}:*\n${orderNotes}\n`;
@@ -307,7 +341,7 @@ function safeCheckoutErrorMessage(value) {
 
 export async function openPaymentStep() {
   if (preparingCheckout) return;
-  const cart = getCart();
+  const cart = getCart().map((item) => ({ ...item }));
   if (!cart.length) {
     showToast(translate("cart.emptyToast"));
     return;
@@ -316,7 +350,9 @@ export async function openPaymentStep() {
     showClosedStoreMessage();
     return;
   }
-  if (!validateAddressFields()) {
+  const fields = getReturnFields();
+  const orderPayload = buildOrderPayload(cart, fields);
+  if (!validateCustomerFields(orderPayload) || !validateAddressFields()) {
     openModal(elements.addressModal);
     return;
   }
@@ -324,14 +360,21 @@ export async function openPaymentStep() {
   setGoToPaymentLoading(true);
   hidePaymentError();
   try {
-    const fingerprint = getCheckoutFingerprint(cart);
+    const fingerprint = getCheckoutFingerprint(orderPayload);
+    const addressText = getAddressText();
     if (
       !checkoutSession ||
       checkoutSession.confirmationDispatched ||
       checkoutSession.fingerprint !== fingerprint
     ) {
-      const order = await createOrder(getOrderType(), mapCartToApiItems(cart));
-      checkoutSession = { ...order, fingerprint, paymentId: null, confirmationDispatched: false };
+      const order = await createOrder(orderPayload);
+      checkoutSession = {
+        ...order,
+        fingerprint,
+        fields,
+        paymentId: null,
+        confirmationDispatched: false,
+      };
       saveCheckoutContext();
     }
     const checkout = await createCheckout(checkoutSession.orderId);
@@ -345,13 +388,11 @@ export async function openPaymentStep() {
       throw new Error("O checkout retornou um endereço inválido.");
     }
     checkoutSession.paymentId = checkout.paymentId;
-    checkoutSession.message = buildWhatsAppMessage();
-    checkoutSession.fields = Object.fromEntries(
-      RETURN_FIELDS.map((id) => [
-        id,
-        /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (document.getElementById(id))
-          ?.value || "",
-      ]),
+    checkoutSession.message = buildWhatsAppMessage(
+      cart,
+      addressText,
+      orderPayload.observation,
+      orderPayload.orderType,
     );
     saveCheckoutContext();
     window.location.href = url.href;
@@ -443,12 +484,16 @@ async function confirmWhatsApp() {
   // Avoid wa.me's redirect, which can replace non-BMP emoji with U+FFFD.
   const url = `https://api.whatsapp.com/send/?phone=${WHATSAPP_PHONE_NUMBER}&text=${encodeURIComponent(checkoutSession.message)}`;
   // Preserve a different cart assembled while the previous purchase was in progress.
-  if (getCheckoutFingerprint(getCart()) === checkoutSession.fingerprint) {
+  if (getCheckoutFingerprint(buildOrderPayload(getCart())) === checkoutSession.fingerprint) {
     clearCart();
     updateCart();
     resetOrderType();
     resetAddressForm();
     clearOrderNotes();
+    for (const id of ["customer-name", "customer-phone"]) {
+      const input = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
+      if (input) input.value = "";
+    }
   }
   closeAllModals();
   const opened = window.open(url, "_blank");
@@ -458,10 +503,20 @@ async function confirmWhatsApp() {
 
 export function bindOrderEvents() {
   checkoutSession = readCheckoutContext();
+  const currentFields = getReturnFields();
+  const currentFingerprint = getCheckoutFingerprint(buildOrderPayload(getCart(), currentFields));
+  // On a fresh return page, reconstruct the full identity before restoring fields.
+  // Never overwrite an edited form. Legacy identities remain usable for payment
+  // confirmation, but cannot authorize reuse of an order for a new checkout.
+  const canRestoreBlankForm =
+    Object.values(currentFields).every((value) => !value.trim()) &&
+    checkoutSession?.fields &&
+    checkoutSession.fingerprint ===
+      getCheckoutFingerprint(buildOrderPayload(getCart(), checkoutSession.fields));
   if (
     checkoutSession?.fields &&
     !checkoutSession.confirmationDispatched &&
-    checkoutSession.fingerprint === getCheckoutFingerprint(getCart())
+    (checkoutSession.fingerprint === currentFingerprint || canRestoreBlankForm)
   ) {
     for (const id of RETURN_FIELDS) {
       const input = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (
@@ -525,7 +580,7 @@ export function bindOrderEvents() {
         return;
       }
 
-      if (!validateAddressFields()) {
+      if (!validateCustomerFields() || !validateAddressFields()) {
         return;
       }
 

@@ -146,6 +146,17 @@ public class BurgerHouseDbContext : DbContext
 
             entity.HasKey(order => order.Id);
 
+            entity.Property(order => order.OrderType).HasMaxLength(10).IsRequired();
+            entity.Property(order => order.CustomerName).HasMaxLength(120).IsRequired();
+            entity.Property(order => order.CustomerPhone).HasMaxLength(25).IsRequired();
+            entity.Property(order => order.ZipCode).HasMaxLength(10);
+            entity.Property(order => order.Street).HasMaxLength(200);
+            entity.Property(order => order.HouseNumber).HasMaxLength(20);
+            entity.Property(order => order.Neighborhood).HasMaxLength(120);
+            entity.Property(order => order.City).HasMaxLength(120);
+            entity.Property(order => order.Complement).HasMaxLength(200);
+            entity.Property(order => order.Observation).HasMaxLength(2000);
+
             entity.Property(order => order.DeliveryFee)
                 .HasPrecision(10, 2);
 
