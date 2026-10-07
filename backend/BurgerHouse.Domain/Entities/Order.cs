@@ -103,4 +103,20 @@ public class Order
 
         Status = OrderStatus.Received;
     }
+
+    public void AdvanceStatus(OrderStatus next)
+    {
+        var expected = Status switch
+        {
+            OrderStatus.Received => OrderStatus.Preparing,
+            OrderStatus.Preparing => OrderStatus.ReadyForPickup,
+            OrderStatus.ReadyForPickup when OrderType == "delivery" => OrderStatus.OutForDelivery,
+            OrderStatus.ReadyForPickup when OrderType == "pickup" => OrderStatus.Completed,
+            OrderStatus.OutForDelivery when OrderType == "delivery" => OrderStatus.Completed,
+            _ => (OrderStatus?)null
+        };
+        if (expected != next)
+            throw new InvalidOperationException("Invalid operational transition.");
+        Status = next;
+    }
 }

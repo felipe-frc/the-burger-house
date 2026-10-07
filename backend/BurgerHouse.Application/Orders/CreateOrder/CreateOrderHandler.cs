@@ -5,7 +5,7 @@ namespace BurgerHouse.Application.Orders.CreateOrder;
 
 public class CreateOrderHandler
 {
-    private const decimal DeliveryFee = 5m;
+    public const decimal DeliveryFee = 5m;
 
     private readonly IProductRepository _productRepository;
     private readonly IOrderRepository _orderRepository;
@@ -71,7 +71,8 @@ public class CreateOrderHandler
                 product.Id,
                 requestedItem.Quantity,
                 product.Price,
-                requestedItem.Observation
+                requestedItem.Observation,
+                product.CostPrice
             );
 
             order.AddItem(orderItem);

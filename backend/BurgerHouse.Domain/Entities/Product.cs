@@ -6,6 +6,7 @@ public class Product
     public string Code { get; private set; }
     public string Name { get; private set; }
     public decimal Price { get; private set; }
+    public decimal? CostPrice { get; private set; }
     public bool IsActive { get; private set; }
 
     public Product(
@@ -39,6 +40,13 @@ public class Product
     public void Activate()
     {
         IsActive = true;
+    }
+
+    public void UpdateCost(decimal? cost)
+    {
+        if (cost is < 0 or > 99999999.99m || (cost.HasValue && decimal.Round(cost.Value, 2) != cost))
+            throw new ArgumentException("Cost must be a nonnegative monetary value with at most two decimal places.");
+        CostPrice = cost;
     }
 
     public void Deactivate()

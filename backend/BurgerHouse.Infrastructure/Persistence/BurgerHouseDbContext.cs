@@ -25,6 +25,24 @@ public class BurgerHouseDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        modelBuilder.Entity<AdminUser>(entity =>
+        {
+            entity.Property(u => u.Email).HasMaxLength(254);
+            entity.HasIndex(u => u.Email).IsUnique();
+            entity.Property(u => u.PasswordHash).HasMaxLength(512);
+        });
+        modelBuilder.Entity<AdminSession>(entity =>
+        {
+            entity.Property(s => s.Id).HasMaxLength(64);
+            entity.HasIndex(s => s.ExpiresAt);
+            entity.HasOne<AdminUser>().WithMany().HasForeignKey(s => s.AdminUserId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<Product>().Property(p => p.CostPrice).HasPrecision(10, 2);
+        modelBuilder.Entity<OrderItem>().Property(i => i.UnitCost).HasPrecision(10, 2);
+        modelBuilder.Entity<Order>().Property(o => o.Status).IsConcurrencyToken();
+        modelBuilder.Entity<Order>().HasIndex(o => new { o.Status, o.CreatedAt });
+        modelBuilder.Entity<Payment>().HasIndex(p => new { p.Status, p.UpdatedAt });
+
         modelBuilder.Entity<Product>(entity =>
         {
             entity.ToTable("Products");

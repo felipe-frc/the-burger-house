@@ -1,16 +1,17 @@
-using BurgerHouse.Application.Payments.SynchronizeCheckoutPayment;
-
 using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Orders.CreateOrder;
 using BurgerHouse.Application.Payments.GetPaymentStatus;
 using BurgerHouse.Application.Payments.PrepareCheckoutPayment;
+using BurgerHouse.Application.Payments.SynchronizeCheckoutPayment;
 
 using BurgerHouse.Infrastructure.Payments.PagBank;
 using BurgerHouse.Infrastructure.Persistence;
 using BurgerHouse.Infrastructure.Repositories;
 
 using Microsoft.EntityFrameworkCore;
+
+using BurgerHouse.Api.Admin;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,8 +53,7 @@ var connectionString =
         "Connection string 'DefaultConnection' was not found."
     );
 
-builder.Services.AddDbContext<
-    BurgerHouseDbContext>(
+builder.Services.AddDbContext<BurgerHouseDbContext>(
     options =>
         options.UseSqlite(
             connectionString
@@ -74,24 +74,59 @@ builder.Services.AddCors(options =>
     );
 });
 
-builder.Services
+var pagBankOptions = builder.Services
     .AddOptions<PagBankOptions>()
-    .Bind(builder.Configuration.GetSection(PagBankOptions.SectionName))
-    .Validate(options =>
-        Uri.TryCreate(options.BaseUrl, UriKind.Absolute, out var uri) &&
-        uri.Scheme == Uri.UriSchemeHttps,
-        "PagBank base URL must be configured as HTTPS.")
-    .Validate(options => !string.IsNullOrWhiteSpace(options.Token),
-        "PagBank token was not configured.")
-    .Validate(options =>
-        Uri.TryCreate(options.RedirectUrl, UriKind.Absolute, out var uri) &&
-        uri.Scheme == Uri.UriSchemeHttps && !uri.IsLoopback,
-        "PagBank redirect URL must be a public HTTPS URL.")
-    .Validate(options =>
-        Uri.TryCreate(options.NotificationUrl, UriKind.Absolute, out var uri) &&
-        uri.Scheme == Uri.UriSchemeHttps && !uri.IsLoopback,
-        "PagBank notification URL must be a public HTTPS URL.")
-    .ValidateOnStart();
+    .Bind(
+        builder.Configuration.GetSection(
+            PagBankOptions.SectionName
+        )
+    )
+    .Validate(
+        options =>
+            Uri.TryCreate(
+                options.BaseUrl,
+                UriKind.Absolute,
+                out var uri
+            ) &&
+            uri.Scheme == Uri.UriSchemeHttps,
+        "PagBank base URL must be configured as HTTPS."
+    );
+
+if (!builder.Environment.IsDevelopment())
+{
+    pagBankOptions
+        .Validate(
+            options =>
+                !string.IsNullOrWhiteSpace(
+                    options.Token
+                ),
+            "PagBank token was not configured."
+        )
+        .Validate(
+            options =>
+                Uri.TryCreate(
+                    options.RedirectUrl,
+                    UriKind.Absolute,
+                    out var uri
+                ) &&
+                uri.Scheme == Uri.UriSchemeHttps &&
+                !uri.IsLoopback,
+            "PagBank redirect URL must be a public HTTPS URL."
+        )
+        .Validate(
+            options =>
+                Uri.TryCreate(
+                    options.NotificationUrl,
+                    UriKind.Absolute,
+                    out var uri
+                ) &&
+                uri.Scheme == Uri.UriSchemeHttps &&
+                !uri.IsLoopback,
+            "PagBank notification URL must be a public HTTPS URL."
+        );
+}
+
+pagBankOptions.ValidateOnStart();
 
 builder.Services.AddScoped<
     IProductRepository,
@@ -122,22 +157,34 @@ builder.Services.AddScoped<
     SynchronizeCheckoutPaymentHandler>();
 
 builder.Services.AddHttpClient<PagBankCheckoutService>(
-    client => client.Timeout = TimeSpan.FromSeconds(15)
+    client =>
+        client.Timeout =
+            TimeSpan.FromSeconds(15)
 );
 
-builder.Services.AddScoped<IHostedCheckoutGateway>(provider =>
-    provider.GetRequiredService<PagBankCheckoutService>()
+builder.Services.AddScoped<IHostedCheckoutGateway>(
+    provider =>
+        provider.GetRequiredService<PagBankCheckoutService>()
 );
 
 builder.Services.AddHttpClient<PagBankPaymentLookup>(
-    client => client.Timeout = TimeSpan.FromSeconds(15)
+    client =>
+        client.Timeout =
+            TimeSpan.FromSeconds(15)
 );
 
 builder.Services.AddHttpClient<PagBankWebhookSignatureValidator>(
-    client => client.Timeout = TimeSpan.FromSeconds(15)
+    client =>
+        client.Timeout =
+            TimeSpan.FromSeconds(15)
 );
 
-builder.Services.AddControllers();
+builder.Services.AddControllersWithViews();
+
+builder.Services.AddOwnerAdministration(
+    builder.Configuration,
+    builder.Environment.IsDevelopment()
+);
 
 builder.Services.AddOpenApi();
 
@@ -157,20 +204,41 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+if (args.Contains("--create-owner"))
+{
+    await AdminSecurity.ProvisionOwnerAsync(
+        app.Services
+    );
+
+    return;
+}
+
 app.UseHttpsRedirection();
 
 app.UseCors(
     FrontendCorsPolicy
 );
 
+app.UseMiddleware<AdminErrorsMiddleware>();
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();
+
 app.MapControllers();
 
 app.MapGet("/", () =>
-    Results.Ok(new
-    {
-        application = "Burger House API",
-        status = "Running"
-    })
+    Results.Ok(
+        new
+        {
+            application = "Burger House API",
+            status = "Running"
+        }
+    )
 );
 
 app.Run();
+
+public partial class Program
+{
+}
