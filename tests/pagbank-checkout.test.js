@@ -366,13 +366,16 @@ it("sends a masked mobile phone as digits only", async () => {
   expect(mocks.createCheckout).toHaveBeenCalledTimes(1);
 });
 
-it.each(["3433334444", "34888888888"])("explains invalid mobile %s before checkout", async (phone) => {
-  document.getElementById("customer-phone").value = phone;
-  await (await import("../scripts/order.js")).openPaymentStep();
-  const { showAddressWarning } = await import("../scripts/ui.js");
-  expect(showAddressWarning).toHaveBeenCalledWith("Informe um celular válido com DDD.");
-  expect(mocks.createOrder).not.toHaveBeenCalled();
-});
+it.each(["3433334444", "34888888888"])(
+  "explains invalid mobile %s before checkout",
+  async (phone) => {
+    document.getElementById("customer-phone").value = phone;
+    await (await import("../scripts/order.js")).openPaymentStep();
+    const { showAddressWarning } = await import("../scripts/ui.js");
+    expect(showAddressWarning).toHaveBeenCalledWith("Informe um celular válido com DDD.");
+    expect(mocks.createOrder).not.toHaveBeenCalled();
+  },
+);
 
 function currentSession() {
   return JSON.parse(sessionStorage.getItem("burger-house-checkout"));
