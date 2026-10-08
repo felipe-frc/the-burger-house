@@ -1,4 +1,5 @@
 using BurgerHouse.Application.Abstractions.Persistence;
+using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Payments.PrepareCheckoutPayment;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
@@ -12,12 +13,15 @@ public class PrepareCheckoutPaymentHandlerTests
     {
         var store = new Store();
         var handler = new PrepareCheckoutPaymentHandler(store, store);
-        var payment = await handler.HandleAsync(1);
+        var prepared = await handler.HandleAsync(1);
+        var payment = prepared.Payment;
         Assert.Equal(17, payment.Id);
         Assert.Equal(PaymentMethod.Unknown, payment.Method);
         Assert.Equal(PaymentStatus.Pending, payment.Status);
         Assert.Equal(43.90m, payment.Amount);
-        Assert.Same(payment, await handler.HandleAsync(1));
+        Assert.Equal(new HostedCheckoutCustomer("Cliente Teste", "cliente@teste.com", "52998224725"), prepared.Customer);
+        Assert.Equal(prepared.Customer, (await handler.HandleAsync(1)).Customer);
+        Assert.Same(payment, (await handler.HandleAsync(1)).Payment);
         Assert.Equal(1, store.Saves);
     }
 
@@ -36,10 +40,11 @@ public class PrepareCheckoutPaymentHandlerTests
     {
         var store = new Store();
         var handler = new PrepareCheckoutPaymentHandler(store, store);
-        var payment = await handler.HandleAsync(1);
+        var prepared = await handler.HandleAsync(1);
+        var payment = prepared.Payment;
         payment.SetExternalCheckoutId("CHEC_1");
         payment.SetMethod(PaymentMethod.Pix);
-        Assert.Same(payment, await handler.HandleAsync(1));
+        Assert.Same(payment, (await handler.HandleAsync(1)).Payment);
     }
 
     [Fact]
@@ -55,6 +60,31 @@ public class PrepareCheckoutPaymentHandlerTests
         var store = new Store();
         store.Order.MarkAsReceived();
         await Assert.ThrowsAsync<InvalidOperationException>(() => new PrepareCheckoutPaymentHandler(store, store).HandleAsync(1));
+    }
+
+    [Theory]
+    [InlineData(nameof(Order.CustomerName))]
+    [InlineData(nameof(Order.CustomerEmail))]
+    [InlineData(nameof(Order.CustomerTaxId))]
+    public async Task HistoricalOrdersWithoutCompleteIdentityRequireExistingCheckout(string field)
+    {
+        var store = new Store();
+        typeof(Order).GetProperty(field)!.SetValue(store.Order, null);
+        var handler = new PrepareCheckoutPaymentHandler(store, store);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleAsync(1));
+        Assert.Equal("Customer payment identity is incomplete.", error.Message);
+        Assert.Null(store.Payment);
+        Assert.Equal(0, store.Saves);
+
+        store.Payment = new Payment(1, 43.90m, Guid.NewGuid().ToString("D"), PaymentMethod.Unknown);
+        error = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleAsync(1));
+        Assert.Equal("Customer payment identity is incomplete.", error.Message);
+        store.Payment.SetExternalCheckoutId("CHEC_1");
+        var reused = await handler.HandleAsync(1);
+        Assert.Null(reused.Customer);
+        Assert.Same(store.Payment, reused.Payment);
+        Assert.Equal(0, store.Saves);
     }
 
     private sealed class Store : IOrderRepository, IPaymentRepository

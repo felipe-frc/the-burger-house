@@ -52,6 +52,7 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
 
     public async Task<HostedCheckoutSession> GetOrCreateAsync(
         Payment payment,
+        HostedCheckoutCustomer? customer,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(payment);
@@ -82,12 +83,37 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
         }
         else
         {
+            if (customer is null ||
+                string.IsNullOrWhiteSpace(customer.Name) ||
+                string.IsNullOrWhiteSpace(customer.Email) ||
+                string.IsNullOrWhiteSpace(customer.TaxId))
+            {
+                throw new InvalidOperationException(
+                    "Customer payment identity is incomplete."
+                );
+            }
+
+            if (customer.Email.Length is < 10 or > 60 ||
+                customer.TaxId.Length != 11 ||
+                customer.TaxId.Any(character => !char.IsAsciiDigit(character)))
+            {
+                throw new InvalidOperationException(
+                    "Customer payment identity is incompatible with hosted checkout."
+                );
+            }
+
             var unitAmount =
                 ToCents(payment.Amount);
 
             var payload =
                 new PagBankCheckoutRequest(
                     reference,
+                    new PagBankCheckoutCustomer(
+                        customer.Name,
+                        customer.Email,
+                        customer.TaxId
+                    ),
+                    false,
                     [
                         new PagBankCheckoutItem(
                             $"order:{payment.OrderId}",
@@ -339,6 +365,12 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
         [property: JsonPropertyName("reference_id")]
         string ReferenceId,
 
+        [property: JsonPropertyName("customer")]
+        PagBankCheckoutCustomer Customer,
+
+        [property: JsonPropertyName("customer_modifiable")]
+        bool CustomerModifiable,
+
         [property: JsonPropertyName("items")]
         PagBankCheckoutItem[] Items,
 
@@ -356,6 +388,17 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
 
         [property: JsonPropertyName("payment_notification_urls")]
         string[] PaymentNotificationUrls
+    );
+
+    private sealed record PagBankCheckoutCustomer(
+        [property: JsonPropertyName("name")]
+        string Name,
+
+        [property: JsonPropertyName("email")]
+        string Email,
+
+        [property: JsonPropertyName("tax_id")]
+        string TaxId
     );
 
     private sealed record PagBankCheckoutItem(

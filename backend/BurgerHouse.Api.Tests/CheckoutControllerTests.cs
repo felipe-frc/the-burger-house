@@ -21,7 +21,7 @@ public class CheckoutControllerTests
         for (var attempt = 0; attempt < 2; attempt++)
         {
             await using var db = fixture.Open();
-            var gateway = new StubGateway(_ => throw new HttpRequestException("provider rejected request"));
+            var gateway = new StubGateway((_, _) => throw new HttpRequestException("provider rejected request"));
             var controller = CreateController(db, gateway);
 
             var result = Assert.IsType<ObjectResult>(
@@ -43,8 +43,9 @@ public class CheckoutControllerTests
         using var fixture = new Fixture();
         var creates = 0;
         var reuses = 0;
-        var gateway = new StubGateway(async payment =>
+        var gateway = new StubGateway(async (payment, customer) =>
         {
+            Assert.Equal(new HostedCheckoutCustomer("Cliente Teste", "cliente@teste.com", "52998224725"), customer);
             if (payment.ExternalCheckoutId is null)
             {
                 Interlocked.Increment(ref creates);
@@ -81,10 +82,53 @@ public class CheckoutControllerTests
                 body.GetProperty("checkoutUrl").GetString()
             );
             Assert.False(body.TryGetProperty("initPoint", out _));
+            Assert.Equal(2, body.EnumerateObject().Count());
         });
         Assert.Equal(1, creates);
         Assert.Equal(1, reuses);
         Assert.Equal("CHEC_1", (await fixture.Payment()).ExternalCheckoutId);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HistoricalOrderWithoutIdentityCallsGatewayOnlyForExistingCheckout(bool hasCheckout)
+    {
+        using var fixture = new Fixture();
+        await using var db = fixture.Open();
+        var order = await db.Orders.Include(o => o.Items).SingleAsync();
+        typeof(Order).GetProperty(nameof(Order.CustomerEmail))!.SetValue(order, null);
+        typeof(Order).GetProperty(nameof(Order.CustomerTaxId))!.SetValue(order, null);
+        if (hasCheckout)
+        {
+            var payment = new Payment(order.Id, order.Total, Guid.NewGuid().ToString("D"), PaymentMethod.Unknown);
+            payment.SetExternalCheckoutId("CHEC_1");
+            db.Payments.Add(payment);
+        }
+        await db.SaveChangesAsync();
+        var called = false;
+        var gateway = new StubGateway((payment, customer) =>
+        {
+            called = true;
+            Assert.Null(customer);
+            Assert.True(payment.Id > 0);
+            Assert.Equal("CHEC_1", payment.ExternalCheckoutId);
+            return Task.FromResult(new HostedCheckoutSession(
+                payment.Id, "CHEC_1", "https://pagamento.pagbank.com.br/checkout/CHEC_1"));
+        });
+
+        var result = await CreateController(db, gateway).CreateCheckoutAsync(fixture.OrderId, default);
+        if (hasCheckout)
+        {
+            Assert.IsType<OkObjectResult>(result);
+        }
+        else
+        {
+            var body = JsonSerializer.SerializeToElement(Assert.IsType<ConflictObjectResult>(result).Value);
+            Assert.Equal("Customer payment identity is incomplete.", body.GetProperty("error").GetString());
+            Assert.Empty(await db.Payments.ToListAsync());
+        }
+        Assert.Equal(hasCheckout, called);
     }
 
     private static CheckoutController CreateController(
@@ -97,11 +141,12 @@ public class CheckoutControllerTests
         );
 
     private sealed class StubGateway(
-        Func<Payment, Task<HostedCheckoutSession>> getOrCreate) : IHostedCheckoutGateway
+        Func<Payment, HostedCheckoutCustomer?, Task<HostedCheckoutSession>> getOrCreate) : IHostedCheckoutGateway
     {
         public Task<HostedCheckoutSession> GetOrCreateAsync(
             Payment payment,
-            CancellationToken cancellationToken = default) => getOrCreate(payment);
+            HostedCheckoutCustomer? customer,
+            CancellationToken cancellationToken = default) => getOrCreate(payment, customer);
     }
 
     private sealed class Fixture : IDisposable

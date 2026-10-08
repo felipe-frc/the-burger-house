@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
 using BurgerHouse.Infrastructure.Payments.PagBank;
@@ -9,9 +10,16 @@ namespace BurgerHouse.Infrastructure.Tests.Payments.PagBank;
 
 public class PagBankCheckoutServiceTests
 {
-    [Fact]
-    public async Task CreatesCheckoutWithBearerReferenceCentsUrlsAndPayLinkByRelation()
+    private static readonly HostedCheckoutCustomer Customer =
+        new("Cliente Teste", "cliente@teste.com", "52998224725");
+
+    [Theory]
+    [InlineData(10)]
+    [InlineData(17)]
+    [InlineData(60)]
+    public async Task CreatesCheckoutWithBearerReferenceCentsUrlsAndPayLinkByRelation(int emailLength)
     {
+        var identity = Customer with { Email = new string('a', emailLength - 8) + "@test.co" };
         HttpRequestMessage? captured = null;
         string? requestBody = null;
 
@@ -46,7 +54,7 @@ public class PagBankCheckoutServiceTests
 
         var result =
             await Service(http)
-                .GetOrCreateAsync(payment);
+                .GetOrCreateAsync(payment, identity);
 
         Assert.Equal(
             HttpMethod.Post,
@@ -79,6 +87,16 @@ public class PagBankCheckoutServiceTests
                 .GetProperty("reference_id")
                 .GetString()
         );
+
+        var customer = body.RootElement.GetProperty("customer");
+        Assert.Equal(identity.Name, customer.GetProperty("name").GetString());
+        Assert.Equal(identity.Email, customer.GetProperty("email").GetString());
+        Assert.Equal(identity.TaxId, customer.GetProperty("tax_id").GetString());
+        Assert.Matches("^[0-9]{11}$", customer.GetProperty("tax_id").GetString()!);
+        Assert.Equal(3, customer.EnumerateObject().Count());
+        Assert.False(body.RootElement.GetProperty("customer_modifiable").GetBoolean());
+        Assert.DoesNotContain(Customer.Email, captured.RequestUri.ToString());
+        Assert.DoesNotContain(Customer.TaxId, captured.RequestUri.ToString());
 
         var item =
             Assert.Single(
@@ -178,14 +196,20 @@ public class PagBankCheckoutServiceTests
         );
     }
 
-    [Fact]
-    public async Task ExistingCheckoutIsReadInsteadOfCreated()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task ExistingCheckoutIsReadInsteadOfCreated(int identityCase)
     {
         HttpRequestMessage? captured = null;
+        var calls = 0;
 
         using var http = new HttpClient(new Stub(request =>
         {
             captured = request;
+            calls++;
+            Assert.Equal(HttpMethod.Get, request.Method);
 
             return Task.FromResult(
                 Json(
@@ -214,7 +238,15 @@ public class PagBankCheckoutServiceTests
         );
 
         await Service(http)
-            .GetOrCreateAsync(payment);
+            .GetOrCreateAsync(payment, identityCase switch
+            {
+                0 => null,
+                1 => Customer,
+                _ => Customer with { Email = new string('a', 61) + "@test.co" }
+            });
+
+        Assert.Equal(1, calls);
+        Assert.Null(captured!.Content);
 
         Assert.Equal(
             HttpMethod.Get,
@@ -302,7 +334,7 @@ public class PagBankCheckoutServiceTests
         var result =
             await Service(http)
                 .GetOrCreateAsync(
-                    NewPayment()
+                    NewPayment(), Customer
                 );
 
         Assert.Equal(
@@ -344,7 +376,7 @@ public class PagBankCheckoutServiceTests
             () =>
                 Service(http)
                     .GetOrCreateAsync(
-                        NewPayment()
+                        NewPayment(), Customer
                     )
         );
     }
@@ -372,7 +404,7 @@ public class PagBankCheckoutServiceTests
                 () =>
                     Service(http)
                         .GetOrCreateAsync(
-                            NewPayment()
+                            NewPayment(), Customer
                         )
             );
 
@@ -397,7 +429,7 @@ public class PagBankCheckoutServiceTests
             () =>
                 Service(http)
                     .GetOrCreateAsync(
-                        payment
+                        payment, Customer
                     )
         );
 
@@ -422,9 +454,64 @@ public class PagBankCheckoutServiceTests
             () =>
                 Service(http)
                     .GetOrCreateAsync(
-                        NewPayment()
+                        NewPayment(), Customer
                     )
         );
+    }
+
+    [Theory]
+    [InlineData("customer", null)]
+    [InlineData("name", null)]
+    [InlineData("name", " ")]
+    [InlineData("email", null)]
+    [InlineData("email", "")]
+    [InlineData("taxId", null)]
+    [InlineData("taxId", " ")]
+    public async Task IncompleteIdentityIsRejectedWithoutHttp(string field, string? value)
+    {
+        var identity = field switch
+        {
+            "name" => Customer with { Name = value! },
+            "email" => Customer with { Email = value! },
+            "taxId" => Customer with { TaxId = value! },
+            _ => null
+        };
+        var calls = 0;
+        using var http = new HttpClient(new Stub(_ =>
+        {
+            calls++;
+            throw new InvalidOperationException("Unexpected HTTP call.");
+        }));
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => Service(http).GetOrCreateAsync(NewPayment(), identity));
+
+        Assert.Equal("Customer payment identity is incomplete.", error.Message);
+        Assert.Equal(0, calls);
+    }
+
+    [Theory]
+    [InlineData(9)]
+    [InlineData(61)]
+    [InlineData(254)]
+    public async Task IncompatibleEmailIsRejectedWithoutHttpOrExposingIdentity(int length)
+    {
+        var identity = Customer with { Email = new string('a', length - 8) + "@test.co" };
+        var calls = 0;
+        using var http = new HttpClient(new Stub(_ =>
+        {
+            calls++;
+            throw new InvalidOperationException("Unexpected HTTP call.");
+        }));
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => Service(http).GetOrCreateAsync(NewPayment(), identity));
+
+        Assert.Equal("Customer payment identity is incompatible with hosted checkout.", error.Message);
+        Assert.DoesNotContain(identity.Name, error.Message);
+        Assert.DoesNotContain(identity.Email, error.Message);
+        Assert.DoesNotContain(identity.TaxId, error.Message);
+        Assert.Equal(0, calls);
     }
 
     private static PagBankCheckoutService Service(

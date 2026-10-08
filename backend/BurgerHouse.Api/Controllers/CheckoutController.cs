@@ -22,13 +22,15 @@ public sealed class CheckoutController(
         {
             // Commit the local identity before sending it to the provider, even if checkout creation fails.
             int paymentId;
+            HostedCheckoutCustomer? customer;
             await using (var preparation = await dbContext.Database.BeginTransactionAsync(cancellationToken))
             {
                 var prepared = await prepareCheckoutPaymentHandler.HandleAsync(
                     orderId,
                     cancellationToken
                 );
-                paymentId = prepared.Id;
+                paymentId = prepared.Payment.Id;
+                customer = prepared.Customer;
                 await preparation.CommitAsync(cancellationToken);
             }
             dbContext.ChangeTracker.Clear();
@@ -37,7 +39,7 @@ public sealed class CheckoutController(
             var payment = await dbContext.Payments.SingleAsync(p => p.Id == paymentId, cancellationToken);
             if (payment.Status != Domain.Enums.PaymentStatus.Pending)
                 return Conflict(new { error = "Payment is no longer pending." });
-            var checkout = await hostedCheckoutGateway.GetOrCreateAsync(payment, cancellationToken);
+            var checkout = await hostedCheckoutGateway.GetOrCreateAsync(payment, customer, cancellationToken);
             await dbContext.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return Ok(new

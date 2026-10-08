@@ -6,6 +6,7 @@ public interface IHostedCheckoutGateway
 {
     Task<HostedCheckoutSession> GetOrCreateAsync(
         Payment payment,
+        HostedCheckoutCustomer? customer,
         CancellationToken cancellationToken = default
     );
 }
