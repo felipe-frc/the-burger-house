@@ -5,13 +5,16 @@ using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
 using BurgerHouse.Infrastructure.Payments.PagBank;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.FileProviders;
 
 namespace BurgerHouse.Infrastructure.Tests.Payments.PagBank;
 
 public class PagBankCheckoutServiceTests
 {
     private static readonly HostedCheckoutCustomer Customer =
-        new("Cliente Teste", "cliente@teste.com", "52998224725");
+        new("Cliente Teste", "cliente@teste.com", "52998224725", "11999990000");
 
     [Theory]
     [InlineData(10)]
@@ -93,7 +96,7 @@ public class PagBankCheckoutServiceTests
         Assert.Equal(identity.Email, customer.GetProperty("email").GetString());
         Assert.Equal(identity.TaxId, customer.GetProperty("tax_id").GetString());
         Assert.Matches("^[0-9]{11}$", customer.GetProperty("tax_id").GetString()!);
-        Assert.Equal(3, customer.EnumerateObject().Count());
+        Assert.Equal(4, customer.EnumerateObject().Count());
         Assert.False(body.RootElement.GetProperty("customer_modifiable").GetBoolean());
         Assert.DoesNotContain(Customer.Email, captured.RequestUri.ToString());
         Assert.DoesNotContain(Customer.TaxId, captured.RequestUri.ToString());
@@ -514,8 +517,129 @@ public class PagBankCheckoutServiceTests
         Assert.Equal(0, calls);
     }
 
+    [Theory]
+    [InlineData("Development", true)]
+    [InlineData("Production", false)]
+    [InlineData("Staging", false)]
+    public async Task LogsOnlySafeTechnicalFieldsInDevelopment(string environment, bool logsExpected)
+    {
+        var logger = new RecordingLogger();
+        using var http = new HttpClient(new Stub(_ => Task.FromResult(Json(HttpStatusCode.BadRequest,
+            """
+            {"error_messages":[
+              {"error":"invalid_parameter","description":"must be between 10 and 60 characters","parameter_name":"customer.email","email":"cliente@teste.com"},
+              {"error":"local-test-token","description":"Cliente Teste cliente@teste.com 52998224725","parameter_name":"Bearer local-test-token"},
+              {"error":"invalid_parameter","description":"(34) 99999-9999","parameter_name":"customer.phone"}
+            ],"Authorization":"Bearer local-test-token","payload":"secret"}
+            """))));
+
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            Service(http, new TestEnvironment { EnvironmentName = environment }, logger)
+                .GetOrCreateAsync(NewPayment(), Customer));
+
+        Assert.Equal(HttpStatusCode.BadRequest, exception.StatusCode);
+        Assert.Equal("PagBank checkout request failed with HTTP 400.", exception.Message);
+        Assert.Equal(logsExpected, logger.Messages.Count > 0);
+        var logs = string.Join("\n", logger.Messages);
+        Assert.DoesNotContain("(34) 99999-9999", logs);
+        if (logsExpected)
+        {
+            Assert.Contains("400", logs);
+            Assert.Contains("invalid_parameter", logs);
+            Assert.Contains("must be between 10 and 60 characters", logs);
+            Assert.Contains("customer.email", logs);
+            Assert.Contains("[redacted]", logs);
+        }
+        foreach (var sensitive in new[] { Customer.Name, Customer.Email, Customer.TaxId, "local-test-token", "Authorization", "Bearer", "secret" })
+            Assert.DoesNotContain(sensitive, logs);
+    }
+
+    [Theory]
+    [InlineData("not-json")]
+    [InlineData("[]")]
+    [InlineData("{\"error_messages\":[null,42,{\"description\":{\"secret\":\"value\"}}]}")]
+    [InlineData("{\"error\":\"invalid_parameter\",\"description\":\"invalid format\",\"parameter_name\":\"customer.tax_id\"}")]
+    public async Task DiagnosticParsingPreservesHttpFailure(string body)
+    {
+        var logger = new RecordingLogger();
+        using var http = new HttpClient(new Stub(_ => Task.FromResult(Json(HttpStatusCode.BadRequest, body))));
+        var exception = await Assert.ThrowsAsync<HttpRequestException>(() =>
+            Service(http, new TestEnvironment(), logger).GetOrCreateAsync(NewPayment(), Customer));
+        Assert.Equal(HttpStatusCode.BadRequest, exception.StatusCode);
+        Assert.DoesNotContain("secret", string.Join("\n", logger.Messages));
+    }
+
+    private sealed class TestEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = "Development";
+        public string ApplicationName { get; set; } = "Tests";
+        public string ContentRootPath { get; set; } = "";
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+
+    private sealed class RecordingLogger : ILogger<PagBankCheckoutService>
+    {
+        public List<string> Messages { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+            => Messages.Add(formatter(state, exception));
+    }
+
+    [Theory]
+    [InlineData("34999999999")]
+    [InlineData("(34) 99999-9999")]
+    [InlineData("34 99999-9999")]
+    [InlineData("+55 34 99999-9999")]
+    public async Task SendsNormalizedMobilePhone(string phone)
+    {
+        using var http = new HttpClient(new Stub(async request =>
+        {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            var customer = body.RootElement.GetProperty("customer");
+            var actual = customer.GetProperty("phone");
+            Assert.Equal("+55", actual.GetProperty("country").GetString());
+            Assert.Equal("34", actual.GetProperty("area").GetString());
+            Assert.Equal("999999999", actual.GetProperty("number").GetString());
+            Assert.False(body.RootElement.GetProperty("customer_modifiable").GetBoolean());
+            return Json(HttpStatusCode.BadRequest, "{}");
+        }));
+        await Assert.ThrowsAsync<HttpRequestException>(() =>
+            Service(http).GetOrCreateAsync(NewPayment(), Customer with { Phone = phone }));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("123")]
+    [InlineData("3433334444")]
+    [InlineData("34888888888")]
+    [InlineData("349999999999")]
+    [InlineData("+54 34 99999-9999")]
+    public async Task InvalidPhoneFailsBeforeHttpButDoesNotPreventReuse(string? phone)
+    {
+        var calls = 0;
+        using var http = new HttpClient(new Stub(request =>
+        {
+            calls++;
+            Assert.Equal(HttpMethod.Get, request.Method);
+            return Task.FromResult(Json(HttpStatusCode.BadRequest, "{}"));
+        }));
+        var customer = Customer with { Phone = phone! };
+        var payment = NewPayment();
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Service(http).GetOrCreateAsync(payment, customer));
+        Assert.Equal("Customer payment identity is incompatible with hosted checkout.", error.Message);
+        Assert.Equal(0, calls);
+        payment.SetExternalCheckoutId("CHEC_1");
+        await Assert.ThrowsAsync<HttpRequestException>(() => Service(http).GetOrCreateAsync(payment, customer));
+        Assert.Equal(1, calls);
+    }
+
     private static PagBankCheckoutService Service(
-        HttpClient http)
+        HttpClient http,
+        IHostEnvironment? environment = null,
+        ILogger<PagBankCheckoutService>? logger = null)
     {
         return new PagBankCheckoutService(
             http,
@@ -534,7 +658,9 @@ public class PagBankCheckoutServiceTests
                     NotificationUrl =
                         "https://api.example/api/webhooks/pagbank"
                 }
-            )
+            ),
+            environment,
+            logger
         );
     }
 

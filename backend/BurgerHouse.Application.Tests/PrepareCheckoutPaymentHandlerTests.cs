@@ -19,7 +19,7 @@ public class PrepareCheckoutPaymentHandlerTests
         Assert.Equal(PaymentMethod.Unknown, payment.Method);
         Assert.Equal(PaymentStatus.Pending, payment.Status);
         Assert.Equal(43.90m, payment.Amount);
-        Assert.Equal(new HostedCheckoutCustomer("Cliente Teste", "cliente@teste.com", "52998224725"), prepared.Customer);
+        Assert.Equal(new HostedCheckoutCustomer("Cliente Teste", "cliente@teste.com", "52998224725", "11999990000"), prepared.Customer);
         Assert.Equal(prepared.Customer, (await handler.HandleAsync(1)).Customer);
         Assert.Same(payment, (await handler.HandleAsync(1)).Payment);
         Assert.Equal(1, store.Saves);

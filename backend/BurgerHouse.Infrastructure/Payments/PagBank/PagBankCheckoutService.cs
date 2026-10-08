@@ -6,6 +6,8 @@ using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace BurgerHouse.Infrastructure.Payments.PagBank;
 
@@ -17,16 +19,22 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
     private readonly HttpClient _httpClient;
     private readonly PagBankOptions _options;
     private readonly Uri _baseUri;
+    private readonly IHostEnvironment? _environment;
+    private readonly ILogger<PagBankCheckoutService>? _logger;
 
     public PagBankCheckoutService(
         HttpClient httpClient,
-        IOptions<PagBankOptions> options)
+        IOptions<PagBankOptions> options,
+        IHostEnvironment? environment = null,
+        ILogger<PagBankCheckoutService>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(options);
 
         _httpClient = httpClient;
         _options = options.Value;
+        _environment = environment;
+        _logger = logger;
 
         _baseUri = ValidateBaseUrl(
             _options.BaseUrl
@@ -102,6 +110,12 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
                 );
             }
 
+            var phone = new string((customer.Phone ?? string.Empty).Where(char.IsAsciiDigit).ToArray());
+            if (phone.Length == 13 && phone.StartsWith("55", StringComparison.Ordinal))
+                phone = phone[2..];
+            if (phone.Length != 11 || phone[2] != '9')
+                throw new InvalidOperationException("Customer payment identity is incompatible with hosted checkout.");
+
             var unitAmount =
                 ToCents(payment.Amount);
 
@@ -111,7 +125,8 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
                     new PagBankCheckoutCustomer(
                         customer.Name,
                         customer.Email,
-                        customer.TaxId
+                        customer.TaxId,
+                        new PagBankCheckoutPhone("+55", phone[..2], phone[2..])
                     ),
                     false,
                     [
@@ -274,6 +289,17 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
 
         if (!response.IsSuccessStatusCode)
         {
+            try
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                if (_environment?.IsDevelopment() == true)
+                    LogProviderError(response.StatusCode, body);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or IOException or OperationCanceledException)
+            {
+                // Diagnostic reads must not replace the existing HTTP failure.
+            }
+
             throw new HttpRequestException(
                 $"PagBank checkout request failed with HTTP {(int)response.StatusCode}.",
                 null,
@@ -296,6 +322,69 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
             ?? throw new JsonException(
                 "PagBank returned an empty checkout response."
             );
+    }
+
+    private void LogProviderError(System.Net.HttpStatusCode status, string body)
+    {
+        _logger?.LogWarning("PagBank checkout failed with HTTP {StatusCode}.", (int)status);
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                return;
+
+            if (root.TryGetProperty("error_messages", out var errors) &&
+                errors.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var error in errors.EnumerateArray())
+                    LogTechnicalFields(error, status);
+            }
+            else
+            {
+                LogTechnicalFields(root, status);
+            }
+        }
+        catch (JsonException)
+        {
+            // Non-JSON error bodies are never logged.
+        }
+    }
+
+    private void LogTechnicalFields(JsonElement error, System.Net.HttpStatusCode status)
+    {
+        if (error.ValueKind != JsonValueKind.Object)
+            return;
+
+        _logger?.LogWarning(
+            "PagBank checkout HTTP {StatusCode}: error={Error}, description={Description}, parameter_name={ParameterName}.",
+            (int)status,
+            SafeTechnicalField(error, "error"),
+            SafeTechnicalField(error, "description"),
+            SafeTechnicalField(error, "parameter_name"));
+    }
+
+    private static string? SafeTechnicalField(JsonElement error, string property)
+    {
+        if (!error.TryGetProperty(property, out var field) || field.ValueKind != JsonValueKind.String)
+            return null;
+
+        var value = field.GetString()!;
+        // Provider descriptions can echo personal data. Only known technical vocabulary
+        // is safe, including when reusing a historical checkout without customer data.
+        const string vocabulary = "invalid required missing malformed unauthorized forbidden " +
+            "bad request parameter parameters value values length size must be between and " +
+            "is not valid allowed supported found minimum maximum min max characters digits " +
+            "customer name email tax id modifiable payment methods type items reference " +
+            "notification urls redirect return url phone number area country code " +
+            "error errors format out of range cannot null empty too long short " +
+            "unprocessable entity access denied internal server service unavailable";
+        var words = value.Split([' ', '_', '-', '.', ':', ',', '[', ']', '(', ')'], StringSplitOptions.RemoveEmptyEntries);
+        return value.Length <= 256 && value.Count(char.IsAsciiDigit) < 9 && words.Length > 0 && words.All(word =>
+            vocabulary.Split(' ').Contains(word, StringComparer.OrdinalIgnoreCase) ||
+            (word.Length <= 5 && word.All(char.IsAsciiDigit)))
+            ? value
+            : "[redacted]";
     }
 
     private static int ToCents(
@@ -398,7 +487,16 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
         string Email,
 
         [property: JsonPropertyName("tax_id")]
-        string TaxId
+        string TaxId,
+
+        [property: JsonPropertyName("phone")]
+        PagBankCheckoutPhone Phone
+    );
+
+    private sealed record PagBankCheckoutPhone(
+        [property: JsonPropertyName("country")] string Country,
+        [property: JsonPropertyName("area")] string Area,
+        [property: JsonPropertyName("number")] string Number
     );
 
     private sealed record PagBankCheckoutItem(

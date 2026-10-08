@@ -61,7 +61,8 @@ public sealed class PrepareCheckoutPaymentHandler
                 : new HostedCheckoutCustomer(
                     order.CustomerName,
                     order.CustomerEmail,
-                    order.CustomerTaxId
+                    order.CustomerTaxId,
+                    order.CustomerPhone ?? string.Empty
                 );
 
         var activePayment =

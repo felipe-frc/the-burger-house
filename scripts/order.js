@@ -124,7 +124,7 @@ function buildOrderPayload(cart, fields = getReturnFields()) {
     orderType,
     items: mapCartToApiItems(cart),
     customerName: text(fields["customer-name"]),
-    customerPhone: text(fields["customer-phone"]),
+    customerPhone: text(fields["customer-phone"]).replace(/\D/g, ""),
     customerEmail: text(fields["customer-email"]),
     customerTaxId: text(fields["customer-tax-id"]).replace(/[.-]/g, ""),
     zipCode: delivery ? optional(fields.cep) : null,
@@ -149,16 +149,13 @@ function isValidCpf(value) {
 }
 
 function validateCustomerFields(details = buildOrderPayload(getCart())) {
-  const digits = details.customerPhone.replace(/\D/g, "");
-  if (
-    !details.customerName ||
-    details.customerName.length > 120 ||
-    details.customerPhone.length > 25 ||
-    digits.length < 10 ||
-    digits.length > 15 ||
-    !/^[0-9 +()-]+$/.test(details.customerPhone)
-  ) {
+  if (!details.customerName || details.customerName.length > 120) {
     showAddressWarning(translate("address.customerRequired"));
+    openModal(elements.addressModal);
+    return false;
+  }
+  if (!/^[0-9]{2}9[0-9]{8}$/.test(details.customerPhone)) {
+    showAddressWarning(translate("address.invalidPhone"));
     openModal(elements.addressModal);
     return false;
   }
@@ -534,6 +531,25 @@ async function confirmWhatsApp() {
 }
 
 export function bindOrderEvents() {
+  const phone = /** @type {HTMLInputElement | null} */ (document.getElementById("customer-phone"));
+  if (phone) {
+    phone.oninput = () => {
+      const caret = phone.selectionStart ?? phone.value.length;
+      const before = phone.value.slice(0, caret).replace(/\D/g, "").length;
+      const digits = phone.value.replace(/\D/g, "").slice(0, 11);
+      phone.value =
+        digits.length <= 2
+          ? digits
+          : `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}${digits.length > 7 ? "-" + digits.slice(7) : ""}`;
+      let position = 0;
+      let count = 0;
+      while (position < phone.value.length && count < before) {
+        if (/\d/.test(phone.value[position])) count++;
+        position++;
+      }
+      phone.setSelectionRange(position, position);
+    };
+  }
   checkoutSession = readCheckoutContext();
   const currentFields = getReturnFields();
   const currentFingerprint = getCheckoutFingerprint(buildOrderPayload(getCart(), currentFields));

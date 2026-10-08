@@ -300,6 +300,9 @@ it.each([
   ["customer-name", " "],
   ["customer-phone", ""],
   ["customer-phone", "123"],
+  ["customer-phone", "3433334444"],
+  ["customer-phone", "34888888888"],
+  ["customer-phone", "349999999999"],
   ["customer-email", ""],
   ["customer-email", "invalido"],
   ["customer-email", "cliente@@teste.com"],
@@ -323,10 +326,10 @@ it("creates a new order after fulfillment edits instead of paying stale customer
   mocks.createCheckout.mockRejectedValue(new Error("offline"));
   const { openPaymentStep } = await import("../scripts/order.js");
   await openPaymentStep();
-  document.getElementById("customer-phone").value = "11888880000";
+  document.getElementById("customer-phone").value = "11988880000";
   await openPaymentStep();
   expect(mocks.createOrder).toHaveBeenCalledTimes(2);
-  expect(mocks.createOrder.mock.calls[1][0].customerPhone).toBe("11888880000");
+  expect(mocks.createOrder.mock.calls[1][0].customerPhone).toBe("11988880000");
 });
 
 function fillFulfillment(overrides = {}) {
@@ -356,13 +359,28 @@ function fillFulfillment(overrides = {}) {
   return fields;
 }
 
+it("sends a masked mobile phone as digits only", async () => {
+  document.getElementById("customer-phone").value = "(34) 99999-9999";
+  await (await import("../scripts/order.js")).openPaymentStep();
+  expect(mocks.createOrder.mock.calls[0][0].customerPhone).toBe("34999999999");
+  expect(mocks.createCheckout).toHaveBeenCalledTimes(1);
+});
+
+it.each(["3433334444", "34888888888"])("explains invalid mobile %s before checkout", async (phone) => {
+  document.getElementById("customer-phone").value = phone;
+  await (await import("../scripts/order.js")).openPaymentStep();
+  const { showAddressWarning } = await import("../scripts/ui.js");
+  expect(showAddressWarning).toHaveBeenCalledWith("Informe um celular válido com DDD.");
+  expect(mocks.createOrder).not.toHaveBeenCalled();
+});
+
 function currentSession() {
   return JSON.parse(sessionStorage.getItem("burger-house-checkout"));
 }
 
 it.each([
   ["customer-name", "Outro Cliente"],
-  ["customer-phone", "11888880000"],
+  ["customer-phone", "11988880000"],
   ["customer-email", "outro@teste.com"],
   ["customer-tax-id", "11144477735"],
   ["cep", "38401-000"],

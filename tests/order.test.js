@@ -136,6 +136,30 @@ async function setup(type = "pickup") {
   const order = await import("../scripts/order.js");
   return { state, order };
 }
+it.each([
+  ["3", "3"],
+  ["34", "34"],
+  ["349", "(34) 9"],
+  ["3499999", "(34) 99999"],
+  ["34999999999", "(34) 99999-9999"],
+  ["abc(34) 99999-9999!", "(34) 99999-9999"],
+  ["349999999991234", "(34) 99999-9999"],
+])("masks mobile input %s progressively", async (value, expected) => {
+  const { order } = await setup();
+  order.bindOrderEvents();
+  const phone = document.getElementById("customer-phone");
+  phone.value = value;
+  phone.dispatchEvent(new Event("input"));
+  expect(phone.value).toBe(expected);
+});
+
+it("provides clear mobile validation translations", async () => {
+  const { translate } = await import("../scripts/i18n.js");
+  expect(translate("address.invalidPhone", "pt-BR")).toBe("Informe um celular válido com DDD.");
+  expect(translate("address.invalidPhone", "en-US")).toBe(
+    "Enter a valid mobile phone number with area code.",
+  );
+});
 it("reviews a pickup order, confirms through backend and sends the preserved message once", async () => {
   const { state, order } = await setup();
   order.bindOrderEvents();

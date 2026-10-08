@@ -45,7 +45,7 @@ public class CheckoutControllerTests
         var reuses = 0;
         var gateway = new StubGateway(async (payment, customer) =>
         {
-            Assert.Equal(new HostedCheckoutCustomer("Cliente Teste", "cliente@teste.com", "52998224725"), customer);
+            Assert.Equal(new HostedCheckoutCustomer("Cliente Teste", "cliente@teste.com", "52998224725", "11999990000"), customer);
             if (payment.ExternalCheckoutId is null)
             {
                 Interlocked.Increment(ref creates);
