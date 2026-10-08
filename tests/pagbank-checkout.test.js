@@ -59,7 +59,7 @@ beforeEach(() => {
   mocks.orderType = "pickup";
   mocks.cart = [{ id: "burger-praiano", quantity: 1, price: 43.9 }];
   document.body.innerHTML =
-    '<input id="customer-name" value="Cliente Teste" /><input id="customer-phone" value="11999990000" /><p id="checkout-status"></p><button id="check-payment-btn"></button><button id="confirm-whatsapp-btn" class="hidden"></button>';
+    '<input id="customer-name" value="Cliente Teste" /><input id="customer-phone" value="11999990000" /><input id="customer-email" value="cliente@teste.com" /><input id="customer-tax-id" value="52998224725" /><p id="checkout-status"></p><button id="check-payment-btn"></button><button id="confirm-whatsapp-btn" class="hidden"></button>';
   mocks.createOrder.mockResolvedValue({ orderId: 99, subtotal: 43.9, deliveryFee: 0, total: 43.9 });
   mocks.createCheckout.mockResolvedValue({
     paymentId: 17,
@@ -80,6 +80,8 @@ it("creates an order and PagBank checkout, preserving return context without cho
     items: [{ productCode: "burger-praiano", quantity: 1, observation: null }],
     customerName: "Cliente Teste",
     customerPhone: "11999990000",
+    customerEmail: "cliente@teste.com",
+    customerTaxId: "52998224725",
     zipCode: null,
     street: null,
     houseNumber: null,
@@ -92,6 +94,8 @@ it("creates an order and PagBank checkout, preserving return context without cho
   const context = JSON.parse(sessionStorage.getItem("burger-house-checkout"));
   expect(context.paymentId).toBe(17);
   expect(context.message).toContain("Rua dos Testes 123");
+  expect(context.message).not.toContain("cliente@teste.com");
+  expect(context.message).not.toContain("52998224725");
   expect(context).not.toHaveProperty("paymentMethod");
 });
 
@@ -246,6 +250,8 @@ it.each(["delivery", "pickup"])(
     const values = {
       "customer-name": " Cliente Teste ",
       "customer-phone": " 11999990000 ",
+      "customer-email": " cliente@teste.com ",
+      "customer-tax-id": " 529.982.247-25 ",
       cep: " 38400-000 ",
       street: " Rua Teste ",
       "house-number": " 10 ",
@@ -270,6 +276,8 @@ it.each(["delivery", "pickup"])(
       items: [{ productCode: "burger-praiano", quantity: 1, observation: null }],
       customerName: "Cliente Teste",
       customerPhone: "11999990000",
+      customerEmail: "cliente@teste.com",
+      customerTaxId: "52998224725",
       zipCode: type === "delivery" ? "38400-000" : null,
       street: type === "delivery" ? "Rua Teste" : null,
       houseNumber: type === "delivery" ? "10" : null,
@@ -292,6 +300,17 @@ it.each([
   ["customer-name", " "],
   ["customer-phone", ""],
   ["customer-phone", "123"],
+  ["customer-email", ""],
+  ["customer-email", "invalido"],
+  ["customer-email", "cliente@@teste.com"],
+  ["customer-email", "x".repeat(245) + "@teste.com"],
+  ["customer-tax-id", ""],
+  ["customer-tax-id", "11111111111"],
+  ["customer-tax-id", "00000000000"],
+  ["customer-tax-id", "52998224724"],
+  ["customer-tax-id", "52998224825"],
+  ["customer-tax-id", "5299822472"],
+  ["customer-tax-id", "a52998224725"],
 ])("blocks missing or invalid customer field %s", async (id, value) => {
   document.getElementById(id).value = value;
   await (await import("../scripts/order.js")).openPaymentStep();
@@ -314,6 +333,8 @@ function fillFulfillment(overrides = {}) {
   const fields = {
     "customer-name": "Cliente Teste",
     "customer-phone": "11999990000",
+    "customer-email": "cliente@teste.com",
+    "customer-tax-id": "52998224725",
     cep: "38400-000",
     street: "Rua Teste",
     "house-number": "10",
@@ -342,6 +363,8 @@ function currentSession() {
 it.each([
   ["customer-name", "Outro Cliente"],
   ["customer-phone", "11888880000"],
+  ["customer-email", "outro@teste.com"],
+  ["customer-tax-id", "11144477735"],
   ["cep", "38401-000"],
   ["street", "Outra Rua"],
   ["house-number", "20"],
@@ -389,6 +412,7 @@ it("reuses identical normalized fulfillment after recovery and whitespace edits"
   const identity = currentSession().fingerprint;
   for (const [id, value] of Object.entries(fields))
     document.getElementById(id).value = " " + value + " ";
+  document.getElementById("customer-tax-id").value = " 529.982.247-25 ";
   vi.resetModules();
   order = await import("../scripts/order.js");
   order.bindOrderEvents();

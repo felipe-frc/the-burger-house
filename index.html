@@ -414,6 +414,40 @@
               />
             </div>
           </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label
+                for="customer-email"
+                class="block text-sm font-bold text-zinc-700 mb-1"
+                data-i18n="address.customerEmail"
+                >E-mail*</label
+              >
+              <input
+                id="customer-email"
+                type="email"
+                autocomplete="email"
+                required
+                maxlength="254"
+                class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none transition-colors"
+              />
+            </div>
+            <div>
+              <label
+                for="customer-tax-id"
+                class="block text-sm font-bold text-zinc-700 mb-1"
+                data-i18n="address.customerTaxId"
+                >CPF*</label
+              >
+              <input
+                id="customer-tax-id"
+                type="text"
+                inputmode="numeric"
+                required
+                maxlength="14"
+                class="w-full border-2 p-2 rounded focus:border-amber-600 outline-none transition-colors"
+              />
+            </div>
+          </div>
           <div id="delivery-fields" class="space-y-3">
             <div>
               <label class="block text-sm font-bold text-zinc-700 mb-1" for="cep">

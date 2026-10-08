@@ -27,6 +27,8 @@ const CHECKOUT_STORAGE_KEY = "burger-house-checkout";
 const RETURN_FIELDS = [
   "customer-name",
   "customer-phone",
+  "customer-email",
+  "customer-tax-id",
   "cep",
   "street",
   "house-number",
@@ -123,6 +125,8 @@ function buildOrderPayload(cart, fields = getReturnFields()) {
     items: mapCartToApiItems(cart),
     customerName: text(fields["customer-name"]),
     customerPhone: text(fields["customer-phone"]),
+    customerEmail: text(fields["customer-email"]),
+    customerTaxId: text(fields["customer-tax-id"]).replace(/[.-]/g, ""),
     zipCode: delivery ? optional(fields.cep) : null,
     street: delivery ? optional(fields.street) : null,
     houseNumber: delivery ? optional(fields["house-number"]) : null,
@@ -131,6 +135,17 @@ function buildOrderPayload(cart, fields = getReturnFields()) {
     complement: delivery ? optional(fields.complement) : null,
     observation: optional(fields["order-notes"]),
   };
+}
+
+function isValidCpf(value) {
+  if (!/^[0-9]{11}$/.test(value) || /^(\d)\1{10}$/.test(value)) return false;
+  for (const length of [9, 10]) {
+    let sum = 0;
+    for (let i = 0; i < length; i++) sum += Number(value[i]) * (length + 1 - i);
+    const remainder = sum % 11;
+    if (Number(value[length]) !== (remainder < 2 ? 0 : 11 - remainder)) return false;
+  }
+  return true;
 }
 
 function validateCustomerFields(details = buildOrderPayload(getCart())) {
@@ -144,6 +159,23 @@ function validateCustomerFields(details = buildOrderPayload(getCart())) {
     !/^[0-9 +()-]+$/.test(details.customerPhone)
   ) {
     showAddressWarning(translate("address.customerRequired"));
+    openModal(elements.addressModal);
+    return false;
+  }
+  const emailInput = document.createElement("input");
+  emailInput.type = "email";
+  emailInput.required = true;
+  emailInput.value = details.customerEmail;
+  const error =
+    !emailInput.checkValidity() ||
+    emailInput.value !== details.customerEmail ||
+    details.customerEmail.length > 254
+      ? "address.invalidEmail"
+      : !isValidCpf(details.customerTaxId)
+        ? "address.invalidCpf"
+        : null;
+  if (error) {
+    showAddressWarning(translate(error));
     openModal(elements.addressModal);
     return false;
   }
@@ -490,7 +522,7 @@ async function confirmWhatsApp() {
     resetOrderType();
     resetAddressForm();
     clearOrderNotes();
-    for (const id of ["customer-name", "customer-phone"]) {
+    for (const id of ["customer-name", "customer-phone", "customer-email", "customer-tax-id"]) {
       const input = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
       if (input) input.value = "";
     }

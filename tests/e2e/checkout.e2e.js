@@ -32,6 +32,8 @@ test.beforeEach(async ({ page }) => {
     const body = route.request().postDataJSON();
     expect(body.customerName).toBe("Cliente Teste");
     expect(body.customerPhone).toBe("11999990000");
+    expect(body.customerEmail).toBe("cliente@teste.com");
+    expect(body.customerTaxId).toBe("52998224725");
     if (body.orderType === "pickup") {
       for (const field of [
         "zipCode",
@@ -115,6 +117,8 @@ test("deve simular o fluxo completo de compra com entrega", async ({ page }) => 
   await page.locator("#go-to-address-btn").click();
   await page.locator("#customer-name").fill("Cliente Teste");
   await page.locator("#customer-phone").fill("11999990000");
+  await page.locator("#customer-email").fill("cliente@teste.com");
+  await page.locator("#customer-tax-id").fill("529.982.247-25");
 
   await expect(page.locator("#address-modal")).toBeVisible();
 
@@ -187,6 +191,8 @@ test("deve permitir retirada no local sem preencher endereço", async ({ page })
   await page.locator("#go-to-address-btn").click();
   await page.locator("#customer-name").fill("Cliente Teste");
   await page.locator("#customer-phone").fill("11999990000");
+  await page.locator("#customer-email").fill("cliente@teste.com");
+  await page.locator("#customer-tax-id").fill("529.982.247-25");
 
   await expect(page.locator("#address-modal")).toBeVisible();
 
@@ -227,6 +233,8 @@ test("deve exibir aviso para CEP inválido", async ({ page }) => {
   await page.locator("#go-to-address-btn").click();
   await page.locator("#customer-name").fill("Cliente Teste");
   await page.locator("#customer-phone").fill("11999990000");
+  await page.locator("#customer-email").fill("cliente@teste.com");
+  await page.locator("#customer-tax-id").fill("529.982.247-25");
   await page.locator("#cep").fill("00000000");
 
   await expect(page.locator("#address-warn")).toContainText(/CEP n.o encontrado/i);
@@ -272,6 +280,8 @@ test("deve enviar observações longas no pedido final", async ({ page }) => {
   await page.locator("#go-to-address-btn").click();
   await page.locator("#customer-name").fill("Cliente Teste");
   await page.locator("#customer-phone").fill("11999990000");
+  await page.locator("#customer-email").fill("cliente@teste.com");
+  await page.locator("#customer-tax-id").fill("529.982.247-25");
   await page.locator("#cep").fill("38400000");
   await page.locator("#house-number").fill("123");
   await page.locator("#go-to-review-btn").click();
@@ -315,6 +325,8 @@ test("deve permitir remover item antes da revisão e seguir com o item restante"
   await page.locator("#go-to-address-btn").click();
   await page.locator("#customer-name").fill("Cliente Teste");
   await page.locator("#customer-phone").fill("11999990000");
+  await page.locator("#customer-email").fill("cliente@teste.com");
+  await page.locator("#customer-tax-id").fill("529.982.247-25");
   await page.locator("#cep").fill("38400000");
   await page.locator("#house-number").fill("123");
   await page.locator("#go-to-review-btn").click();

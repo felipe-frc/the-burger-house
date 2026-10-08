@@ -108,6 +108,10 @@ const translations = {
 
     "address.customerName": "Nome*",
     "address.customerPhone": "Telefone com DDD*",
+    "address.customerEmail": "E-mail*",
+    "address.customerTaxId": "CPF*",
+    "address.invalidEmail": "Informe um e-mail válido.",
+    "address.invalidCpf": "Informe um CPF válido.",
     "address.customerRequired": "Informe seu nome e um telefone válido com DDD.",
     "whatsapp.newOrder": "Novo Pedido - The Burger House",
     "whatsapp.orderType": "Tipo de pedido",
@@ -230,6 +234,10 @@ const translations = {
 
     "address.customerName": "Name*",
     "address.customerPhone": "Phone with area code*",
+    "address.customerEmail": "Email*",
+    "address.customerTaxId": "CPF*",
+    "address.invalidEmail": "Enter a valid email address.",
+    "address.invalidCpf": "Enter a valid CPF (Brazilian tax ID).",
     "address.customerRequired": "Enter your name and a valid phone number with area code.",
     "whatsapp.newOrder": "New Order - The Burger House",
     "whatsapp.orderType": "Order type",

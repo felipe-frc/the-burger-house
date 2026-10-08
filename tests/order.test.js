@@ -57,7 +57,7 @@ function setupOrderDom() {
       class="hidden"
     ></span>
 
-    <input id="customer-name" value="Cliente Teste" /><input id="customer-phone" value="11999990000" /><input id="cep" />
+    <input id="customer-name" value="Cliente Teste" /><input id="customer-phone" value="11999990000" /><input id="customer-email" value="cliente@teste.com" /><input id="customer-tax-id" value="52998224725" /><input id="cep" />
     <input id="street" />
     <input id="neighborhood" />
     <input id="city" />
@@ -163,6 +163,8 @@ it("reviews a pickup order, confirms through backend and sends the preserved mes
   expect(message).toContain("Sem cebola.");
   expect(state.getCart()).toEqual([]);
   expect(document.getElementById("order-notes").value).toBe("");
+  expect(document.getElementById("customer-email").value).toBe("");
+  expect(document.getElementById("customer-tax-id").value).toBe("");
   document.getElementById("confirm-whatsapp-btn").click();
   await vi.advanceTimersByTimeAsync(20);
   expect(window.open).toHaveBeenCalledTimes(1);
@@ -224,6 +226,8 @@ it("restores delivery fields and notes when returning in the same tab", async ()
   const fields = {
     "customer-name": "Cliente Teste",
     "customer-phone": "11999990000",
+    "customer-email": "cliente@teste.com",
+    "customer-tax-id": "52998224725",
     cep: "38400-000",
     street: "Rua dos Testes",
     neighborhood: "Centro",
