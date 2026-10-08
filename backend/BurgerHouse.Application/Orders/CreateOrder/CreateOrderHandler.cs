@@ -14,17 +14,23 @@ public class CreateOrderHandler
         IProductRepository productRepository,
         IOrderRepository orderRepository)
     {
-        _productRepository = productRepository;
-        _orderRepository = orderRepository;
+        _productRepository =
+            productRepository;
+
+        _orderRepository =
+            orderRepository;
     }
 
     public async Task<CreateOrderResponse> HandleAsync(
         CreateOrderRequest request,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(
+            request
+        );
 
-        if (request.Items is null || request.Items.Count == 0)
+        if (request.Items is null ||
+            request.Items.Count == 0)
         {
             throw new ArgumentException(
                 "The order must contain at least one item."
@@ -36,21 +42,37 @@ public class CreateOrderHandler
                 .Trim()
                 .ToLowerInvariant();
 
-        var deliveryFee = normalizedOrderType switch
-        {
-            OrderTypes.Delivery => DeliveryFee,
-            OrderTypes.Pickup => 0m,
+        var deliveryFee =
+            normalizedOrderType switch
+            {
+                OrderTypes.Delivery =>
+                    DeliveryFee,
 
-            _ => throw new ArgumentException(
-                "Order type must be 'delivery' or 'pickup'."
-            )
-        };
+                OrderTypes.Pickup =>
+                    0m,
 
-        var order = new Order(
-            deliveryFee, normalizedOrderType, request.CustomerName, request.CustomerPhone,
-            request.ZipCode, request.Street, request.HouseNumber, request.Neighborhood,
-            request.City, request.Complement, request.Observation
-        );
+                _ =>
+                    throw new ArgumentException(
+                        "Order type must be 'delivery' or 'pickup'."
+                    )
+            };
+
+        var order =
+            new Order(
+                deliveryFee,
+                normalizedOrderType,
+                request.CustomerName,
+                request.CustomerPhone,
+                request.CustomerEmail,
+                request.CustomerTaxId,
+                request.ZipCode,
+                request.Street,
+                request.HouseNumber,
+                request.Neighborhood,
+                request.City,
+                request.Complement,
+                request.Observation
+            );
 
         foreach (var requestedItem in request.Items)
         {
@@ -67,15 +89,18 @@ public class CreateOrderHandler
                 );
             }
 
-            var orderItem = new OrderItem(
-                product.Id,
-                requestedItem.Quantity,
-                product.Price,
-                requestedItem.Observation,
-                product.CostPrice
-            );
+            var orderItem =
+                new OrderItem(
+                    product.Id,
+                    requestedItem.Quantity,
+                    product.Price,
+                    requestedItem.Observation,
+                    product.CostPrice
+                );
 
-            order.AddItem(orderItem);
+            order.AddItem(
+                orderItem
+            );
         }
 
         await _orderRepository.AddAsync(

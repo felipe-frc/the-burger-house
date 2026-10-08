@@ -30,6 +30,7 @@ public sealed class AdminServiceTests : IAsyncLifetime
     private async Task<Order> Seed(PaymentStatus status = PaymentStatus.Approved, string type = "pickup", decimal? cost = 10m)
     {
         var order = new Order(type == "delivery" ? 5 : 0, type, "Cliente Teste", "11999990000",
+            "cliente@teste.com", "52998224725",
             type == "delivery" ? "38400-000" : null, type == "delivery" ? "Rua Teste" : null,
             type == "delivery" ? "10" : null, type == "delivery" ? "Centro" : null, type == "delivery" ? "Cidade" : null);
         order.AddItem(new OrderItem(1, 2, 30m, "Sem cebola", cost));
@@ -104,6 +105,7 @@ public sealed class AdminServiceTests : IAsyncLifetime
         await service.UpdateProductAsync(1, 30, 12.5m, true, default);
         var handler = new CreateOrderHandler(new ProductRepository(db), new OrderRepository(db));
         await handler.HandleAsync(new CreateOrderRequest { OrderType = "pickup", CustomerName = "Cliente",
+            CustomerEmail = "cliente@teste.com", CustomerTaxId = "52998224725",
             CustomerPhone = "11999990000", Items = [new() { ProductCode = "burger-praiano", Quantity = 1 }] });
         await service.UpdateProductAsync(1, 50, 20, true, default);
         db.ChangeTracker.Clear();

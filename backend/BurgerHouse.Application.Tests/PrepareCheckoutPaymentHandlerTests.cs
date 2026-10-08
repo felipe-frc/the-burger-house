@@ -59,7 +59,14 @@ public class PrepareCheckoutPaymentHandlerTests
 
     private sealed class Store : IOrderRepository, IPaymentRepository
     {
-        public Order Order { get; } = new(0, "pickup", "Cliente Teste", "11999990000");
+        public Order Order { get; } = new(
+    0,
+    "pickup",
+    "Cliente Teste",
+    "11999990000",
+    "cliente@teste.com",
+    "52998224725"
+);
         public Payment? Payment { get; set; }
         public int Saves { get; private set; }
         public Store()

@@ -32,6 +32,8 @@ public class CreateOrderHandlerTests
         var request = new CreateOrderRequest
         {
             OrderType = OrderTypes.Pickup, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ", Observation = " Sem cebola ",
+            CustomerEmail = "cliente@teste.com",
+            CustomerTaxId = "52998224725",
 
             Items =
             [
@@ -102,6 +104,8 @@ public class CreateOrderHandlerTests
         var request = new CreateOrderRequest
         {
             OrderType = OrderTypes.Delivery, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ", ZipCode = " 38400-000 ", Street = " Rua Teste ", HouseNumber = " 10 ", Neighborhood = " Centro ", City = " Cidade ", Complement = " Apto ", Observation = " Sem cebola ",
+            CustomerEmail = "cliente@teste.com",
+            CustomerTaxId = "52998224725",
 
             Items =
             [
@@ -195,6 +199,8 @@ public class CreateOrderHandlerTests
         var request = new CreateOrderRequest
         {
             OrderType = OrderTypes.Pickup, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ", Observation = " Sem cebola ",
+            CustomerEmail = "cliente@teste.com",
+            CustomerTaxId = "52998224725",
             Items = []
         };
 
@@ -220,6 +226,8 @@ public class CreateOrderHandlerTests
         var request = new CreateOrderRequest
         {
             OrderType = OrderTypes.Pickup, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ", Observation = " Sem cebola ",
+            CustomerEmail = "cliente@teste.com",
+            CustomerTaxId = "52998224725",
 
             Items =
             [
@@ -266,6 +274,8 @@ public class CreateOrderHandlerTests
         var request = new CreateOrderRequest
         {
             OrderType = OrderTypes.Pickup, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ", Observation = " Sem cebola ",
+            CustomerEmail = "cliente@teste.com",
+            CustomerTaxId = "52998224725",
 
             Items =
             [
@@ -313,6 +323,8 @@ public class CreateOrderHandlerTests
         var request = new CreateOrderRequest
         {
             OrderType = "delivery", CustomerName = "Cliente Teste", CustomerPhone = "11999990000",
+            CustomerEmail = "cliente@teste.com",
+            CustomerTaxId = "52998224725",
             Items = [new() { ProductCode = "burger-praiano", Quantity = 1 }]
         };
         await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(request));

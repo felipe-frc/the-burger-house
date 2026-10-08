@@ -208,7 +208,14 @@ public class PagBankPaymentReconciliationServiceTests
         {
             using var db = Open();
             db.Database.EnsureCreated();
-            var order = new Order(0, "pickup", "Cliente Teste", "11999990000");
+            var order = new Order(
+    0,
+    "pickup",
+    "Cliente Teste",
+    "11999990000",
+    "cliente@teste.com",
+    "52998224725"
+);
             order.AddItem(new OrderItem(1, 1, 43.90m));
             db.Orders.Add(order);
             db.SaveChanges();

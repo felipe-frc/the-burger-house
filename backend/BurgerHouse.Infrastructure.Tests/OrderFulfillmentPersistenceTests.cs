@@ -53,6 +53,8 @@ public class OrderFulfillmentPersistenceTests
             var result = await handler.HandleAsync(new CreateOrderRequest
             {
                 OrderType = type, CustomerName = " Cliente Teste ", CustomerPhone = " 11999990000 ",
+                CustomerEmail = "cliente@teste.com",
+                CustomerTaxId = "52998224725",
                 ZipCode = type == "delivery" ? "38400-000" : null,
                 Street = type == "delivery" ? " Rua Teste " : null,
                 HouseNumber = type == "delivery" ? "10" : null,
