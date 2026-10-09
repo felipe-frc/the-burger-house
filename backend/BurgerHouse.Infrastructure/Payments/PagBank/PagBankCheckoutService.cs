@@ -143,6 +143,9 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
                         ),
                         new PagBankPaymentMethod(
                             "CREDIT_CARD"
+                        ),
+                        new PagBankPaymentMethod(
+                            "DEBIT_CARD"
                         )
                     ],
                     _options.RedirectUrl,

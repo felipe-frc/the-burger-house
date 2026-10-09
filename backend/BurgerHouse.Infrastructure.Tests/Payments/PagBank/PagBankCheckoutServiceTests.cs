@@ -140,7 +140,7 @@ public class PagBankCheckoutServiceTests
                 .ToArray();
 
         Assert.Equal(
-            ["PIX", "CREDIT_CARD"],
+            ["PIX", "CREDIT_CARD", "DEBIT_CARD"],
             paymentMethods
         );
 
