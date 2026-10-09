@@ -25,14 +25,38 @@ public sealed class PagBankPaymentReconciliationService(
             .SingleOrDefaultAsync(payment => payment.Id == paymentId, cancellationToken);
 
         if (localPayment is null ||
-            !ShouldReconcile(localPayment.Status) ||
-            string.IsNullOrWhiteSpace(localPayment.ExternalPaymentId))
+            !ShouldReconcile(localPayment) ||
+            (string.IsNullOrWhiteSpace(localPayment.ExternalPaymentId) &&
+             string.IsNullOrWhiteSpace(localPayment.ExternalCheckoutId)))
             return;
 
         var externalPaymentId = localPayment.ExternalPaymentId;
         PagBankPaymentSnapshot? snapshot;
         try
         {
+            if (string.IsNullOrWhiteSpace(externalPaymentId))
+            {
+                logger.LogInformation("PagBank checkout fallback started. PaymentId: {PaymentId}.", paymentId);
+                var order = await dbContext.Orders.AsNoTracking().Include(o => o.Items)
+                    .SingleOrDefaultAsync(o => o.Id == localPayment.OrderId, cancellationToken);
+                if (order is null || order.Total != localPayment.Amount)
+                {
+                    logger.LogWarning("PagBank checkout fallback rejected local order amount. PaymentId: {PaymentId}.", paymentId);
+                    return;
+                }
+                var discovery = await paymentLookup.DiscoverChargeAsync(
+                    localPayment.ExternalCheckoutId!, paymentId, localPayment.Amount, cancellationToken);
+                logger.LogInformation(
+                    "PagBank checkout fallback result. PaymentId: {PaymentId}, CheckoutFound: {CheckoutFound}, Candidates: {Candidates}, Reason: {Reason}.",
+                    paymentId, discovery.CheckoutFound, discovery.Candidates, discovery.Reason);
+                if (discovery.ChargeId is null)
+                {
+                    logger.LogWarning("PagBank checkout fallback rejected selection. PaymentId: {PaymentId}, Reason: {Reason}.", paymentId, discovery.Reason);
+                    return;
+                }
+                externalPaymentId = discovery.ChargeId;
+            }
+            logger.LogInformation("PagBank canonical charge lookup started. PaymentId: {PaymentId}.", paymentId);
             snapshot = await paymentLookup.GetAsync(externalPaymentId, cancellationToken);
         }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -46,7 +70,7 @@ public sealed class PagBankPaymentReconciliationService(
             return;
         }
 
-        if (!IsSnapshotCompatible(localPayment, snapshot, out var reason))
+        if (!IsSnapshotCompatible(localPayment, externalPaymentId!, snapshot, out var reason))
         {
             logger.LogWarning(
                 "PagBank charge reconciliation response rejected. PaymentId: {PaymentId}, ExternalPaymentId: {ExternalPaymentId}, ProviderStatus: {ProviderStatus}, Reason: {Reason}.",
@@ -88,7 +112,7 @@ public sealed class PagBankPaymentReconciliationService(
                 return;
             }
 
-            if (!ShouldReconcile(currentPayment.Status))
+            if (!ShouldReconcile(currentPayment))
             {
                 logger.LogInformation(
                     "PagBank charge reconciliation became a no-op after reloading local state. PaymentId: {PaymentId}, ExternalPaymentId: {ExternalPaymentId}, LocalStatus: {LocalStatus}.",
@@ -99,7 +123,7 @@ public sealed class PagBankPaymentReconciliationService(
                 return;
             }
 
-            if (!IsCurrentStateCompatible(currentPayment, currentOrder, snapshot!, out reason))
+            if (!IsCurrentStateCompatible(currentPayment, currentOrder, localPayment.ExternalCheckoutId, snapshot!, out reason))
             {
                 logger.LogWarning(
                     "PagBank charge reconciliation correlation rejected after reloading local state. PaymentId: {PaymentId}, ExternalPaymentId: {ExternalPaymentId}, Reason: {Reason}.",
@@ -117,7 +141,8 @@ public sealed class PagBankPaymentReconciliationService(
                 snapshot.Currency,
                 snapshot.PaymentMethod,
                 snapshot.PaymentStatus,
-                cancellationToken
+                cancellationToken,
+                refundedAmount: snapshot.RefundedAmountInCents / 100m
             );
             await transaction.CommitAsync(cancellationToken);
 
@@ -152,6 +177,7 @@ public sealed class PagBankPaymentReconciliationService(
 
     private static bool IsSnapshotCompatible(
         Payment payment,
+        string expectedChargeId,
         PagBankPaymentSnapshot? snapshot,
         out string reason)
     {
@@ -160,7 +186,7 @@ public sealed class PagBankPaymentReconciliationService(
             reason = "charge-not-found";
             return false;
         }
-        if (!string.Equals(snapshot.Id, payment.ExternalPaymentId, StringComparison.Ordinal))
+        if (!string.Equals(snapshot.Id, expectedChargeId, StringComparison.Ordinal))
         {
             reason = "charge-id-mismatch";
             return false;
@@ -192,11 +218,14 @@ public sealed class PagBankPaymentReconciliationService(
     private static bool IsCurrentStateCompatible(
         Payment payment,
         Order order,
+        string? expectedCheckoutId,
         PagBankPaymentSnapshot snapshot,
         out string reason)
     {
         if (string.IsNullOrWhiteSpace(payment.ExternalCheckoutId) ||
-            !string.Equals(payment.ExternalPaymentId, snapshot.Id, StringComparison.Ordinal) ||
+            !string.Equals(payment.ExternalCheckoutId, expectedCheckoutId, StringComparison.Ordinal) ||
+            (payment.ExternalPaymentId is not null &&
+             !string.Equals(payment.ExternalPaymentId, snapshot.Id, StringComparison.Ordinal)) ||
             !string.Equals(
                 snapshot.ReferenceId,
                 PagBankCheckoutService.CreateReference(payment.Id),
@@ -216,7 +245,7 @@ public sealed class PagBankPaymentReconciliationService(
         return true;
     }
 
-    private void LogLookupFailure(int paymentId, string externalPaymentId, string failure)
+    private void LogLookupFailure(int paymentId, string? externalPaymentId, string failure)
     {
         logger.LogWarning(
             "PagBank charge lookup failed during reconciliation. PaymentId: {PaymentId}, ExternalPaymentId: {ExternalPaymentId}, Failure: {Failure}.",
@@ -226,6 +255,7 @@ public sealed class PagBankPaymentReconciliationService(
         );
     }
 
-    private static bool ShouldReconcile(PaymentStatus status) =>
-        status is PaymentStatus.Pending or PaymentStatus.Approved or PaymentStatus.PartiallyRefunded;
+    private static bool ShouldReconcile(Payment payment) =>
+        payment.Status is PaymentStatus.Pending or PaymentStatus.Approved or PaymentStatus.PartiallyRefunded ||
+        payment.Status == PaymentStatus.Refunded && payment.RefundTrackingStartedAt is null;
 }

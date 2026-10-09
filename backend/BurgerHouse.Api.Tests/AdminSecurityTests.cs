@@ -123,6 +123,14 @@ public sealed class AdminSecurityTests : IAsyncLifetime
         var response = await client.GetAsync("/api/admin/" + path);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var text = await response.Content.ReadAsStringAsync();
+        if (path == "finance/summary")
+        {
+            using var json = JsonDocument.Parse(text);
+            var summary = json.RootElement;
+            Assert.Equal(summary.GetProperty("grossRevenue").GetDecimal() - summary.GetProperty("refundedAmount").GetDecimal(),
+                summary.GetProperty("netRevenue").GetDecimal());
+            Assert.True(summary.TryGetProperty("unknownApprovalPayments", out _));
+        }
         foreach (var forbidden in new[] { password, "passwordHash", "idempotencyKey", "externalPaymentId", "externalCheckoutId", "test-placeholder" })
             Assert.DoesNotContain(forbidden, text);
     }

@@ -27,6 +27,8 @@ public class PagBankPaymentReconciliationServiceTests
         Assert.Equal("CHAR_1", payment.ExternalPaymentId);
         Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
         Assert.Equal(1, fixture.LookupCalls);
+        Assert.Equal(0, fixture.CheckoutCalls);
+        Assert.Equal(0, fixture.OrderCalls);
         Assert.False(fixture.TransactionObservedDuringLookup);
     }
 
@@ -54,14 +56,115 @@ public class PagBankPaymentReconciliationServiceTests
     }
 
     [Fact]
-    public async Task MissingExternalPaymentIdReturnsLocalStateWithoutCallingProvider()
+    public async Task CheckoutWithoutOrdersReturnsLocalStateWithoutChargeLookup()
     {
         using var fixture = new Fixture(setExternalPaymentId: false);
 
         await fixture.Reconcile();
 
         Assert.Equal(0, fixture.LookupCalls);
+        Assert.Equal(1, fixture.CheckoutCalls);
         await fixture.AssertPending();
+    }
+
+    [Fact]
+    public async Task CheckoutDiscoveryApprovesPixAndPreservesFinancialHistory()
+    {
+        using var fixture = new Fixture(false) { DiscoverOrder = true, ProviderMethod = "PIX" };
+        await fixture.Reconcile();
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.Equal(PaymentMethod.Pix, payment.Method);
+        Assert.Equal("CHAR_1", payment.ExternalPaymentId);
+        Assert.NotNull(payment.ApprovedAt);
+        Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
+        await fixture.Reconcile();
+        Assert.Equal(1, fixture.CheckoutCalls);
+        Assert.Equal(1, fixture.OrderCalls);
+        Assert.Equal(2, fixture.LookupCalls);
+        Assert.Equal(payment.ApprovedAt, (await fixture.Payment()).ApprovedAt);
+        await using (var db = fixture.Open()) Assert.Empty(await db.PaymentRefunds.ToListAsync());
+        fixture.RefundedInCents = 1000;
+        await fixture.Reconcile();
+        await fixture.Reconcile();
+        fixture.RefundedInCents = 2000;
+        await fixture.Reconcile();
+        await using var final = fixture.Open();
+        Assert.Equal(new decimal[] { 10, 10 }, await final.PaymentRefunds.OrderBy(r => r.Id).Select(r => r.Amount).ToArrayAsync());
+        Assert.Equal(20, (await fixture.Payment()).RefundedAmount);
+        Assert.False(fixture.TransactionObservedDuringLookup);
+    }
+
+    [Fact]
+    public async Task DiscoveredWaitingChargeRemainsPending()
+    {
+        using var fixture = new Fixture(false) { DiscoverOrder = true, ProviderStatus = "WAITING", ProviderMethod = "PIX" };
+        await fixture.Reconcile();
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+        Assert.Equal("CHAR_1", (await fixture.Payment()).ExternalPaymentId);
+        Assert.Equal(OrderStatus.PendingPayment, await fixture.GetOrderStatus());
+    }
+
+    [Theory]
+    [InlineData("checkout-id")]
+    [InlineData("checkout-reference")]
+    [InlineData("multiple-orders")]
+    [InlineData("order-id")]
+    [InlineData("order-reference")]
+    [InlineData("no-charges")]
+    [InlineData("multiple-charges")]
+    [InlineData("charge-id")]
+    [InlineData("reference")]
+    [InlineData("currency")]
+    [InlineData("amount")]
+    [InlineData("canonical-id")]
+    [InlineData("local-order-total")]
+    public async Task InvalidDiscoveryDoesNotPersistAssociation(string mismatch)
+    {
+        using var fixture = new Fixture(false) { DiscoverOrder = true, DiscoveryMismatch = mismatch };
+        if (mismatch == "local-order-total")
+        {
+            await using var db = fixture.Open();
+            await db.Database.ExecuteSqlRawAsync("UPDATE OrderItems SET UnitPrice = 1");
+        }
+        await fixture.Reconcile();
+        await fixture.AssertPending();
+        Assert.Null((await fixture.Payment()).ExternalPaymentId);
+    }
+
+    [Fact]
+    public async Task ConcurrentDiscoveriesAreIdempotent()
+    {
+        using var fixture = new Fixture(false) { DiscoverOrder = true, ProviderMethod = "PIX" };
+        await Task.WhenAll(fixture.Reconcile(), fixture.Reconcile());
+        Assert.Equal(PaymentStatus.Approved, (await fixture.Payment()).Status);
+        Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
+        Assert.Equal("CHAR_1", (await fixture.Payment()).ExternalPaymentId);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"id\":\"CHEC_1\",\"reference_id\":\"payment:1\",\"charges\":[]}")]
+    [InlineData("{\"id\":\"CHEC_1\",\"reference_id\":\"payment:1\",\"orders\":[null]}")]
+    [InlineData("{\"id\":\"CHEC_1\",\"reference_id\":\"payment:1\",\"orders\":{}}")]
+    [InlineData("not-json")]
+    public async Task UnrecognizedCheckoutResponseDoesNotInventChargeStructure(string json)
+    {
+        using var fixture = new Fixture(false) { CheckoutJson = json };
+        await fixture.Reconcile();
+        await fixture.AssertPending();
+        Assert.Null((await fixture.Payment()).ExternalPaymentId);
+        Assert.Equal(0, fixture.LookupCalls);
+    }
+
+    [Fact]
+    public async Task DiscoveredChargeAssociationRollsBackWithOrderWriteFailure()
+    {
+        using var fixture = new Fixture(false) { DiscoverOrder = true };
+        await fixture.AddFailingOrderTrigger();
+        await fixture.Reconcile();
+        await fixture.AssertPending();
+        Assert.Null((await fixture.Payment()).ExternalPaymentId);
     }
 
     [Theory]
@@ -90,6 +193,7 @@ public class PagBankPaymentReconciliationServiceTests
         await fixture.Reconcile();
 
         Assert.Equal(expected, (await fixture.Payment()).Status);
+        Assert.Equal(refunded / 100m, (await fixture.Payment()).RefundedAmount);
         Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
     }
 
@@ -178,6 +282,31 @@ public class PagBankPaymentReconciliationServiceTests
         Assert.Equal(OrderStatus.Received, await fixture.GetOrderStatus());
     }
 
+    [Fact]
+    public async Task ConcurrentRefundSnapshotsAndRepeatedReconciliationCreateOnlyOneDelta()
+    {
+        using var fixture = new Fixture();
+        await fixture.ApproveLocally();
+        var approved = (await fixture.Payment()).ApprovedAt;
+        fixture.RefundedInCents = 1000;
+        await Task.WhenAll(fixture.Reconcile(), fixture.Reconcile());
+        await fixture.Reconcile();
+        await using (var db = fixture.Open())
+        {
+            Assert.Equal(10, Assert.Single(await db.PaymentRefunds.ToListAsync()).Amount);
+        }
+        fixture.RefundedInCents = 2000;
+        await fixture.Reconcile();
+        fixture.RefundedInCents = 4390;
+        await fixture.Reconcile();
+        await using var final = fixture.Open();
+        Assert.Equal(new decimal[] { 10, 10, 23.90m }, await final.PaymentRefunds.OrderBy(r => r.Id).Select(r => r.Amount).ToArrayAsync());
+        var payment = await final.Payments.SingleAsync();
+        Assert.Equal(approved, payment.ApprovedAt);
+        Assert.Equal(43.90m, payment.RefundedAmount);
+        Assert.Equal(PaymentStatus.Refunded, payment.Status);
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _path = Path.Combine(
@@ -192,6 +321,11 @@ public class PagBankPaymentReconciliationServiceTests
 
         public int PaymentId { get; }
         public int LookupCalls;
+        public int CheckoutCalls;
+        public int OrderCalls;
+        public bool DiscoverOrder;
+        public string? CheckoutJson;
+        public string? DiscoveryMismatch;
         public bool TransactionObservedDuringLookup;
         public bool Timeout;
         public bool InvalidJson;
@@ -243,8 +377,41 @@ public class PagBankPaymentReconciliationServiceTests
         public async Task Reconcile()
         {
             await using var db = Open();
-            using var http = new HttpClient(new Stub(_ =>
+            using var http = new HttpClient(new Stub(request =>
             {
+                Assert.Equal("sandbox.api.pagseguro.com", request.RequestUri!.Host);
+                Assert.Equal(HttpMethod.Get, request.Method);
+                Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
+                Assert.Equal("local-test-token", request.Headers.Authorization?.Parameter);
+                var mismatch = DiscoveryMismatch;
+                if (request.RequestUri.AbsolutePath == "/checkouts/CHEC_1")
+                {
+                    Interlocked.Increment(ref CheckoutCalls);
+                    Assert.Equal("?offset=0&limit=100", request.RequestUri.Query);
+                    var orders = !DiscoverOrder ? Array.Empty<object>() : Enumerable.Range(0, mismatch == "multiple-orders" ? 2 : 1)
+                        .Select(i => (object)new { id = $"ORDE_{i + 1}", links = new[] { new { href = "https://untrusted.invalid/orders/ORDE_1" } } }).ToArray();
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(CheckoutJson ?? JsonSerializer.Serialize(new {
+                        id = mismatch == "checkout-id" ? "CHEC_other" : "CHEC_1",
+                        reference_id = mismatch == "checkout-reference" ? "payment:999" : ChargeReference,
+                        orders
+                    })) });
+                }
+                if (request.RequestUri.AbsolutePath == "/orders/ORDE_1")
+                {
+                    Interlocked.Increment(ref OrderCalls);
+                    var charges = Enumerable.Range(0, mismatch == "no-charges" ? 0 : mismatch == "multiple-charges" ? 2 : 1).Select(i => new {
+                        id = mismatch == "charge-id" ? "invalid" : $"CHAR_{i + 1}",
+                        reference_id = mismatch == "reference" ? "payment:999" : ChargeReference,
+                        amount = new { value = mismatch == "amount" ? 1 : AmountInCents, currency = mismatch == "currency" ? "USD" : Currency },
+                        links = new[] { new { href = "https://internal.sandbox.api.pagseguro.com/charges/CHAR_1" } }
+                    });
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new {
+                        id = mismatch == "order-id" ? "ORDE_other" : "ORDE_1",
+                        reference_id = mismatch == "order-reference" ? "payment:999" : ChargeReference,
+                        charges
+                    })) });
+                }
+                Assert.Equal("/charges/CHAR_1", request.RequestUri.AbsolutePath);
                 Interlocked.Increment(ref LookupCalls);
                 TransactionObservedDuringLookup = db.Database.CurrentTransaction is not null;
                 if (Timeout)
@@ -255,7 +422,7 @@ public class PagBankPaymentReconciliationServiceTests
                         ? "not-json"
                         : JsonSerializer.Serialize(new
                         {
-                            id = ResponseChargeId,
+                            id = mismatch == "canonical-id" ? "CHAR_other" : ResponseChargeId,
                             reference_id = ChargeReference,
                             status = ProviderStatus,
                             amount = new

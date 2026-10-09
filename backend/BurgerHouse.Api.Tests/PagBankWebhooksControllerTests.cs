@@ -20,6 +20,85 @@ namespace BurgerHouse.Api.Tests;
 public class PagBankWebhooksControllerTests
 {
     [Fact]
+    public async Task WebhookWhileCheckoutFallbackIsInFlightCommitsOneConsistentApproval()
+    {
+        using var fixture = new Fixture();
+        var discovered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var fallback = fixture.Reconcile(async () =>
+        {
+            discovered.SetResult();
+            await resume.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        });
+        await discovered.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        try { Assert.True(Synchronized(await fixture.Receive())); }
+        finally { resume.TrySetResult(); }
+        await fallback;
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.Equal(PaymentMethod.Pix, payment.Method);
+        Assert.Equal("CHAR_1", payment.ExternalPaymentId);
+        Assert.NotNull(payment.ApprovedAt);
+        Assert.Equal(OrderStatus.Received, await fixture.OrderStatus());
+        await using var db = fixture.Open();
+        Assert.Empty(await db.PaymentRefunds.ToListAsync());
+        Assert.False(Synchronized(await fixture.Receive()));
+        Assert.Equal(payment.ApprovedAt, (await fixture.Payment()).ApprovedAt);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task PaidPixWithoutExternalPaymentIdCommitsFinancialApproval(bool migrate, bool legacy)
+    {
+        using var fixture = new Fixture(migrate);
+        if (legacy)
+        {
+            await using var setup = fixture.Open();
+            await setup.Database.ExecuteSqlRawAsync("UPDATE Payments SET RefundTrackingStartedAt = NULL");
+        }
+        var before = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Pending, before.Status);
+        Assert.Equal(PaymentMethod.Unknown, before.Method);
+        Assert.NotNull(before.ExternalCheckoutId);
+        Assert.Null(before.ExternalPaymentId);
+        Assert.Null(before.ApprovedAt);
+
+        Assert.True(Synchronized(await fixture.Receive()));
+
+        // A new context verifies committed database state, not tracked in-memory values.
+        await using var persisted = fixture.Open();
+        var payment = await persisted.Payments.SingleAsync();
+        Assert.Equal("CHAR_1", payment.ExternalPaymentId);
+        Assert.Equal(PaymentMethod.Pix, payment.Method);
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.NotNull(payment.ApprovedAt);
+        Assert.Equal(ApprovalDateSource.Observed, payment.ApprovalDateSource);
+        Assert.Equal(OrderStatus.Received, (await persisted.Orders.SingleAsync()).Status);
+        Assert.Equal(0, payment.RefundedAmount);
+        Assert.Empty(await persisted.PaymentRefunds.ToListAsync());
+        Assert.False(Synchronized(await fixture.Receive()));
+        Assert.Equal(payment.ApprovedAt, (await fixture.Payment()).ApprovedAt);
+    }
+
+    [Fact]
+    public async Task RefundWebhookPersistsProviderDeltaAndDuplicateDoesNotAddEvent()
+    {
+        using var fixture = new Fixture();
+        Assert.True(Synchronized(await fixture.Receive()));
+        var approved = (await fixture.Payment()).ApprovedAt;
+        fixture.RefundedInCents = 1000;
+        Assert.True(Synchronized(await fixture.Receive()));
+        Assert.False(Synchronized(await fixture.Receive()));
+        fixture.RefundedInCents = 2000;
+        Assert.True(Synchronized(await fixture.Receive()));
+        await using var db = fixture.Open();
+        Assert.Equal(new decimal[] { 10, 10 }, await db.PaymentRefunds.OrderBy(r => r.Id).Select(r => r.Amount).ToArrayAsync());
+        var payment = await fixture.Payment();
+        Assert.Equal(approved, payment.ApprovedAt); Assert.Equal(20, payment.RefundedAmount);
+    }
+    [Fact]
     public async Task ApprovedWebhookUpdatesPaymentAndOrderAndDuplicateIsIdempotent()
     {
         using var fixture = new Fixture();
@@ -367,6 +446,7 @@ public class PagBankWebhooksControllerTests
         public string WebhookResourceId = "ORDE_1";
         public string Currency = "BRL";
         public int AmountInCents = 4390;
+        public int RefundedInCents;
         public string PaymentMethodType = "PIX";
         public string LookupChargeId = "CHAR_1";
         public ChargeSpec[]? WebhookCharges;
@@ -382,10 +462,11 @@ public class PagBankWebhooksControllerTests
         public int LookupCalls;
         public bool TransactionObservedDuringLookup;
 
-        public Fixture()
+        public Fixture(bool migrate = false)
         {
             using var db = Open();
-            db.Database.EnsureCreated();
+            if (migrate) db.Database.Migrate();
+            else db.Database.EnsureCreated();
             var order = new Order(0, "pickup", "Cliente Teste", "11999990000", "cliente@teste.com", "52998224725");
             order.AddItem(new OrderItem(1, 1, 43.90m));
             db.Orders.Add(order);
@@ -448,7 +529,7 @@ public class PagBankWebhooksControllerTests
                             {
                                 value = AmountInCents,
                                 currency = Currency,
-                                summary = new { total = AmountInCents, refunded = 0 }
+                                summary = new { total = AmountInCents, refunded = RefundedInCents }
                             },
                             payment_method = new { type = PaymentMethodType }
                         }))
@@ -513,6 +594,36 @@ public class PagBankWebhooksControllerTests
         {
             await using var db = Open();
             return await db.Payments.SingleAsync();
+        }
+
+        public async Task Reconcile(Func<Task> beforeCanonical)
+        {
+            await using var db = Open();
+            using var http = new HttpClient(new Stub(async request =>
+            {
+                var path = request.RequestUri!.AbsolutePath;
+                object response;
+                if (path == "/checkouts/CHEC_1")
+                    response = new { id = "CHEC_1", reference_id = ChargeReference, orders = new[] { new { id = "ORDE_1" } } };
+                else if (path == "/orders/ORDE_1")
+                    response = new { id = "ORDE_1", reference_id = ChargeReference, charges = new[] {
+                        new { id = "CHAR_1", reference_id = ChargeReference, amount = new { value = 4390, currency = "BRL" } }
+                    } };
+                else
+                {
+                    Assert.Equal("/charges/CHAR_1", path);
+                    await beforeCanonical();
+                    response = new { id = "CHAR_1", reference_id = ChargeReference, status = "PAID",
+                        amount = new { value = 4390, currency = "BRL", summary = new { total = 4390, refunded = 0 } },
+                        payment_method = new { type = "PIX" } };
+                }
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(response)) };
+            }));
+            var options = Options.Create(new PagBankOptions { BaseUrl = BaseUrl, Token = "local-test-token" });
+            var service = new PagBankPaymentReconciliationService(new PagBankPaymentLookup(http, options),
+                new SynchronizeCheckoutPaymentHandler(new PaymentRepository(db), new OrderRepository(db)), db,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<PagBankPaymentReconciliationService>.Instance);
+            await service.ReconcileAsync(_paymentId);
         }
 
         public async Task<int> PaymentCount()

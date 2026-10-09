@@ -45,6 +45,8 @@ public sealed class AdminServiceTests : IAsyncLifetime
                 payment.Approve(); order.MarkAsReceived();
                 if (status == PaymentStatus.Refunded) payment.Refund();
                 if (status == PaymentStatus.PartiallyRefunded) payment.Refund(true);
+                if (status == PaymentStatus.Refunded) payment.RecordRefundTotal(payment.Amount);
+                if (status == PaymentStatus.PartiallyRefunded) payment.RecordRefundTotal(30m);
                 if (status == PaymentStatus.ChargedBack) payment.ChargeBack();
                 break;
         }
@@ -58,12 +60,15 @@ public sealed class AdminServiceTests : IAsyncLifetime
     [InlineData(PaymentStatus.Refunded)]
     [InlineData(PaymentStatus.PartiallyRefunded)]
     [InlineData(PaymentStatus.ChargedBack)]
-    public async Task OnlyCurrentlyApprovedPaymentsCount(PaymentStatus excluded)
+    public async Task SettledSalesRemainGrossRevenueAfterRefundOrChargeback(PaymentStatus excluded)
     {
         await Seed(); await Seed(excluded);
         var summary = await service.SummaryAsync(Today, default);
-        Assert.Equal(60, summary.Revenue); Assert.Equal(1, summary.PaidOrders);
-        Assert.Equal(60, summary.AverageTicket); Assert.Equal(40m, summary.GrossProfit);
+        var settled = excluded is PaymentStatus.Refunded or PaymentStatus.PartiallyRefunded or PaymentStatus.ChargedBack;
+        Assert.Equal(settled ? 120 : 60, summary.GrossRevenue); Assert.Equal(settled ? 2 : 1, summary.PaidOrders);
+        Assert.Equal(60, summary.AverageTicket); Assert.Equal(settled ? 80m : 40m, summary.GrossProfit);
+        Assert.Equal(excluded == PaymentStatus.Refunded ? 60 : excluded == PaymentStatus.PartiallyRefunded ? 30 : 0, summary.RefundedAmount);
+        Assert.Equal(summary.GrossRevenue - summary.RefundedAmount, summary.NetRevenue);
         Assert.Equal(excluded == PaymentStatus.PartiallyRefunded ? 1 : 0, summary.PartialRefunds);
         var transactions = await service.TransactionsAsync(Today, 1, default);
         Assert.Equal(2, transactions.Total);
@@ -76,7 +81,7 @@ public sealed class AdminServiceTests : IAsyncLifetime
         completed.AdvanceStatus(OrderStatus.Preparing); completed.AdvanceStatus(OrderStatus.ReadyForPickup);
         completed.AdvanceStatus(OrderStatus.Completed); await db.SaveChangesAsync();
         var dashboard = await service.DashboardAsync(DateTime.UtcNow, default);
-        Assert.Equal(125, dashboard.Today.Revenue); Assert.Equal(2, dashboard.Today.PaidOrders);
+        Assert.Equal(125, dashboard.Today.GrossRevenue); Assert.Equal(2, dashboard.Today.PaidOrders);
         Assert.Equal(62.5m, dashboard.Today.AverageTicket); Assert.Equal(1, dashboard.OpenOrders);
         Assert.Equal(1, dashboard.NewPaidOrders); Assert.Equal(80m, dashboard.Month.GrossProfit);
         var series = await service.RevenueAsync(Today, default);
@@ -170,7 +175,7 @@ public sealed class AdminServiceTests : IAsyncLifetime
     {
         await Seed();
         var yesterday = DateRange.LocalToday(DateTime.UtcNow).AddDays(-1);
-        Assert.Equal(0, (await service.SummaryAsync(DateRange.FromDates(yesterday, yesterday), default)).Revenue);
+        Assert.Equal(0, (await service.SummaryAsync(DateRange.FromDates(yesterday, yesterday), default)).GrossRevenue);
         var series = await service.RevenueAsync(DateRange.FromDates(yesterday, yesterday.AddDays(1)), default);
         Assert.Equal(2, series.Count); Assert.Equal(0, series[0].Revenue); Assert.Equal(60, series[1].Revenue);
         Assert.Throws<ArgumentException>(() => DateRange.FromDates(yesterday, yesterday.AddDays(367)));
@@ -207,5 +212,54 @@ public sealed class AdminServiceTests : IAsyncLifetime
         Assert.Equal(2, rest.Items.Count); Assert.Null(rest.NextAfterId);
         Assert.Empty(rest.Items.Select(o => o.Id).Intersect(batch.Items.Select(o => o.Id)));
         Assert.Empty((await service.NotificationsAsync(batch.Until, DateTime.UtcNow, 0, default)).Items);
+    }
+
+    [Fact]
+    public async Task ApprovalAndMultipleRefundDaysHaveIndependentFinancialPeriods()
+    {
+        await Seed();
+        var payment = await db.Payments.SingleAsync();
+        var approval = new DateTime(2026, 10, 1, 15, 0, 0, DateTimeKind.Utc);
+        typeof(Payment).GetProperty(nameof(Payment.ApprovedAt))!.SetValue(payment, approval);
+        payment.Refund(true);
+        payment.RecordRefundTotal(30, approval.AddDays(4));
+        payment.RecordRefundTotal(50, approval.AddDays(9));
+        payment.Refund();
+        payment.RecordRefundTotal(60, approval.AddDays(10));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        DateRange Day(int day) => DateRange.FromDates(new(2026, 10, day), new(2026, 10, day));
+        var sale = await service.SummaryAsync(Day(1), default);
+        Assert.Equal(60, sale.GrossRevenue); Assert.Equal(0, sale.RefundedAmount); Assert.Equal(60, sale.NetRevenue);
+        var refund = await service.SummaryAsync(Day(5), default);
+        Assert.Equal(0, refund.GrossRevenue); Assert.Equal(30, refund.RefundedAmount); Assert.Equal(-30, refund.NetRevenue);
+        Assert.Equal(20, (await service.SummaryAsync(Day(10), default)).RefundedAmount);
+        var period = await service.SummaryAsync(DateRange.FromDates(new(2026, 10, 1), new(2026, 10, 10)), default);
+        Assert.Equal(60, period.GrossRevenue); Assert.Equal(50, period.RefundedAmount); Assert.Equal(10, period.NetRevenue);
+        Assert.Equal(1, period.PaidOrders); Assert.Equal(60, period.AverageTicket);
+        Assert.Equal(60, Assert.Single(await service.RevenueAsync(Day(1), default)).Revenue);
+        Assert.Equal(0, Assert.Single(await service.RevenueAsync(Day(11), default)).Revenue);
+        Assert.Equal(60, Assert.Single(await service.MethodsAsync(Day(1), default)).Revenue);
+    }
+
+    [Fact]
+    public async Task UnknownLegacyDatesAndOpeningRefundBalanceAreExplicitlyUndated()
+    {
+        await Seed(PaymentStatus.Approved);
+        var payment = await db.Payments.SingleAsync();
+        typeof(Payment).GetProperty(nameof(Payment.ApprovedAt))!.SetValue(payment, null);
+        typeof(Payment).GetProperty(nameof(Payment.ApprovalDateSource))!.SetValue(payment, ApprovalDateSource.Unknown);
+        typeof(Payment).GetProperty(nameof(Payment.RefundTrackingStartedAt))!.SetValue(payment, null);
+        payment.Refund(true);
+        await db.SaveChangesAsync();
+        var before = await service.SummaryAsync(Today, default);
+        Assert.Equal(1, before.UnknownApprovalPayments); Assert.Equal(1, before.UnreconstructedRefundPayments);
+        payment.RecordRefundTotal(30);
+        await db.SaveChangesAsync();
+        var summary = await service.SummaryAsync(Today, default);
+        Assert.Equal(0, summary.GrossRevenue); Assert.Equal(0, summary.RefundedAmount);
+        Assert.Equal(30, summary.UndatedRefundBalance); Assert.Equal(0, summary.UnreconstructedRefundPayments);
+        Assert.Empty(await db.PaymentRefunds.ToListAsync());
+        Assert.Equal(0, (await service.DashboardAsync(DateTime.UtcNow, default)).Today.GrossRevenue);
     }
 }

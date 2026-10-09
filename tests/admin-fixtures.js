@@ -1,10 +1,16 @@
 export const summary = {
-  revenue: 120,
+  grossRevenue: 120,
+  refundedAmount: 0,
+  netRevenue: 120,
   paidOrders: 2,
   averageTicket: 60,
   grossProfit: 40,
   ordersWithCost: 1,
   partialRefunds: 0,
+  estimatedApprovals: 0,
+  unknownApprovalPayments: 0,
+  unreconstructedRefundPayments: 0,
+  undatedRefundBalance: 0,
 };
 export const order = {
   id: 108,

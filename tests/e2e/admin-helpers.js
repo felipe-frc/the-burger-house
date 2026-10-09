@@ -30,7 +30,8 @@ export async function mockAdmin(page) {
     }
     const data = mockData(path);
     if (path === "orders/108") data.order.status = status;
-    if (path.startsWith("finance/summary") && path.includes("period=30d")) data.revenue = 300;
+    if (path.startsWith("finance/summary") && path.includes("period=30d"))
+      data.grossRevenue = data.netRevenue = 300;
     return route.fulfill({ json: data });
   });
   return calls;

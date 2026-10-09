@@ -8,7 +8,7 @@ public sealed class SynchronizeCheckoutPaymentHandler(IPaymentRepository payment
 {
     public async Task<bool> HandleAsync(int paymentId, string externalPaymentId, decimal amount,
         string? currency, PaymentMethod method,
-        PaymentGatewayStatus status, CancellationToken ct = default)
+        PaymentGatewayStatus status, CancellationToken ct = default, decimal refundedAmount = 0)
     {
         var payment = await payments.GetByIdAsync(paymentId, ct)
             ?? throw new KeyNotFoundException("Local payment was not found.");
@@ -29,6 +29,12 @@ public sealed class SynchronizeCheckoutPaymentHandler(IPaymentRepository payment
         if (method != PaymentMethod.Unknown &&
             payment.Method != PaymentMethod.Unknown && payment.Method != method)
             throw new InvalidOperationException("Payment method does not match the recorded method.");
+        if (refundedAmount < 0 || refundedAmount > payment.Amount || decimal.Round(refundedAmount, 2) != refundedAmount)
+            throw new InvalidOperationException("Refund total is invalid.");
+        if (refundedAmount < payment.RefundedAmount) return false;
+        if (status == PaymentGatewayStatus.PartiallyRefunded && (refundedAmount <= 0 || refundedAmount >= amount) ||
+            status == PaymentGatewayStatus.Refunded && refundedAmount != amount)
+            throw new InvalidOperationException("Refund status and total are inconsistent.");
 
         var target = status switch
         {
@@ -43,6 +49,11 @@ public sealed class SynchronizeCheckoutPaymentHandler(IPaymentRepository payment
         };
         if (order.Status == OrderStatus.Cancelled && target == PaymentStatus.Approved)
             throw new InvalidOperationException("A cancelled order cannot be received.");
+
+        // Ignore stale snapshots without moving settled payments back to approval/pending.
+        if (payment.Status is PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded or PaymentStatus.ChargedBack &&
+            target is PaymentStatus.Pending or PaymentStatus.Approved)
+            return false;
 
         var previousUpdate = payment.UpdatedAt;
         var previousOrderStatus = order.Status;
@@ -63,17 +74,21 @@ public sealed class SynchronizeCheckoutPaymentHandler(IPaymentRepository payment
                     case PaymentStatus.PartiallyRefunded:
                     case PaymentStatus.ChargedBack:
                         // The first notification may arrive after settlement and refund/chargeback.
-                        if (payment.Status == PaymentStatus.Pending) payment.Approve();
+                        if (payment.Status == PaymentStatus.Pending)
+                            payment.Approve(recordObservation: payment.RefundTrackingStartedAt.HasValue);
                         if (target == PaymentStatus.ChargedBack) payment.ChargeBack();
                         else payment.Refund(target == PaymentStatus.PartiallyRefunded);
                         break;
                 }
             }
         }
+        var financialChange = false;
+        if (target != PaymentStatus.ChargedBack && payment.Status != PaymentStatus.ChargedBack)
+            financialChange = payment.RecordRefundTotal(refundedAmount);
         if (payment.Status == PaymentStatus.Approved && order.Status == OrderStatus.PendingPayment)
             order.MarkAsReceived();
 
-        var changed = previousUpdate != payment.UpdatedAt || previousOrderStatus != order.Status;
+        var changed = financialChange || previousUpdate != payment.UpdatedAt || previousOrderStatus != order.Status;
         if (changed) await payments.SaveChangesAsync(ct);
         return changed;
     }

@@ -10,7 +10,8 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
 {
     private IQueryable<Payment> Period(DateRange range) => db.Payments.AsNoTracking()
         .Where(p => (p.UpdatedAt ?? p.CreatedAt) >= range.Start && (p.UpdatedAt ?? p.CreatedAt) < range.End);
-    private IQueryable<Payment> Approved(DateRange range) => Period(range).Where(p => p.Status == PaymentStatus.Approved);
+    private IQueryable<Payment> Approved(DateRange range) => db.Payments.AsNoTracking()
+        .Where(p => p.ApprovedAt >= range.Start && p.ApprovedAt < range.End);
 
     public async Task<FinanceSummary> SummaryAsync(DateRange range, CancellationToken ct)
     {
@@ -22,14 +23,25 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
         var covered = await completeOrders.CountAsync(ct);
         var profit = await completeOrders.SelectMany(o => o.Items)
             .SumAsync(i => (i.UnitPrice - i.UnitCost!.Value) * i.Quantity, ct);
-        var partial = await Period(range).CountAsync(p => p.Status == PaymentStatus.PartiallyRefunded, ct);
-        return new(revenue, count, count == 0 ? 0 : decimal.Round(revenue / count, 2),
-            covered == 0 ? null : profit, covered, partial);
+        var refundEvents = db.PaymentRefunds.AsNoTracking().Where(r => r.CreatedAt >= range.Start && r.CreatedAt < range.End);
+        var refunded = await refundEvents.SumAsync(r => r.Amount, ct);
+        var partial = await (from r in refundEvents join p in db.Payments on r.PaymentId equals p.Id
+            where r.CumulativeRefundedAmount < p.Amount select p.Id).Distinct().CountAsync(ct);
+        var estimated = await payments.CountAsync(p => p.ApprovalDateSource == ApprovalDateSource.LegacyEstimate, ct);
+        // These quality indicators describe the entire history, not dated period totals.
+        var unknown = await db.Payments.CountAsync(p => p.ApprovedAt == null &&
+            (p.Status == PaymentStatus.Approved || p.Status == PaymentStatus.PartiallyRefunded ||
+             p.Status == PaymentStatus.Refunded || p.Status == PaymentStatus.ChargedBack), ct);
+        var unreconstructed = await db.Payments.CountAsync(p => p.RefundTrackingStartedAt == null, ct);
+        var openingBalance = await db.Payments.SumAsync(p => p.RefundedAmount, ct) -
+            await db.PaymentRefunds.SumAsync(r => r.Amount, ct);
+        return new(revenue, refunded, revenue - refunded, count, count == 0 ? 0 : decimal.Round(revenue / count, 2),
+            covered == 0 ? null : profit, covered, partial, estimated, unknown, unreconstructed, openingBalance);
     }
     public async Task<IReadOnlyList<RevenuePoint>> RevenueAsync(DateRange range, CancellationToken ct)
     {
         // Current shop dates use São Paulo (UTC-3); group in SQL, return at most 367 days.
-        var rows = await Approved(range).GroupBy(p => (p.UpdatedAt ?? p.CreatedAt).AddHours(-3).Date)
+        var rows = await Approved(range).GroupBy(p => p.ApprovedAt!.Value.AddHours(-3).Date)
             .Select(g => new { Date = g.Key, Revenue = g.Sum(p => p.Amount) }).ToListAsync(ct);
         var values = rows.ToDictionary(r => r.Date, r => r.Revenue);
         var result = new List<RevenuePoint>();
@@ -52,10 +64,12 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
         var total = await query.CountAsync(ct);
         var rows = await (from p in query join o in db.Orders on p.OrderId equals o.Id
             orderby (p.UpdatedAt ?? p.CreatedAt) descending, p.Id descending
-            select new { p.OrderId, o.CustomerName, Date = p.UpdatedAt ?? p.CreatedAt, p.Method, p.Amount, p.Status })
+            select new { p.OrderId, o.CustomerName, Date = p.UpdatedAt ?? p.CreatedAt, p.Method, p.Amount, p.Status,
+                p.ApprovedAt, p.ApprovalDateSource, p.RefundedAmount })
             .Skip((page - 1) * 20).Take(20).ToListAsync(ct);
         return new(rows.Select(r => new TransactionRow(r.OrderId, r.CustomerName, r.Date,
-            r.Method.ToString(), r.Amount, r.Status.ToString())).ToList(), total, page);
+            r.Method.ToString(), r.Amount, r.Status.ToString(), r.ApprovedAt,
+            r.ApprovalDateSource.ToString(), r.RefundedAmount)).ToList(), total, page);
     }
     public async Task<Dashboard> DashboardAsync(DateTime utcNow, CancellationToken ct)
     {

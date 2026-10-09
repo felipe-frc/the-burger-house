@@ -23,11 +23,14 @@ public record ProductRow(int Id, string Name, decimal Price, decimal? CostPrice,
 {
     public decimal? Margin => CostPrice.HasValue ? Price - CostPrice : null;
 }
-public record FinanceSummary(decimal Revenue, int PaidOrders, decimal AverageTicket, decimal? GrossProfit,
-    int OrdersWithCost, int PartialRefunds);
+public record FinanceSummary(decimal GrossRevenue, decimal RefundedAmount, decimal NetRevenue,
+    int PaidOrders, decimal AverageTicket, decimal? GrossProfit, int OrdersWithCost, int PartialRefunds,
+    int EstimatedApprovals, int UnknownApprovalPayments, int UnreconstructedRefundPayments,
+    decimal UndatedRefundBalance);
 public record RevenuePoint(string Date, decimal Revenue);
 public record MethodSummary(string Method, int Count, decimal Revenue, decimal Percentage);
-public record TransactionRow(int OrderId, string CustomerName, DateTime Date, string Method, decimal Amount, string Status);
+public record TransactionRow(int OrderId, string CustomerName, DateTime Date, string Method, decimal Amount, string Status,
+    DateTime? ApprovedAt, string ApprovalDateSource, decimal RefundedAmount);
 public record Dashboard(FinanceSummary Today, FinanceSummary Week, FinanceSummary Month, FinanceSummary Last30Days,
     int OpenOrders, int NewPaidOrders, IReadOnlyList<OrderRow> RecentOrders);
 public record OrderFilter(string? Status = null, string? Search = null, string Sort = "newest", int Page = 1);

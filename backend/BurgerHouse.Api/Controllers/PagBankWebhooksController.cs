@@ -31,6 +31,8 @@ public sealed class PagBankWebhooksController(
     [Consumes("application/json")]
     public async Task<IActionResult> Receive(CancellationToken ct)
     {
+        var stage = "received";
+        logger?.LogDebug("PagBank webhook stage: {Stage}.", stage);
         try
         {
             var rawBody = await ReadBodyAsync(ct);
@@ -61,6 +63,8 @@ public sealed class PagBankWebhooksController(
                 return StatusCode(502, new { error = "PagBank verification failed." });
             }
 
+            stage = "signature-accepted";
+            logger?.LogDebug("PagBank webhook stage: {Stage}.", stage);
             var webhook = JsonSerializer.Deserialize<PagBankWebhookRequest>(rawBody.Span, JsonOptions)
                 ?? throw new JsonException("Webhook body is empty.");
 
@@ -94,6 +98,8 @@ public sealed class PagBankWebhooksController(
             }
 
             PagBankPaymentSnapshot? snapshot;
+            stage = "charge-correlated";
+            logger?.LogDebug("PagBank webhook stage: {Stage}.", stage);
             try
             {
                 snapshot = await paymentLookup.GetAsync(notifiedCharge!.Id!, ct);
@@ -104,6 +110,8 @@ public sealed class PagBankWebhooksController(
             }
             if (snapshot is null || !string.Equals(snapshot.Id, notifiedCharge.Id, StringComparison.Ordinal))
                 return StatusCode(502, new { error = "Could not verify the notified payment." });
+            stage = "snapshot-obtained";
+            logger?.LogDebug("PagBank webhook stage: {Stage}, MappedStatus: {MappedStatus}.", stage, snapshot.PaymentStatus);
             if (!string.Equals(
                     snapshot.ReferenceId,
                     PagBankCheckoutService.CreateReference(paymentId),
@@ -133,6 +141,8 @@ public sealed class PagBankWebhooksController(
                  !string.Equals(currentPayment.ExternalPaymentId, snapshot.Id, StringComparison.Ordinal)))
                 return Conflict(new { error = "Payment correlation is incompatible." });
 
+            stage = "synchronizing";
+            logger?.LogDebug("PagBank webhook stage: {Stage}.", stage);
             var changed = await synchronizer.HandleAsync(
                 paymentId,
                 snapshot.Id,
@@ -140,9 +150,16 @@ public sealed class PagBankWebhooksController(
                 snapshot.Currency,
                 snapshot.PaymentMethod,
                 snapshot.PaymentStatus,
-                ct
+                ct,
+                refundedAmount: snapshot.RefundedAmountInCents / 100m
             );
+            stage = "synchronized";
+            logger?.LogDebug(
+                "PagBank webhook stage: {Stage}, PaymentStatus: {PaymentStatus}, OrderStatus: {OrderStatus}, Saved: {Saved}.",
+                stage, currentPayment.Status, currentOrder.Status, changed);
             await transaction.CommitAsync(ct);
+            stage = "committed";
+            logger?.LogDebug("PagBank webhook stage: {Stage}.", stage);
 
             logger?.LogInformation(
                 "PagBank payment synchronized. PaymentId: {PaymentId}, ExternalOrderId: {ExternalOrderId}, ExternalPaymentId: {ExternalPaymentId}, ProviderStatus: {ProviderStatus}, Changed: {Changed}.",
@@ -155,7 +172,11 @@ public sealed class PagBankWebhooksController(
             return Ok(new { received = true, synchronized = changed });
         }
         catch (KeyNotFoundException) { return Conflict(new { error = "Local payment or order was not found." }); }
-        catch (InvalidOperationException) { return Conflict(new { error = "Payment data or transition is incompatible." }); }
+        catch (InvalidOperationException)
+        {
+            logger?.LogWarning("PagBank webhook rejected an operation at stage: {Stage}.", stage);
+            return Conflict(new { error = "Payment data or transition is incompatible." });
+        }
         catch (HttpRequestException) { return StatusCode(502, new { error = "PagBank verification failed." }); }
         catch (JsonException) { return BadRequest(new { error = "Invalid webhook payload." }); }
         catch (CryptographicException) { return StatusCode(502, new { error = "Webhook signature verification failed." }); }
@@ -164,8 +185,21 @@ public sealed class PagBankWebhooksController(
         {
             return StatusCode(502, new { error = "PagBank verification timed out." });
         }
-        catch (DbUpdateException) { return StatusCode(503, new { error = "Payment update must be retried." }); }
-        catch (SqliteException) { return StatusCode(503, new { error = "Payment update must be retried." }); }
+        catch (DbUpdateConcurrencyException)
+        {
+            logger?.LogWarning("PagBank webhook concurrency conflict at stage: {Stage}; transaction was not committed.", stage);
+            return StatusCode(503, new { error = "Payment update must be retried." });
+        }
+        catch (DbUpdateException)
+        {
+            logger?.LogWarning("PagBank webhook persistence failure at stage: {Stage}; transaction was not committed.", stage);
+            return StatusCode(503, new { error = "Payment update must be retried." });
+        }
+        catch (SqliteException exception)
+        {
+            logger?.LogWarning("PagBank webhook SQLite failure at stage: {Stage}, Code: {Code}; transaction was not committed.", stage, exception.SqliteErrorCode);
+            return StatusCode(503, new { error = "Payment update must be retried." });
+        }
     }
 
     private static bool TrySelectCharge(

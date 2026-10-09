@@ -19,11 +19,23 @@ public class BurgerHouseDbContext : DbContext
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
 
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PaymentRefund> PaymentRefunds => Set<PaymentRefund>();
 
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<PaymentRefund>(entity =>
+        {
+            entity.ToTable("PaymentRefunds", table =>
+                table.HasCheckConstraint("CK_PaymentRefunds_PositiveAmount",
+                    "CAST(Amount AS NUMERIC) > 0 AND CAST(CumulativeRefundedAmount AS NUMERIC) >= CAST(Amount AS NUMERIC)"));
+            entity.Property(r => r.Amount).HasPrecision(10, 2);
+            entity.Property(r => r.CumulativeRefundedAmount).HasPrecision(10, 2);
+            entity.HasIndex(r => new { r.PaymentId, r.CumulativeRefundedAmount }).IsUnique();
+            entity.HasIndex(r => r.CreatedAt);
+        });
 
         modelBuilder.Entity<AdminUser>(entity =>
         {
@@ -235,7 +247,18 @@ public class BurgerHouseDbContext : DbContext
 
         modelBuilder.Entity<Payment>(entity =>
         {
+            // Avoid rebuilding this legacy SQLite table: it contains historical columns
+            // outside the current EF model. Refund bounds are enforced by the domain.
             entity.ToTable("Payments");
+            entity.Property(p => p.RefundedAmount).HasPrecision(10, 2).HasDefaultValue(0m).IsConcurrencyToken();
+            entity.Property(p => p.ApprovalDateSource).HasDefaultValue(BurgerHouse.Domain.Enums.ApprovalDateSource.Unknown);
+            entity.Property(p => p.ApprovedAt).IsConcurrencyToken();
+            entity.Property(p => p.RefundTrackingStartedAt).IsConcurrencyToken();
+            entity.Property(p => p.Status).IsConcurrencyToken();
+            entity.HasIndex(p => p.ApprovedAt);
+            entity.HasMany(p => p.Refunds).WithOne().HasForeignKey(r => r.PaymentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(p => p.Refunds).UsePropertyAccessMode(PropertyAccessMode.Field);
 
             entity.HasKey(payment => payment.Id);
 

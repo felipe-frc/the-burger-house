@@ -95,6 +95,74 @@ public sealed class PagBankPaymentLookup
         );
     }
 
+    public async Task<PagBankChargeDiscovery> DiscoverChargeAsync(
+        string checkoutId, int paymentId, decimal amount, CancellationToken cancellationToken = default)
+    {
+        if (!IsResourceId(checkoutId, "CHEC_"))
+            return new(null, false, 0, "invalid-checkout-id");
+
+        // Only the checkout.orders and order.charges structures captured from the API
+        // are supported. Never follow provider links (including internal hosts).
+        var checkout = await GetResourceAsync<CheckoutResponse>(
+            $"checkouts/{Uri.EscapeDataString(checkoutId)}?offset=0&limit=100", cancellationToken);
+        if (checkout is null) return new(null, false, 0, "checkout-not-found");
+        var reference = PagBankCheckoutService.CreateReference(paymentId);
+        if (checkout.Id != checkoutId || checkout.ReferenceId != reference)
+            return new(null, true, 0, "checkout-correlation-mismatch");
+        // Requiring one order also rejects a full/truncated page; never select a
+        // single result from a potentially ambiguous collection or unknown schema.
+        if (checkout.Orders is not { Length: 1 } ||
+            !IsResourceId(checkout.Orders[0]?.Id, "ORDE_"))
+            return new(null, true, 0, "missing-or-ambiguous-orders");
+
+        var orderId = checkout.Orders[0]!.Id!;
+        var order = await GetResourceAsync<OrderResponse>(
+            $"orders/{Uri.EscapeDataString(orderId)}", cancellationToken);
+        if (order is null || order.Id != orderId || order.ReferenceId != reference)
+            return new(null, true, 0, "order-correlation-mismatch");
+        if (order.Charges is null)
+            return new(null, true, 0, "unrecognized-charge-collection");
+        var candidates = order.Charges.Where(charge =>
+            charge is not null && IsResourceId(charge.Id, "CHAR_") &&
+            charge.ReferenceId == reference && charge.Amount?.Currency == "BRL" &&
+            charge.Amount.Value > 0 && charge.Amount.Value / 100m == amount).ToArray();
+        return candidates.Length == 1
+            ? new(candidates[0]!.Id, true, 1, "selected")
+            : new(null, true, candidates.Length, "missing-or-ambiguous-charges");
+    }
+
+    private async Task<T?> GetResourceAsync<T>(string path, CancellationToken ct) where T : class
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(_baseUri, path));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("*/*"));
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        if (!response.IsSuccessStatusCode)
+            throw new HttpRequestException($"PagBank discovery failed with HTTP {(int)response.StatusCode}.", null, response.StatusCode);
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        return await JsonSerializer.DeserializeAsync<T>(stream, JsonOptions, ct)
+            ?? throw new JsonException("PagBank returned an empty discovery response.");
+    }
+
+    private static bool IsResourceId(string? id, string prefix) =>
+        id is not null && id.StartsWith(prefix, StringComparison.Ordinal) && id.Length > prefix.Length &&
+        id[prefix.Length..].All(c => char.IsAsciiLetterOrDigit(c) || c == '-');
+
+    private sealed class CheckoutResponse
+    {
+        [JsonPropertyName("id")] public string? Id { get; init; }
+        [JsonPropertyName("reference_id")] public string? ReferenceId { get; init; }
+        [JsonPropertyName("orders")] public OrderResponse?[]? Orders { get; init; }
+    }
+
+    private sealed class OrderResponse
+    {
+        [JsonPropertyName("id")] public string? Id { get; init; }
+        [JsonPropertyName("reference_id")] public string? ReferenceId { get; init; }
+        [JsonPropertyName("charges")] public PagBankChargeResponse?[]? Charges { get; init; }
+    }
+
     private sealed class PagBankChargeResponse
     {
         [JsonPropertyName("id")] public string? Id { get; init; }
@@ -141,3 +209,5 @@ public sealed record PagBankPaymentSnapshot(
     int TotalAmountInCents,
     int RefundedAmountInCents
 );
+
+public sealed record PagBankChargeDiscovery(string? ChargeId, bool CheckoutFound, int Candidates, string Reason);

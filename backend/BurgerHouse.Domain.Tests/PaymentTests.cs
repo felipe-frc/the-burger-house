@@ -5,6 +5,53 @@ namespace BurgerHouse.Domain.Tests;
 
 public class PaymentTests
 {
+    [Fact]
+    public void FinancialHistoryTracksOnlyPositiveDeltasAndImmutableApproval()
+    {
+        var payment = new Payment(1, 100m, Guid.NewGuid().ToString(), PaymentMethod.Pix);
+        var approved = new DateTime(2026, 10, 1, 15, 0, 0, DateTimeKind.Utc);
+        payment.Approve(approved);
+        payment.Approve(approved.AddDays(1));
+        Assert.Equal(approved, payment.ApprovedAt);
+        Assert.Equal(ApprovalDateSource.Observed, payment.ApprovalDateSource);
+        payment.Refund(true);
+        Assert.True(payment.RecordRefundTotal(30, approved.AddDays(4)));
+        var updated = payment.UpdatedAt;
+        Assert.False(payment.RecordRefundTotal(30, approved.AddDays(5)));
+        Assert.False(payment.RecordRefundTotal(20, approved.AddDays(6)));
+        Assert.Equal(updated, payment.UpdatedAt);
+        payment.RecordRefundTotal(50, approved.AddDays(9));
+        payment.Refund();
+        payment.RecordRefundTotal(100, approved.AddDays(10));
+        Assert.Equal(new decimal[] { 30, 20, 50 }, payment.Refunds.Select(r => r.Amount));
+        Assert.Equal(new decimal[] { 30, 50, 100 }, payment.Refunds.Select(r => r.CumulativeRefundedAmount));
+        Assert.Equal(approved.AddDays(4), payment.Refunds.First().CreatedAt);
+        Assert.Equal(100, payment.RefundedAmount);
+        Assert.Equal(approved, payment.ApprovedAt);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(101)]
+    public void InvalidRefundTotalsNeverMutateHistory(decimal total)
+    {
+        var payment = new Payment(1, 100m, Guid.NewGuid().ToString(), PaymentMethod.CreditCard);
+        payment.Approve();
+        Assert.Throws<InvalidOperationException>(() => payment.RecordRefundTotal(total));
+        Assert.Empty(payment.Refunds); Assert.Equal(0, payment.RefundedAmount);
+    }
+
+    [Fact]
+    public void ChargebackPreservesApprovalWithoutInventingRefund()
+    {
+        var payment = new Payment(1, 100m, Guid.NewGuid().ToString(), PaymentMethod.CreditCard);
+        payment.Approve();
+        var approved = payment.ApprovedAt;
+        payment.ChargeBack();
+        Assert.Equal(approved, payment.ApprovedAt);
+        Assert.Empty(payment.Refunds); Assert.Equal(0, payment.RefundedAmount);
+    }
+
     private const string IdempotencyKey =
         "11111111-1111-4111-8111-111111111111";
 

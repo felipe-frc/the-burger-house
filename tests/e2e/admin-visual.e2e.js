@@ -1,6 +1,5 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { mkdir } from "node:fs/promises";
 import { mockAdmin, login } from "./admin-helpers.js";
 import { mockData } from "../admin-fixtures.js";
 
@@ -15,7 +14,6 @@ test("owner visual review on standard desktop, large desktop and mobile", async 
           { name: "large-desktop", width: 1440, height: 1000 },
         ]
       : [{ name: "mobile", width: 390, height: 844 }];
-  await mkdir("artifacts/admin-visual", { recursive: true });
   for (const size of sizes) {
     const context = await browser.newContext({
       viewport: { width: size.width, height: size.height },
@@ -36,7 +34,7 @@ test("owner visual review on standard desktop, large desktop and mobile", async 
       );
       const a11y = await new AxeBuilder({ page }).analyze();
       expect(a11y.violations).toEqual([]);
-      const path = `artifacts/admin-visual/${size.name}-${name}.png`;
+      const path = testInfo.outputPath(`${size.name}-${name}.png`);
       await page.screenshot({ path, fullPage: true, animations: "disabled" });
       await testInfo.attach(`${size.name}-${name}`, { path, contentType: "image/png" });
     };
@@ -74,7 +72,10 @@ test("owner visual review on standard desktop, large desktop and mobile", async 
     await page.route("**/api/admin/dashboard", async (route) => {
       const data = mockData("dashboard");
       const empty = {
-        revenue: 0,
+        ...data.today,
+        grossRevenue: 0,
+        refundedAmount: 0,
+        netRevenue: 0,
         paidOrders: 0,
         averageTicket: 0,
         grossProfit: null,

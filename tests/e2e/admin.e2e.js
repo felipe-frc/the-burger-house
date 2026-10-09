@@ -14,7 +14,7 @@ test("private routes redirect and invalid login reveals no account details", asy
 test("owner logs in and sees dashboard cards chart and new paid badge", async ({ page }) => {
   await mockAdmin(page);
   await login(page);
-  await expect(page.getByText("Faturamento hoje", { exact: true })).toBeVisible();
+  await expect(page.getByText("Receita bruta hoje", { exact: true })).toBeVisible();
   await expect(page.getByText("Novo pedido pago", { exact: true })).toBeVisible();
   await expect(page.locator(".chart-point")).toHaveCount(2);
   await page.locator(".chart-point").last().focus();
@@ -41,6 +41,8 @@ test("finance period updates real response totals and has accessible chart", asy
   await page.getByRole("combobox", { name: "Período", exact: true }).selectOption("30d");
   await page.getByRole("button", { name: "Aplicar período", exact: true }).click();
   await expect(page.locator("#finance-results .card").first()).toContainText("300,00");
+  await expect(page.locator("#finance-results")).toContainText("Estornos observados");
+  await expect(page.locator("#finance-results")).toContainText("Receita líquida no período");
   await expect(page.getByText("Baseado em", { exact: false })).toBeVisible();
 });
 test("products allow controlled edits and store remains read-only", async ({ page }) => {

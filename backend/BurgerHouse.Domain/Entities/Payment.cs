@@ -24,6 +24,14 @@ public class Payment
 
     public DateTime? UpdatedAt { get; private set; }
 
+    public DateTime? ApprovedAt { get; private set; }
+    public ApprovalDateSource ApprovalDateSource { get; private set; }
+    public decimal RefundedAmount { get; private set; }
+    // Null means a legacy payment still needs a provider-confirmed opening balance.
+    public DateTime? RefundTrackingStartedAt { get; private set; }
+    private readonly List<PaymentRefund> _refunds = [];
+    public IReadOnlyCollection<PaymentRefund> Refunds => _refunds.AsReadOnly();
+
     public Payment(
         int orderId,
         decimal amount,
@@ -76,6 +84,7 @@ public class Payment
         IdempotencyKey = parsedKey.ToString("D");
         Status = PaymentStatus.Pending;
         CreatedAt = DateTime.UtcNow;
+        RefundTrackingStartedAt = CreatedAt;
     }
 
     public void SetMethod(PaymentMethod method)
@@ -136,8 +145,9 @@ public class Payment
         UpdatedAt = DateTime.UtcNow;
     }
 
-    public void Approve()
+    public void Approve(DateTime? observedAt = null, bool recordObservation = true)
     {
+        if (Status == PaymentStatus.Approved) return;
         EnsurePending();
 
         if (Method == PaymentMethod.Unknown)
@@ -148,7 +158,36 @@ public class Payment
         }
 
         Status = PaymentStatus.Approved;
-        UpdatedAt = DateTime.UtcNow;
+        UpdatedAt = observedAt ?? DateTime.UtcNow;
+        if (ApprovedAt is null && recordObservation)
+        {
+            ApprovedAt = UpdatedAt;
+            ApprovalDateSource = ApprovalDateSource.Observed;
+        }
+    }
+
+    public bool RecordRefundTotal(decimal total, DateTime? observedAt = null)
+    {
+        if (total < 0 || total > Amount || decimal.Round(total, 2) != total)
+            throw new InvalidOperationException("Refund total is invalid.");
+        if (total < RefundedAmount) return false;
+        if (total > 0 && Status is not (PaymentStatus.Approved or PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded))
+            throw new InvalidOperationException("Only a settled payment can record refunds.");
+
+        var now = observedAt ?? DateTime.UtcNow;
+        if (RefundTrackingStartedAt is null)
+        {
+            // Reconstruct only the opening balance, never invent dated legacy events.
+            RefundTrackingStartedAt = now;
+            RefundedAmount = total;
+            UpdatedAt = now;
+            return true;
+        }
+        if (total == RefundedAmount) return false;
+        _refunds.Add(new PaymentRefund(total - RefundedAmount, total, now));
+        RefundedAmount = total;
+        UpdatedAt = now;
+        return true;
     }
 
     public void Reject()

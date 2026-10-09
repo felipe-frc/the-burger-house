@@ -163,7 +163,7 @@ it("escapes personal text and exposes accessible chart with exact values", () =>
   expect(html).toContain("55,90");
   expect(html).toContain("aria-label");
   expect(html).toContain("Ver valores por dia");
-  expect(views.coverage({ ...summary, partialRefunds: 1 })).toContain("saldo desconhecido");
+  expect(views.coverage({ ...summary, partialRefunds: 1 })).toContain("incremento parcial");
   expect(
     views.orderDetails({
       ...detail,
@@ -190,7 +190,7 @@ it("login succeeds, dashboard cards chart and paid badge load, then logout block
   submit("#login-form");
   await flush();
   expect(location.pathname).toBe("/admin/dashboard");
-  expect(document.body.textContent).toContain("Faturamento hoje");
+  expect(document.body.textContent).toContain("Receita bruta hoje");
   expect(document.body.textContent).toContain("Novo pedido pago");
   expect(document.querySelectorAll(".chart-point")).toHaveLength(2);
   document.getElementById("logout").click();
@@ -243,6 +243,23 @@ it("finance filters custom periods and shows methods coverage and transactions",
   expect(
     request.mock.calls.some(([p]) => p.includes("period=custom&start=2026-10-01&end=2026-10-05")),
   ).toBe(true);
+});
+it("separates gross revenue refunds and negative net without inventing historical dates", () => {
+  const html = views.financeResults(
+    { ...summary, grossRevenue: 0, refundedAmount: 30, netRevenue: -30 },
+    [],
+    [],
+    { items: [], pageNumber: 1, pageSize: 20, total: 0 },
+  );
+  expect(html).toContain("Receita bruta no período");
+  expect(html).toContain("Estornos observados");
+  expect(html).toContain("Receita líquida no período");
+  expect(html).toContain("-R$");
+  expect(views.historyNotice(summary)).toBe("");
+  expect(views.historyNotice({ ...summary, unknownApprovalPayments: 1 })).toContain(
+    "Histórico global incompleto",
+  );
+  expect(views.historyNotice({ ...summary, estimatedApprovals: 1 })).toContain("estimativa legada");
 });
 it("edits only allowed product fields and shows read-only store source", async () => {
   const request = setup();
