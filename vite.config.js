@@ -17,6 +17,12 @@ export default defineConfig({
   ],
   server: { proxy: { "/api/admin": { target: "http://localhost:5041", changeOrigin: true } } },
   build: {
-    rollupOptions: { input: { shop: resolve("index.html"), admin: resolve("admin/index.html") } },
+    rollupOptions: {
+      input: {
+        shop: resolve("index.html"),
+        admin: resolve("admin/index.html"),
+        privacy: resolve("privacy.html"),
+      },
+    },
   },
 });

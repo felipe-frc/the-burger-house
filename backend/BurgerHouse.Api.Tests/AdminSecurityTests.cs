@@ -135,6 +135,61 @@ public sealed class AdminSecurityTests : IAsyncLifetime
             Assert.DoesNotContain(forbidden, text);
     }
     [Fact]
+    public async Task PopulatedAdminResponsesExcludePaymentIdentityAndLimitFulfillmentToDetails()
+    {
+        var orderIds = new List<int>();
+        var keys = new List<string>();
+        using (var scope = app.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BurgerHouseDbContext>();
+            foreach (var type in new[] { "delivery", "pickup" })
+            {
+                var order = new Order(0, type, "Cliente Privacidade", "11999990000", "privado@teste.com", "52998224725",
+                    type == "delivery" ? "38400-000" : null, type == "delivery" ? "Rua Privada" : null,
+                    type == "delivery" ? "10" : null, type == "delivery" ? "Centro" : null,
+                    type == "delivery" ? "Uberlândia" : null);
+                order.AddItem(new OrderItem(1, 1, 43.90m));
+                db.Orders.Add(order);
+                await db.SaveChangesAsync();
+                var key = Guid.NewGuid().ToString();
+                keys.Add(key);
+                var payment = new Payment(order.Id, order.Total, key, BurgerHouse.Domain.Enums.PaymentMethod.Pix);
+                payment.SetExternalCheckoutId($"CHEC_privacy_{order.Id}");
+                payment.SetExternalPaymentId($"CHAR_privacy_{order.Id}");
+                payment.Approve(); order.MarkAsReceived();
+                db.Payments.Add(payment);
+                await db.SaveChangesAsync();
+                orderIds.Add(order.Id);
+                // Historical pickup rows must not expose an accidentally retained address.
+                if (type == "pickup")
+                    await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE Orders SET Street = 'Rua Legada Privada' WHERE Id = {order.Id}");
+            }
+        }
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+        foreach (var path in new[] { "dashboard", "notifications", "orders", "products", "store",
+            "finance/summary", "finance/revenue", "finance/payment-methods", "finance/transactions" }
+            .Concat(orderIds.Select(id => $"orders/{id}")))
+        {
+            var response = await client.GetAsync("/api/admin/" + path);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var text = await response.Content.ReadAsStringAsync();
+            foreach (var forbidden in new[] { "52998224725", "privado@teste.com", "customerTaxId", "customerEmail",
+                "externalPaymentId", "externalCheckoutId", "idempotencyKey", "CHAR_privacy_", "CHEC_privacy_",
+                "test-placeholder", "Authorization", "Bearer", "qr_code", "tax_id", "cardNumber", "cvv" }.Concat(keys))
+                Assert.DoesNotContain(forbidden, text, StringComparison.OrdinalIgnoreCase);
+            if (!path.StartsWith("orders/"))
+                foreach (var field in new[] { "customerPhone", "zipCode", "street", "houseNumber", "neighborhood", "complement", "11999990000", "Rua Privada" })
+                    Assert.DoesNotContain(field, text, StringComparison.OrdinalIgnoreCase);
+            else
+            {
+                var json = JsonSerializer.Deserialize<JsonElement>(text);
+                Assert.Equal("11999990000", json.GetProperty("customerPhone").GetString());
+                Assert.Equal(path == $"orders/{orderIds[0]}" ? "Rua Privada" : null, json.GetProperty("street").GetString());
+            }
+        }
+    }
+
+    [Fact]
     public async Task ExpiredSessionCannotAccess()
     {
         await Login();

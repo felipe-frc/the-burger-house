@@ -142,8 +142,10 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
             select new ItemDetail(product.Name, item.Quantity, item.UnitPrice, item.UnitPrice * item.Quantity, item.Observation)).ToListAsync(ct);
         var payments = await db.Payments.AsNoTracking().Where(p => p.OrderId == id).OrderByDescending(p => p.Id)
             .Select(p => new PaymentDetail(p.Status.ToString(), p.Method.ToString(), p.Amount, p.UpdatedAt ?? p.CreatedAt)).ToListAsync(ct);
-        return new(row, o.CustomerPhone, o.ZipCode, o.Street, o.HouseNumber, o.Neighborhood, o.City,
-            o.Complement, o.Observation, o.DeliveryFee, items, payments);
+        var delivery = o.OrderType == "delivery";
+        return new(row, o.CustomerPhone, delivery ? o.ZipCode : null, delivery ? o.Street : null,
+            delivery ? o.HouseNumber : null, delivery ? o.Neighborhood : null, delivery ? o.City : null,
+            delivery ? o.Complement : null, o.Observation, o.DeliveryFee, items, payments);
     }
     public async Task AdvanceAsync(int id, OrderStatus expected, OrderStatus next, CancellationToken ct)
     {

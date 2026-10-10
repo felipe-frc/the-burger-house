@@ -9,6 +9,10 @@ export const DEFAULT_LANGUAGE = SUPPORTED_LANGUAGES.PT_BR;
 
 const translations = {
   "pt-BR": {
+    "privacy.notice":
+      "Usamos seus dados para processar o pedido, pagamento e entrega/retirada. O PagBank recebe os dados necessários ao pagamento.",
+    "privacy.link": "Política de Privacidade",
+    "privacy.checkoutLink": "Política de Privacidade (abre em nova aba)",
     "meta.title": "The Burger House - Hamburgueria Artesanal",
     "meta.description":
       "Cardápio digital da The Burger House com hambúrgueres artesanais, acompanhamentos, bebidas, carrinho interativo, entrega e retirada no local.",
@@ -136,6 +140,10 @@ const translations = {
   },
 
   "en-US": {
+    "privacy.notice":
+      "We use your data to process your order, payment and delivery/pickup. PagBank receives the data needed to process payment.",
+    "privacy.link": "Privacy Policy (Portuguese)",
+    "privacy.checkoutLink": "Privacy Policy (Portuguese, opens in a new tab)",
     "meta.title": "The Burger House - Artisan Burger Shop",
     "meta.description":
       "Digital menu for The Burger House with artisan burgers, sides, drinks, interactive cart, delivery and pickup.",

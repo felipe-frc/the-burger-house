@@ -175,14 +175,13 @@ it.each(["createOrder", "createCheckout"])("shows safe API errors from %s", asyn
   expect(mocks.toast).toHaveBeenCalledWith("Não foi possível preparar o pedido neste momento.");
   expect(console.error).toHaveBeenCalledWith("Checkout preparation failed", {
     name: "ApiError",
-    message: "Fallback error",
     status: 409,
-    data: { error: "Não foi possível preparar o pedido neste momento." },
   });
   const logs = JSON.stringify(console.error.mock.calls);
   expect(logs).not.toContain("do-not-log-token");
   expect(logs).not.toContain("12345678900");
   expect(logs).not.toContain("private-address");
+  expect(logs).not.toContain("Fallback error");
   if (operation === "createOrder") expect(mocks.createCheckout).not.toHaveBeenCalled();
 });
 
@@ -203,6 +202,18 @@ it.each([
   expect(logs).not.toContain(message);
   expect(logs).not.toContain("hidden-secret");
   expect(logs).not.toContain("private-name");
+});
+
+it("never logs personal text echoed in an API error", async () => {
+  const { ApiError } = await import("../scripts/api.js");
+  const personal = "Cliente Maria Silva Rua das Flores";
+  mocks.createOrder.mockRejectedValue(new ApiError(personal, 400, { error: personal }));
+  await (await import("../scripts/order.js")).openPaymentStep();
+  expect(console.error).toHaveBeenCalledWith("Checkout preparation failed", {
+    name: "ApiError",
+    status: 400,
+  });
+  expect(JSON.stringify(console.error.mock.calls)).not.toContain(personal);
 });
 
 it("shows a safe Error message without logging its stack or custom properties", async () => {

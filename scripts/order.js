@@ -435,7 +435,6 @@ export async function openPaymentStep() {
       message = apiMessage || errorMessage || fallback;
       console.error("Checkout preparation failed", {
         name: error instanceof ApiError ? "ApiError" : "Error",
-        message: errorMessage || fallback,
         status:
           error instanceof ApiError &&
           Number.isInteger(error.status) &&
@@ -443,7 +442,6 @@ export async function openPaymentStep() {
           error.status <= 599
             ? error.status
             : undefined,
-        data: apiMessage ? { error: apiMessage } : undefined,
       });
     }
     showToast(message);

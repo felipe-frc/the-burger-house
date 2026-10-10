@@ -1,0 +1,37 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+  color: #27272a;
+  background: #faf7f2;
+}
+body {
+  margin: 0;
+}
+header,
+main,
+footer {
+  max-width: 48rem;
+  margin: auto;
+  padding: 1.5rem;
+}
+main {
+  background: white;
+  border-radius: 1rem;
+  line-height: 1.7;
+}
+h1 {
+  font-size: clamp(1.8rem, 6vw, 2.6rem);
+  line-height: 1.2;
+}
+h2 {
+  font-size: 1.25rem;
+  margin-top: 2rem;
+}
+a {
+  color: #9a3412;
+  text-underline-offset: 0.2em;
+}
+a:focus-visible {
+  outline: 3px solid #9a3412;
+  outline-offset: 4px;
+}

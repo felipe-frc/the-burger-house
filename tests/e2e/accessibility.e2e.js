@@ -46,6 +46,9 @@ async function openAddressModal(page) {
   await page.locator("#go-to-address-btn").click();
 
   await expect(page.locator("#address-modal")).toBeVisible();
+  await expect(page.locator("#privacy-notice")).toBeVisible();
+  await expect(page.locator("#privacy-notice a")).toHaveAttribute("href", "/privacy.html");
+  await expect(page.locator('#address-modal input[type="checkbox"][required]')).toHaveCount(0);
 }
 
 async function openReviewModal(page) {

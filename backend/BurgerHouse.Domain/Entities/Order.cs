@@ -14,6 +14,15 @@ public class Order
     public OrderStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
+    // Privacy retention plan (not an active deletion policy): keep fulfillment data
+    // while an order is operational. A future Privacy:RetentionDays setting must be
+    // explicitly configured, with no assumed legal/default duration, measured from
+    // a reliably recorded completion/cancellation date (not CreatedAt). Legacy orders
+    // without that date require review. Before anonymization, check pending payments,
+    // disputes and applicable retention obligations. Prioritize CustomerTaxId, then
+    // contact/address/free-text data; preserve financial amounts, dates and refund
+    // history independently. Stage 2 must also cover backups and browser storage.
+    // No automatic deletion or anonymization is implemented in Stage 1.
     public string OrderType { get; private set; } = string.Empty;
     public string CustomerName { get; private set; } = string.Empty;
     public string CustomerPhone { get; private set; } = string.Empty;
