@@ -32,22 +32,22 @@ O fluxo de pagamentos utiliza o **checkout hospedado do PagBank**. O backend cri
 
 ### 🎯 O que este projeto demonstra
 
-| Competência    | Aplicação no projeto                                                   |
-| -------------- | ---------------------------------------------------------------------- |
-| JavaScript     | ES Modules, DOM, eventos, estado, serviços e regras de interface       |
-| C# / .NET      | ASP.NET Core 9, API REST, DI, handlers, serviços e validações          |
-| Arquitetura    | Separação em Domain, Application, Infrastructure e API                 |
+| Competência    | Aplicação no projeto                                                    |
+| -------------- | ----------------------------------------------------------------------- |
+| JavaScript     | ES Modules, DOM, eventos, estado, serviços e regras de interface        |
+| C# / .NET      | ASP.NET Core 9, API REST, DI, handlers, serviços e validações           |
+| Arquitetura    | Separação em Domain, Application, Infrastructure e API                  |
 | Persistência   | Entity Framework Core + SQLite, migrations e proteção de dados          |
-| Integração     | ViaCEP, PagBank, WhatsApp e comunicação frontend/backend               |
+| Integração     | ViaCEP, PagBank, WhatsApp e comunicação frontend/backend                |
 | Pagamentos     | Checkout hospedado, PIX, cartão, webhooks, idempotência e reconciliação |
 | Segurança      | Autenticação Admin, secrets externos, minimização e AES-256-GCM         |
-| Testes         | Vitest, xUnit, Playwright, jsdom e axe-core                            |
-| Qualidade      | ESLint, Prettier, TypeScript `checkJs`, builds e quality gates         |
-| Acessibilidade | Navegação por teclado, ARIA, foco e auditoria automatizada             |
-| Performance    | Otimização de mídia e auditoria com Lighthouse                         |
-| CI/CD          | GitHub Actions, Vercel e Azure App Service                             |
-| Deploy         | Frontend na Vercel e backend no Azure                                  |
-| Administração   | Painel de pedidos, operação, financeiro e autenticação                  |
+| Testes         | Vitest, xUnit, Playwright, jsdom e axe-core                             |
+| Qualidade      | ESLint, Prettier, TypeScript `checkJs`, builds e quality gates          |
+| Acessibilidade | Navegação por teclado, ARIA, foco e auditoria automatizada              |
+| Performance    | Otimização de mídia e auditoria com Lighthouse                          |
+| CI/CD          | GitHub Actions, Vercel e Azure App Service                              |
+| Deploy         | Frontend na Vercel e backend no Azure                                   |
+| Administração  | Painel de pedidos, operação, financeiro e autenticação                  |
 
 ---
 
@@ -98,8 +98,8 @@ O fluxo de pagamentos utiliza o **checkout hospedado do PagBank**. O backend cri
 | 💬 WhatsApp           | Confirmação final com mensagem estruturada                           |
 | 🌎 Idiomas            | Português/Inglês com persistência da preferência                     |
 | 🕒 Loja               | Status Aberto/Fechado calculado dinamicamente                        |
-| 🧑‍💼 Administração     | Autenticação, pedidos, fluxo operacional e visão financeira          |
-| 🔐 Privacidade         | Minimização de dados e criptografia AES-256-GCM em repouso           |
+| 🧑‍💼 Administração      | Autenticação, pedidos, fluxo operacional e visão financeira          |
+| 🔐 Privacidade        | Minimização de dados e criptografia AES-256-GCM em repouso           |
 
 ### 🍔 Cardápio
 
@@ -263,21 +263,21 @@ A estrutura separa responsabilidades entre interface, aplicação, domínio, inf
 
 ### Frontend
 
-| Módulo                               | Responsabilidade                      |
-| ------------------------------------ | ------------------------------------- |
-| `scripts/data.js`                    | Produtos e dados do cardápio          |
-| `scripts/cart-service.js`            | Regras de negócio do carrinho         |
-| `scripts/cart.js`                    | Interface e eventos do carrinho       |
-| `scripts/state.js`                   | Estado compartilhado e persistência   |
-| `scripts/address.js`                 | Formulário e regras de endereço       |
-| `scripts/services/viacep-service.js` | Comunicação com ViaCEP                |
-| `scripts/api.js`                     | Comunicação com o backend             |
-| `scripts/order.js`                   | Revisão, checkout, retorno e WhatsApp |
-| `scripts/i18n.js`                    | Internacionalização                   |
-| `scripts/ui.js`                      | Interface, modais e navegação         |
-| `scripts/config.js`                  | Configurações gerais                  |
-| `scripts/main.js`                    | Inicialização da aplicação            |
-| `scripts/utils.js`                   | Funções utilitárias                   |
+| Módulo                               | Responsabilidade                                         |
+| ------------------------------------ | -------------------------------------------------------- |
+| `scripts/data.js`                    | Produtos e dados do cardápio                             |
+| `scripts/cart-service.js`            | Regras de negócio do carrinho                            |
+| `scripts/cart.js`                    | Interface e eventos do carrinho                          |
+| `scripts/state.js`                   | Estado compartilhado e persistência                      |
+| `scripts/address.js`                 | Formulário e regras de endereço                          |
+| `scripts/services/viacep-service.js` | Comunicação com ViaCEP                                   |
+| `scripts/api.js`                     | Comunicação com o backend                                |
+| `scripts/order.js`                   | Revisão, checkout, retorno e WhatsApp                    |
+| `scripts/i18n.js`                    | Internacionalização                                      |
+| `scripts/ui.js`                      | Interface, modais e navegação                            |
+| `scripts/config.js`                  | Configurações gerais                                     |
+| `scripts/main.js`                    | Inicialização da aplicação                               |
+| `scripts/utils.js`                   | Funções utilitárias                                      |
 | `scripts/admin/*`                    | Cliente, estado, ícones e views do painel administrativo |
 
 ### Backend
@@ -292,13 +292,13 @@ BurgerHouse.Domain
 BurgerHouse.Infrastructure
 ```
 
-| Projeto                      | Responsabilidade                                |
-| ---------------------------- | ----------------------------------------------- |
-| `BurgerHouse.Api`            | Controllers, endpoints, configuração e webhooks |
-| `BurgerHouse.Application`    | Casos de uso, handlers e abstrações             |
-| `BurgerHouse.Domain`         | Entidades, enums, regras e transições de estado |
+| Projeto                      | Responsabilidade                                                  |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `BurgerHouse.Api`            | Controllers, endpoints, configuração e webhooks                   |
+| `BurgerHouse.Application`    | Casos de uso, handlers e abstrações                               |
+| `BurgerHouse.Domain`         | Entidades, enums, regras e transições de estado                   |
 | `BurgerHouse.Infrastructure` | EF Core, repositórios, PagBank, persistência, Admin e privacidade |
-| `*.Tests`                    | Testes automatizados por camada                 |
+| `*.Tests`                    | Testes automatizados por camada                                   |
 
 ### Fluxo principal
 
@@ -792,33 +792,33 @@ dist/
 
 ## 🧠 Decisões de desenvolvimento
 
-| Decisão                       | Motivo                                                              |
-| ----------------------------- | ------------------------------------------------------------------- |
-| JavaScript Vanilla            | Aprofundar fundamentos da linguagem, DOM, eventos e módulos         |
-| Vite                          | Modernizar o ambiente de desenvolvimento e build                    |
-| ES Modules                    | Separar responsabilidades e reduzir arquivos monolíticos            |
-| `cart-service.js`             | Isolar regras do carrinho da interface                              |
-| `state.js`                    | Centralizar estado e persistência                                   |
-| Service ViaCEP                | Separar comunicação HTTP da lógica do formulário                    |
-| ASP.NET Core 9                | Criar um backend tipado, testável e adequado a APIs REST            |
-| Arquitetura em camadas        | Separar domínio, casos de uso, infraestrutura e entrada HTTP        |
-| EF Core + SQLite              | Adicionar persistência estruturada com migrations                   |
-| Abstrações de pagamento       | Evitar acoplamento direto das regras de negócio ao provedor         |
-| Migração para PagBank         | Evoluir a integração mantendo o domínio desacoplado do gateway      |
-| Hosted Checkout               | Manter dados sensíveis de pagamento fora da aplicação               |
-| Webhook + reconciliação       | Sincronizar o estado financeiro com validações adicionais           |
-| Idempotência                  | Evitar efeitos duplicados em reenvios e novas tentativas            |
-| i18n                          | Concentrar textos e permitir troca dinâmica de idioma               |
-| axe-core + Playwright         | Automatizar verificações de acessibilidade                          |
-| Testes em camadas             | Proteger domínio, aplicação, infraestrutura, DOM e fluxos completos |
-| Quality gates                 | Impedir queda de cobertura abaixo dos limites                       |
-| ESLint + Prettier + Typecheck | Melhorar consistência e detecção antecipada de problemas            |
-| GitHub Actions                | Automatizar qualidade, build, testes e deploy                       |
-| Vercel + Azure                | Separar deploy do frontend e da API                                 |
-| Painel administrativo         | Separar operação interna do fluxo público do cliente                |
-| AES-256-GCM                    | Proteger dados pessoais em repouso com autenticação do ciphertext   |
-| Compatibilidade com legado     | Permitir evolução gradual sem reescrever registros antigos          |
-| Reconciliação em Development   | Recuperar pagamentos locais sem depender do webhook de outro ambiente |
+| Decisão                       | Motivo                                                                |
+| ----------------------------- | --------------------------------------------------------------------- |
+| JavaScript Vanilla            | Aprofundar fundamentos da linguagem, DOM, eventos e módulos           |
+| Vite                          | Modernizar o ambiente de desenvolvimento e build                      |
+| ES Modules                    | Separar responsabilidades e reduzir arquivos monolíticos              |
+| `cart-service.js`             | Isolar regras do carrinho da interface                                |
+| `state.js`                    | Centralizar estado e persistência                                     |
+| Service ViaCEP                | Separar comunicação HTTP da lógica do formulário                      |
+| ASP.NET Core 9                | Criar um backend tipado, testável e adequado a APIs REST              |
+| Arquitetura em camadas        | Separar domínio, casos de uso, infraestrutura e entrada HTTP          |
+| EF Core + SQLite              | Adicionar persistência estruturada com migrations                     |
+| Abstrações de pagamento       | Evitar acoplamento direto das regras de negócio ao provedor           |
+| Migração para PagBank         | Evoluir a integração mantendo o domínio desacoplado do gateway        |
+| Hosted Checkout               | Manter dados sensíveis de pagamento fora da aplicação                 |
+| Webhook + reconciliação       | Sincronizar o estado financeiro com validações adicionais             |
+| Idempotência                  | Evitar efeitos duplicados em reenvios e novas tentativas              |
+| i18n                          | Concentrar textos e permitir troca dinâmica de idioma                 |
+| axe-core + Playwright         | Automatizar verificações de acessibilidade                            |
+| Testes em camadas             | Proteger domínio, aplicação, infraestrutura, DOM e fluxos completos   |
+| Quality gates                 | Impedir queda de cobertura abaixo dos limites                         |
+| ESLint + Prettier + Typecheck | Melhorar consistência e detecção antecipada de problemas              |
+| GitHub Actions                | Automatizar qualidade, build, testes e deploy                         |
+| Vercel + Azure                | Separar deploy do frontend e da API                                   |
+| Painel administrativo         | Separar operação interna do fluxo público do cliente                  |
+| AES-256-GCM                   | Proteger dados pessoais em repouso com autenticação do ciphertext     |
+| Compatibilidade com legado    | Permitir evolução gradual sem reescrever registros antigos            |
+| Reconciliação em Development  | Recuperar pagamentos locais sem depender do webhook de outro ambiente |
 
 A camada de pagamentos foi projetada por abstrações. Isso permitiu a evolução do provedor de pagamento sem transportar regras específicas para o domínio da aplicação.
 
@@ -826,26 +826,26 @@ A camada de pagamentos foi projetada por abstrações. Isso permitiu a evoluçã
 
 ## 🧾 Releases
 
-| Versão                                                                       | Categoria           | Destaque                                                                                   |
-| ---------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------ |
+| Versão                                                                           | Categoria           | Destaque                                                                         |
+| -------------------------------------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------- |
 | [**v4.0.0**](https://github.com/felipe-frc/the-burger-house/releases/tag/v4.0.0) | 🚀 Última publicada | Administração, financeiro, privacidade, criptografia e resiliência de pagamentos |
-| [v3.0.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v3.0.0) | 🚀 Major            | Evolução full-stack, backend ASP.NET Core, persistência, PagBank e Azure                  |
-| [v2.7.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.7.0) | 🛡️ Hardening        | Testes, E2E desktop/mobile, acessibilidade, Lighthouse, SEO e segurança                  |
-| [v2.6.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.6.0) | 🧪 Testes           | Testes E2E com Playwright                                                                  |
-| [v2.5.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.5.0) | ♻️ Refatoração      | Refatoração do carrinho e cobertura de testes                                              |
-| [v2.4.1](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.4.1) | 🛠️ Manutenção       | Documentação, CI e otimização da logo                                                      |
-| [v2.4.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.4.0) | 🌎 Feature          | Internacionalização inicial                                                                |
-| [v2.3.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.3.0) | 🧪 Testes           | Testes automatizados com Vitest                                                            |
-| v2.2.2                                                                       | 🩹 Correção         | Correções de consistência estrutural                                                       |
-| v2.2.1                                                                       | ⚡ Melhoria         | Melhorias de SEO e performance                                                             |
-| v2.2.0                                                                       | ✨ Feature          | Retirada no local e melhorias no carrinho                                                  |
-| v2.1.0                                                                       | ✨ Feature          | Campo de observações no pedido                                                             |
-| v2.0.0                                                                       | 🚀 Major            | Melhorias de navegação e UX                                                                |
-| v1.3.0                                                                       | ♿ Melhoria         | Acessibilidade e experiência nos modais                                                    |
-| v1.2.1                                                                       | 🩹 Correção         | Correções de CI e produção                                                                 |
-| v1.2.0                                                                       | 🩹 Correção         | Correções no formulário de endereço                                                        |
-| v1.1.0                                                                       | ♻️ Refatoração      | Refatoração estrutural                                                                     |
-| v1.0.0                                                                       | 🎉 Inicial          | Primeira versão estável                                                                    |
+| [v3.0.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v3.0.0)     | 🚀 Major            | Evolução full-stack, backend ASP.NET Core, persistência, PagBank e Azure         |
+| [v2.7.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.7.0)     | 🛡️ Hardening        | Testes, E2E desktop/mobile, acessibilidade, Lighthouse, SEO e segurança          |
+| [v2.6.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.6.0)     | 🧪 Testes           | Testes E2E com Playwright                                                        |
+| [v2.5.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.5.0)     | ♻️ Refatoração      | Refatoração do carrinho e cobertura de testes                                    |
+| [v2.4.1](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.4.1)     | 🛠️ Manutenção       | Documentação, CI e otimização da logo                                            |
+| [v2.4.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.4.0)     | 🌎 Feature          | Internacionalização inicial                                                      |
+| [v2.3.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.3.0)     | 🧪 Testes           | Testes automatizados com Vitest                                                  |
+| v2.2.2                                                                           | 🩹 Correção         | Correções de consistência estrutural                                             |
+| v2.2.1                                                                           | ⚡ Melhoria         | Melhorias de SEO e performance                                                   |
+| v2.2.0                                                                           | ✨ Feature          | Retirada no local e melhorias no carrinho                                        |
+| v2.1.0                                                                           | ✨ Feature          | Campo de observações no pedido                                                   |
+| v2.0.0                                                                           | 🚀 Major            | Melhorias de navegação e UX                                                      |
+| v1.3.0                                                                           | ♿ Melhoria         | Acessibilidade e experiência nos modais                                          |
+| v1.2.1                                                                           | 🩹 Correção         | Correções de CI e produção                                                       |
+| v1.2.0                                                                           | 🩹 Correção         | Correções no formulário de endereço                                              |
+| v1.1.0                                                                           | ♻️ Refatoração      | Refatoração estrutural                                                           |
+| v1.0.0                                                                           | 🎉 Inicial          | Primeira versão estável                                                          |
 
 📦 [Consultar histórico completo de releases](https://github.com/felipe-frc/the-burger-house/releases)
 
