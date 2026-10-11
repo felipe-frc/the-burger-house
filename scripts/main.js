@@ -1,7 +1,7 @@
 import { bindAddressEvents, updateOrderTypeUI } from "./address.js";
 import { bindAddToCartButtons, bindCartControls, updateCart } from "./cart.js";
 import { applyStaticTranslations, bindLanguageSwitcher, getCurrentLanguage } from "./i18n.js";
-import { bindOrderEvents } from "./order.js";
+import { bindOrderEvents, resumeCheckoutReturn } from "./order.js";
 import {
   bindModalCloseEvents,
   hideCartFooter,
@@ -46,3 +46,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 window.addEventListener("scroll", revealOnScroll);
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) void resumeCheckoutReturn();
+});

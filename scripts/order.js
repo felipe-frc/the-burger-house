@@ -41,6 +41,70 @@ const RETURN_FIELDS = [
 let checkoutSession = null;
 let preparingCheckout = false;
 let checkingPayment = false;
+let paymentApproved = false;
+
+function renderPaymentState(paymentStatus) {
+  paymentApproved = paymentStatus === 2;
+  const messages = {
+    1: "pending",
+    2: "approved",
+    3: "rejected",
+    4: "cancelled",
+    5: "refunded",
+    6: "partialRefund",
+    7: "disputed",
+  };
+  for (const [id, key] of [
+    ["payment-modal-title", paymentApproved ? "payment.approvedTitle" : "payment.title"],
+    ["checkout-status", `payment.${messages[paymentStatus] || "unknown"}`],
+  ]) {
+    const element = document.getElementById(id);
+    if (element) {
+      element.dataset.i18n = key;
+      element.textContent = translate(key);
+    }
+  }
+  document.getElementById("check-payment-btn")?.classList.toggle("hidden", paymentApproved);
+  document.getElementById("back-to-review-btn")?.classList.toggle("hidden", paymentApproved);
+  document.getElementById("new-order-btn")?.classList.toggle("hidden", !paymentApproved);
+}
+
+function startNewOrder() {
+  if (!paymentApproved || checkingPayment) return;
+  clearOrderContext();
+}
+
+function clearOrderContext() {
+  checkoutSession = null;
+  paymentApproved = false;
+  clearCart();
+  resetOrderType();
+  resetAddressForm();
+  for (const id of RETURN_FIELDS) {
+    const input = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (
+      document.getElementById(id)
+    );
+    if (input) input.value = input.defaultValue = "";
+  }
+  // Remove only order-owned data; language and public configuration are retained.
+  for (const storage of [sessionStorage, localStorage]) {
+    for (const key of [CHECKOUT_STORAGE_KEY, "cart", "orderType"]) storage.removeItem(key);
+  }
+  const returnUrl = new URL(window.location.href);
+  for (const key of ["status", "payment_id", "order_id", "checkout_id", "reference_id"])
+    returnUrl.searchParams.delete(key);
+  window.history.replaceState(window.history.state, "", returnUrl);
+  updateCart();
+  for (const id of ["review-items", "review-address", "review-total"])
+    document.getElementById(id)?.replaceChildren();
+  renderPaymentState(null);
+  document.getElementById("confirm-whatsapp-btn")?.classList.add("hidden");
+  hidePaymentError();
+  closeAllModals();
+  const menu = document.getElementById("menu");
+  menu?.scrollIntoView({ behavior: "auto", block: "start" });
+  menu?.querySelector("button")?.focus({ preventScroll: true });
+}
 
 function saveCheckoutContext() {
   sessionStorage.setItem(CHECKOUT_STORAGE_KEY, JSON.stringify(checkoutSession));
@@ -61,14 +125,6 @@ function readCheckoutContext() {
     /* Missing or invalid browser context cannot confirm a payment. */
   }
   return null;
-}
-
-function clearOrderNotes() {
-  if (!elements.orderNotesInput) {
-    return;
-  }
-
-  elements.orderNotesInput.value = "";
 }
 
 function getLocalizedCartItem(item) {
@@ -369,6 +425,10 @@ function safeCheckoutErrorMessage(value) {
 }
 
 export async function openPaymentStep() {
+  if (paymentApproved) {
+    openModal(elements.paymentModal);
+    return;
+  }
   if (preparingCheckout) return;
   const cart = getCart().map((item) => ({ ...item }));
   if (!cart.length) {
@@ -456,34 +516,29 @@ export async function checkCheckoutReturn() {
   checkoutSession ??= readCheckoutContext();
   if (!Number.isInteger(checkoutSession?.paymentId) || checkoutSession.paymentId <= 0) return null;
   checkingPayment = true;
+  const context = checkoutSession;
   const button = /** @type {HTMLButtonElement | null} */ (
     document.getElementById("check-payment-btn")
   );
   const confirmation = document.getElementById("confirm-whatsapp-btn");
-  const status = document.getElementById("checkout-status");
+  const newOrder = /** @type {HTMLButtonElement | null} */ (
+    document.getElementById("new-order-btn")
+  );
+  if (newOrder) newOrder.disabled = true;
   confirmation?.classList.add("hidden");
   if (button) button.disabled = true;
   openModal(elements.paymentModal);
   hidePaymentError();
   try {
     const payment = await getPaymentStatus(checkoutSession.paymentId);
+    if (context !== checkoutSession) return null;
     if (
       payment.paymentId !== checkoutSession.paymentId ||
       payment.orderId !== checkoutSession.orderId ||
       Number(payment.amount) !== checkoutSession.total
     )
       throw new Error("Pagamento incompatível com o pedido.");
-    const messages = {
-      1: "Aguardando confirmação do pagamento. Você pode consultar novamente em instantes.",
-      2: "Pagamento aprovado! Confirme o envio do pedido pelo WhatsApp.",
-      3: "Pagamento recusado. Volte à revisão para tentar novamente.",
-      4: "Pagamento cancelado. Volte à revisão para tentar novamente.",
-      5: "Pagamento reembolsado.",
-      6: "Pagamento parcialmente reembolsado.",
-      7: "Pagamento contestado. Entre em contato com o restaurante.",
-    };
-    if (status)
-      status.textContent = messages[payment.status] || "Status de pagamento não reconhecido.";
+    renderPaymentState(payment.status);
     if (
       payment.status === 2 &&
       !checkoutSession.confirmationDispatched &&
@@ -493,14 +548,28 @@ export async function checkCheckoutReturn() {
     }
     return payment;
   } catch {
-    showPaymentError(
-      "Não foi possível confirmar o pagamento. Consulte novamente antes de repetir a compra.",
-    );
+    if (context === checkoutSession) showPaymentError(translate("payment.error"));
     return null;
   } finally {
-    checkingPayment = false;
-    if (button) button.disabled = false;
+    if (context === checkoutSession) {
+      checkingPayment = false;
+      if (button) button.disabled = false;
+      if (newOrder) newOrder.disabled = false;
+    }
   }
+}
+
+export async function resumeCheckoutReturn() {
+  const saved = readCheckoutContext();
+  if (!saved && checkoutSession) {
+    // A newer history entry already cleared this order. Do not revive a cached form.
+    checkingPayment = false;
+    clearOrderContext();
+    return;
+  }
+  checkoutSession = saved;
+  checkingPayment = false;
+  if (saved) await checkCheckoutReturn();
 }
 
 async function confirmWhatsApp() {
@@ -510,25 +579,15 @@ async function confirmWhatsApp() {
   saveCheckoutContext();
   // Avoid wa.me's redirect, which can replace non-BMP emoji with U+FFFD.
   const url = `https://api.whatsapp.com/send/?phone=${WHATSAPP_PHONE_NUMBER}&text=${encodeURIComponent(checkoutSession.message)}`;
-  // Preserve a different cart assembled while the previous purchase was in progress.
-  if (getCheckoutFingerprint(buildOrderPayload(getCart())) === checkoutSession.fingerprint) {
-    clearCart();
-    updateCart();
-    resetOrderType();
-    resetAddressForm();
-    clearOrderNotes();
-    for (const id of ["customer-name", "customer-phone", "customer-email", "customer-tax-id"]) {
-      const input = /** @type {HTMLInputElement | null} */ (document.getElementById(id));
-      if (input) input.value = "";
-    }
-  }
-  closeAllModals();
+  // Keep the approved order available until the customer explicitly starts another.
+  document.getElementById("confirm-whatsapp-btn")?.classList.add("hidden");
   const opened = window.open(url, "_blank");
   if (opened) opened.opener = null;
   else window.location.href = url;
 }
 
 export function bindOrderEvents() {
+  document.getElementById("new-order-btn")?.addEventListener("click", startNewOrder);
   const phone = /** @type {HTMLInputElement | null} */ (document.getElementById("customer-phone"));
   if (phone) {
     phone.oninput = () => {
@@ -572,8 +631,7 @@ export function bindOrderEvents() {
         input.value = checkoutSession.fields[id];
     }
   }
-  if (checkoutSession?.paymentId && !checkoutSession.confirmationDispatched)
-    void checkCheckoutReturn();
+  if (checkoutSession?.paymentId) void checkCheckoutReturn();
   document
     .getElementById("check-payment-btn")
     ?.addEventListener("click", () => void checkCheckoutReturn());
@@ -581,7 +639,8 @@ export function bindOrderEvents() {
     .getElementById("confirm-whatsapp-btn")
     ?.addEventListener("click", () => void confirmWhatsApp());
   if (elements.cartBtn) {
-    elements.cartBtn.onclick = () => openModal(elements.cartModal);
+    elements.cartBtn.onclick = () =>
+      openModal(paymentApproved ? elements.paymentModal : elements.cartModal);
   }
 
   if (elements.closeModalBtn) {
@@ -614,6 +673,10 @@ export function bindOrderEvents() {
 
   if (elements.goToReviewBtn) {
     elements.goToReviewBtn.onclick = () => {
+      if (paymentApproved) {
+        openModal(elements.paymentModal);
+        return;
+      }
       if (!isStoreOpenNow()) {
         showClosedStoreMessage();
 
@@ -646,6 +709,7 @@ export function bindOrderEvents() {
 
   if (elements.backToReviewBtn) {
     elements.backToReviewBtn.onclick = () => {
+      if (paymentApproved) return;
       loadReview();
 
       openModal(elements.reviewModal);

@@ -719,19 +719,44 @@
       aria-labelledby="payment-modal-title"
     >
       <div class="cart-modal-panel bg-white rounded-2xl p-6 max-w-lg w-full mx-4">
-        <h2 id="payment-modal-title" class="cart-modal-title">Seu pagamento</h2>
-        <p id="checkout-status" class="my-4" role="status">
+        <h2 id="payment-modal-title" class="cart-modal-title" data-i18n="payment.title">
+          Seu pagamento
+        </h2>
+        <p id="checkout-status" class="my-4" role="status" data-i18n="payment.checking">
           Consultando confirmação do pagamento...
         </p>
         <p id="payment-error" class="text-red-700 my-4 hidden" role="alert"></p>
         <div class="flex flex-col gap-3">
-          <button id="check-payment-btn" type="button" class="cart-btn-primary">
+          <button
+            id="new-order-btn"
+            type="button"
+            class="cart-btn-primary hidden"
+            data-i18n="payment.newOrder"
+          >
+            Fazer novo pedido
+          </button>
+          <button
+            id="check-payment-btn"
+            type="button"
+            class="cart-btn-primary"
+            data-i18n="payment.check"
+          >
             Consultar pagamento
           </button>
-          <button id="confirm-whatsapp-btn" type="button" class="cart-btn-primary hidden">
+          <button
+            id="confirm-whatsapp-btn"
+            type="button"
+            class="cart-btn-secondary hidden"
+            data-i18n="payment.whatsapp"
+          >
             Confirmar pedido pelo WhatsApp
           </button>
-          <button id="back-to-review-btn" type="button" class="cart-btn-secondary">
+          <button
+            id="back-to-review-btn"
+            type="button"
+            class="cart-btn-secondary"
+            data-i18n="payment.back"
+          >
             Voltar à revisão
           </button>
         </div>

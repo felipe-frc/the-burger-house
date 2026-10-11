@@ -583,6 +583,35 @@ function savedContext() {
   );
 }
 
+it.each([1, 2, 3, 4])("renders appropriate payment actions for status %s", async (status) => {
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    '<h2 id="payment-modal-title"></h2><button id="new-order-btn" class="hidden"></button><button id="back-to-review-btn"></button>',
+  );
+  savedContext();
+  mocks.getPaymentStatus.mockResolvedValue({ paymentId: 17, orderId: 99, amount: 43.9, status });
+  await (await import("../scripts/order.js")).checkCheckoutReturn();
+  expect(document.getElementById("check-payment-btn").classList.contains("hidden")).toBe(
+    status === 2,
+  );
+  expect(document.getElementById("back-to-review-btn").classList.contains("hidden")).toBe(
+    status === 2,
+  );
+  expect(document.getElementById("new-order-btn").classList.contains("hidden")).toBe(status !== 2);
+  if (status === 2) {
+    expect(document.getElementById("payment-modal-title").textContent).toBe("Pagamento aprovado!");
+    expect(document.getElementById("checkout-status").textContent).toBe(
+      "Seu pedido foi recebido e já está sendo processado.",
+    );
+    const i18n = await import("../scripts/i18n.js");
+    i18n.applyStaticTranslations("en-US");
+    expect(document.getElementById("payment-modal-title").textContent).toBe("Payment approved!");
+    expect(document.getElementById("checkout-status").textContent).toBe(
+      "Your order has been received and is being processed.",
+    );
+  }
+});
+
 it("ignores approved URL parameters and uses the local backend status", async () => {
   savedContext();
   window.history.replaceState({}, "", "/?status=approved&payment_id=666");

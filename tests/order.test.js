@@ -162,6 +162,7 @@ it("provides clear mobile validation translations", async () => {
 });
 it("reviews a pickup order, confirms through backend and sends the preserved message once", async () => {
   const { state, order } = await setup();
+  document.body.insertAdjacentHTML("beforeend", '<button id="new-order-btn"></button>');
   order.bindOrderEvents();
   document.getElementById("order-notes").value = "Sem cebola.";
   for (const id of [
@@ -185,6 +186,12 @@ it("reviews a pickup order, confirms through backend and sends the preserved mes
   const message = new URL(window.open.mock.calls[0][0]).searchParams.get("text");
   expect(message).toContain("O Praiano");
   expect(message).toContain("Sem cebola.");
+  expect(state.getCart()).toHaveLength(1);
+  expect(document.getElementById("order-notes").value).toBe("Sem cebola.");
+  document.getElementById("confirm-whatsapp-btn").click();
+  await vi.advanceTimersByTimeAsync(20);
+  expect(window.open).toHaveBeenCalledTimes(1);
+  document.getElementById("new-order-btn").click();
   expect(state.getCart()).toEqual([]);
   expect(document.getElementById("order-notes").value).toBe("");
   expect(document.getElementById("customer-email").value).toBe("");
@@ -192,6 +199,21 @@ it("reviews a pickup order, confirms through backend and sends the preserved mes
   document.getElementById("confirm-whatsapp-btn").click();
   await vi.advanceTimersByTimeAsync(20);
   expect(window.open).toHaveBeenCalledTimes(1);
+});
+
+it("restores a cached return from storage and never revives a cleared order", async () => {
+  const { state, order } = await setup();
+  document.body.insertAdjacentHTML("beforeend", '<button id="new-order-btn"></button>');
+  order.bindOrderEvents();
+  await order.openPaymentStep();
+  await order.resumeCheckoutReturn();
+  expect(document.getElementById("payment-modal").classList.contains("hidden")).toBe(false);
+  sessionStorage.removeItem("burger-house-checkout");
+  await order.resumeCheckoutReturn();
+  expect(state.getCart()).toEqual([]);
+  expect(document.getElementById("customer-name").value).toBe("");
+  expect(document.getElementById("customer-name").defaultValue).toBe("");
+  expect(document.getElementById("payment-modal").classList.contains("hidden")).toBe(true);
 });
 
 it.each(["pickup", "delivery"])(
@@ -246,6 +268,7 @@ it.each(["pickup", "delivery"])(
 );
 
 it("restores delivery fields and notes when returning in the same tab", async () => {
+  mocks.getPaymentStatus.mockResolvedValue({ paymentId: 17, orderId: 99, amount: 43.9, status: 1 });
   let { order } = await setup("delivery");
   const fields = {
     "customer-name": "Cliente Teste",
@@ -271,6 +294,64 @@ it("restores delivery fields and notes when returning in the same tab", async ()
     expect(document.getElementById(id).value).toBe(value);
   document.getElementById("go-to-review-btn").click();
   expect(document.getElementById("review-address").textContent).toContain("123");
+});
+it("new order clears all personal fields and checkout state but preserves language and configuration", async () => {
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    '<button id="new-order-btn" class="hidden"></button>',
+  );
+  const { state, order } = await setup();
+  order.bindOrderEvents();
+  const fields = [
+    "customer-name",
+    "customer-phone",
+    "customer-email",
+    "customer-tax-id",
+    "cep",
+    "street",
+    "house-number",
+    "neighborhood",
+    "city",
+    "complement",
+    "order-notes",
+  ];
+  document.getElementById("order-notes").value = "Private notes";
+  await order.openPaymentStep();
+  await order.checkCheckoutReturn();
+  expect(document.getElementById("new-order-btn").classList.contains("hidden")).toBe(false);
+  document.getElementById("back-to-review-btn").click();
+  expect(document.getElementById("review-modal").classList.contains("hidden")).toBe(true);
+  for (const id of fields) document.getElementById(id).value = "Private data";
+  state.setCart([
+    { id: "burger-praiano", quantity: 1, price: 43.9, observation: "Private item notes" },
+  ]);
+  document.body.insertAdjacentHTML(
+    "beforeend",
+    '<select id="language-select"><option value="pt-BR">PT</option><option value="en-US">EN</option></select>',
+  );
+  const { bindLanguageSwitcher, getCurrentLanguage } = await import("../scripts/i18n.js");
+  bindLanguageSwitcher();
+  document.getElementById("language-select").value = "en-US";
+  document.getElementById("language-select").dispatchEvent(new Event("change"));
+  localStorage.setItem("public-config", "keep");
+  localStorage.setItem("burger-house-checkout", "legacy private context");
+  document.getElementById("new-order-btn").click();
+  expect(state.getCart()).toEqual([]);
+  for (const id of fields) expect(document.getElementById(id).value).toBe("");
+  for (const storage of [localStorage, sessionStorage]) {
+    for (const key of ["cart", "orderType", "burger-house-checkout"])
+      expect(storage.getItem(key)).toBeNull();
+  }
+  expect(getCurrentLanguage()).toBe("en-US");
+  expect(localStorage.getItem("public-config")).toBe("keep");
+  expect(document.getElementById("payment-modal").classList.contains("hidden")).toBe(true);
+  mocks.getPaymentStatus.mockClear();
+  order.bindOrderEvents();
+  expect(mocks.getPaymentStatus).not.toHaveBeenCalled();
+  state.setCart([{ id: "burger-praiano", quantity: 1, price: 43.9 }]);
+  await order.openPaymentStep();
+  expect(mocks.createOrder).toHaveBeenCalledTimes(1);
+  expect(document.getElementById("customer-name").value).toBe("");
 });
 it("preserves a new cart when confirming the previous purchase", async () => {
   const { state, order } = await setup();

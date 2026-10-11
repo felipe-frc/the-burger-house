@@ -104,6 +104,105 @@ async function openCart(page) {
   await expect(page.locator("#cart-modal")).toBeVisible();
 }
 
+test("approved payment offers a clean new order without retaining personal data or losing language", async ({
+  page,
+}) => {
+  await page.route("**/api/payments/17", (route) =>
+    route.fulfill({ json: { paymentId: 17, orderId: 99, amount: 43.9, status: 2 } }),
+  );
+  await page.goto("/");
+  await expect(page.locator('[data-i18n="hero.hours"]')).toHaveText(
+    "Segunda a domingo • 18h às 23h",
+  );
+  await page.locator("#language-select").selectOption("en-US");
+  await expect(page.locator('[data-i18n="hero.hours"]')).toHaveText(
+    "Monday to Sunday • 6 PM to 11 PM",
+  );
+  await addFirstProductToCart(page);
+  await openCart(page);
+  await page.locator("#go-to-address-btn").click();
+  await page.locator("#customer-name").fill("Cliente Teste");
+  await page.locator("#customer-phone").fill("11999990000");
+  await page.locator("#customer-email").fill("cliente@teste.com");
+  await page.locator("#customer-tax-id").fill("529.982.247-25");
+  await page.locator('label[for="order-type-pickup"]').click();
+  await expect(page.locator("#order-type-pickup")).toBeChecked();
+  await page.locator("#go-to-review-btn").click();
+  await page.locator("#order-notes").fill("Private order notes");
+  await page.locator("#go-to-payment-btn").click();
+  await expect(page.locator("#new-order-btn")).toBeVisible();
+  await expect(page.locator("#payment-modal-title")).toHaveText("Payment approved!");
+  await expect(page.locator("#check-payment-btn")).toBeHidden();
+  await expect(page.locator("#back-to-review-btn")).toBeHidden();
+  await expect(page.locator("#confirm-whatsapp-btn")).toBeVisible();
+  await page.reload();
+  await expect(page.locator("#new-order-btn")).toBeVisible();
+  await page.evaluate(() =>
+    window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })),
+  );
+  await expect(page.locator("#new-order-btn")).toBeVisible();
+  await page.locator("#new-order-btn").click();
+  expect(new URL(page.url()).searchParams.has("status")).toBe(false);
+  await expect(page.locator("#payment-modal")).toBeHidden();
+  const fields = [
+    "customer-name",
+    "customer-phone",
+    "customer-email",
+    "customer-tax-id",
+    "cep",
+    "street",
+    "house-number",
+    "neighborhood",
+    "city",
+    "complement",
+    "order-notes",
+  ];
+  for (const id of fields) await expect(page.locator(`#${id}`)).toHaveValue("");
+  expect(
+    await page.evaluate(() => [
+      localStorage.getItem("cart"),
+      sessionStorage.getItem("burger-house-checkout"),
+    ]),
+  ).toEqual([null, null]);
+  await expect(page.locator("#language-select")).toHaveValue("en-US");
+  await page.reload();
+  for (const id of fields) await expect(page.locator(`#${id}`)).toHaveValue("");
+  await addFirstProductToCart(page);
+  await openCart(page);
+  await page.locator("#go-to-address-btn").click();
+  await expect(page.locator("#customer-name")).toHaveValue("");
+  await expect(page.locator("#customer-email")).toHaveValue("");
+});
+
+for (const status of [1, 3, 4]) {
+  test(`fresh return without query restores backend status ${status}`, async ({ page }) => {
+    await page.route("**/api/payments/17", (route) =>
+      route.fulfill({ json: { paymentId: 17, orderId: 99, amount: 48.9, status } }),
+    );
+    await page.goto("/");
+    await page.evaluate(() =>
+      sessionStorage.setItem(
+        "burger-house-checkout",
+        JSON.stringify({
+          orderId: 99,
+          paymentId: 17,
+          total: 48.9,
+          fingerprint: "saved",
+          message: "Pedido de teste",
+        }),
+      ),
+    );
+    await page.reload();
+    await expect(page.locator("#payment-modal")).toBeVisible();
+    await expect(page.locator("#check-payment-btn")).toBeVisible();
+    await expect(page.locator("#back-to-review-btn")).toBeVisible();
+    await expect(page.locator("#new-order-btn")).toBeHidden();
+    await expect(page.locator("#confirm-whatsapp-btn")).toBeHidden();
+    await page.locator("#back-to-review-btn").click();
+    await expect(page.locator("#review-modal")).toBeVisible();
+  });
+}
+
 test("deve simular o fluxo completo de compra com entrega", async ({ page }) => {
   await page.goto("/");
 
