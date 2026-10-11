@@ -22,7 +22,7 @@ const translations = {
 
     "hero.title": "The Burger House",
     "hero.address": "Rua Dev 25, Uberlândia - MG",
-    "hero.hours": "Seg à Dom • 18h às 23h",
+    "hero.hours": "Segunda a domingo • 18h às 23h",
     "hero.cta": "Explorar Cardápio",
     "hero.ctaAria": "Ir para o cardápio",
 
@@ -153,7 +153,7 @@ const translations = {
 
     "hero.title": "The Burger House",
     "hero.address": "Dev Street 25, Uberlândia - MG",
-    "hero.hours": "Mon to Sun • 6 PM to 11 PM",
+    "hero.hours": "Monday to Sunday • 6 PM to 11 PM",
     "hero.cta": "Explore Menu",
     "hero.ctaAria": "Go to menu",
 
@@ -344,6 +344,13 @@ export function applyStaticTranslations(language = getCurrentLanguage()) {
     if (!key) return;
 
     element.textContent = translate(key, language);
+    if (key === "hero.hours") {
+      const [days, hours] = translate(key, language).split(" • ");
+      const separator = document.createElement("span");
+      separator.className = "px-1 text-amber-400";
+      separator.textContent = "•";
+      element.replaceChildren(`${days} `, separator, ` ${hours}`);
+    }
   });
 
   const placeholderElements = /** @type {NodeListOf<HTMLElement>} */ (
