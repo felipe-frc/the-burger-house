@@ -87,5 +87,5 @@ public class OrderFulfillmentPersistenceTests
     }
 
     private static BurgerHouseDbContext Create(SqliteConnection connection) =>
-        new(new DbContextOptionsBuilder<BurgerHouseDbContext>().UseSqlite(connection).Options);
+        new(new DbContextOptionsBuilder<BurgerHouseDbContext>().UseSqlite(connection).Options, TestPersonalData.Protector);
 }

@@ -23,6 +23,7 @@ public sealed class AdminSecurityTests : IAsyncLifetime
         app = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Production");
+            builder.UseSetting("Privacy:EncryptionKey", TestPersonalData.Key);
             builder.UseSetting("ConnectionStrings:DefaultConnection", $"Data Source={database}");
             builder.UseSetting("PagBank:Token", "test-placeholder");
             builder.UseSetting("PagBank:RedirectUrl", "https://example.invalid/");
@@ -173,7 +174,7 @@ public sealed class AdminSecurityTests : IAsyncLifetime
             var response = await client.GetAsync("/api/admin/" + path);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             var text = await response.Content.ReadAsStringAsync();
-            foreach (var forbidden in new[] { "52998224725", "privado@teste.com", "customerTaxId", "customerEmail",
+            foreach (var forbidden in new[] { "enc:v1:", "52998224725", "privado@teste.com", "customerTaxId", "customerEmail",
                 "externalPaymentId", "externalCheckoutId", "idempotencyKey", "CHAR_privacy_", "CHEC_privacy_",
                 "test-placeholder", "Authorization", "Bearer", "qr_code", "tax_id", "cardNumber", "cvv" }.Concat(keys))
                 Assert.DoesNotContain(forbidden, text, StringComparison.OrdinalIgnoreCase);

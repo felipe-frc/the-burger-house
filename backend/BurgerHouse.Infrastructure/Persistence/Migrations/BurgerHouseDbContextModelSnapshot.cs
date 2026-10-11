@@ -69,18 +69,15 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("City")
-                        .HasMaxLength(120)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Complement")
-                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CustomerEmail")
-                        .HasMaxLength(254)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CustomerName")
@@ -90,11 +87,9 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("CustomerPhone")
                         .IsRequired()
-                        .HasMaxLength(25)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CustomerTaxId")
-                        .HasMaxLength(11)
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("DeliveryFee")
@@ -102,15 +97,12 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("HouseNumber")
-                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Neighborhood")
-                        .HasMaxLength(120)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Observation")
-                        .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("OrderType")
@@ -123,11 +115,9 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Street")
-                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ZipCode")
-                        .HasMaxLength(10)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -144,7 +134,6 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Observation")
-                        .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("OrderId")

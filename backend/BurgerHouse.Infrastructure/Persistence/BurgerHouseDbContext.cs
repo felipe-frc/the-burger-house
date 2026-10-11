@@ -1,4 +1,8 @@
 using BurgerHouse.Domain.Entities;
+using BurgerHouse.Application.Abstractions.Persistence;
+using BurgerHouse.Infrastructure.Privacy;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -7,9 +11,22 @@ namespace BurgerHouse.Infrastructure.Persistence;
 public class BurgerHouseDbContext : DbContext
 {
     public BurgerHouseDbContext(
-        DbContextOptions<BurgerHouseDbContext> options)
+        DbContextOptions<BurgerHouseDbContext> options,
+        IPersonalDataProtector personalDataProtector)
         : base(options)
     {
+        PersonalDataProtector = personalDataProtector ?? throw new ArgumentNullException(nameof(personalDataProtector));
+    }
+
+    internal IPersonalDataProtector PersonalDataProtector { get; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
+        optionsBuilder.ReplaceService<IModelCacheKeyFactory, PersonalDataModelCacheKeyFactory>();
+
+    private ValueConverter<string, string> PersonalDataConverter(string purpose)
+    {
+        var protector = PersonalDataProtector;
+        return new(value => protector.Protect(value, purpose)!, value => protector.Unprotect(value, purpose)!);
     }
 
     public DbSet<Product> Products => Set<Product>();
@@ -178,21 +195,20 @@ public class BurgerHouseDbContext : DbContext
 
             entity.Property(order => order.OrderType).HasMaxLength(10).IsRequired();
             entity.Property(order => order.CustomerName).HasMaxLength(120).IsRequired();
-            entity.Property(order => order.CustomerPhone).HasMaxLength(25).IsRequired();
+            entity.Property(order => order.CustomerPhone).IsRequired();
 
             entity.Property(order => order.CustomerEmail)
-                .HasMaxLength(254);
+                .HasColumnType("TEXT");
 
             entity.Property(order => order.CustomerTaxId)
-                .HasMaxLength(11);
+                .HasColumnType("TEXT");
 
-            entity.Property(order => order.ZipCode).HasMaxLength(10);
-            entity.Property(order => order.Street).HasMaxLength(200);
-            entity.Property(order => order.HouseNumber).HasMaxLength(20);
-            entity.Property(order => order.Neighborhood).HasMaxLength(120);
-            entity.Property(order => order.City).HasMaxLength(120);
-            entity.Property(order => order.Complement).HasMaxLength(200);
-            entity.Property(order => order.Observation).HasMaxLength(2000);
+            // Domain limits still apply to plaintext. SQLite stores the larger envelopes as TEXT.
+            // CustomerName remains queryable for the existing Admin substring search.
+            foreach (var field in new[] { nameof(Order.CustomerPhone), nameof(Order.CustomerEmail),
+                nameof(Order.CustomerTaxId), nameof(Order.ZipCode), nameof(Order.Street), nameof(Order.HouseNumber),
+                nameof(Order.Neighborhood), nameof(Order.City), nameof(Order.Complement), nameof(Order.Observation) })
+                entity.Property<string>(field).HasColumnType("TEXT").HasConversion(PersonalDataConverter($"Orders.{field}"));
 
             entity.Property(order => order.DeliveryFee)
                 .HasPrecision(10, 2);
@@ -235,7 +251,7 @@ public class BurgerHouseDbContext : DbContext
                 .HasPrecision(10, 2);
 
             entity.Property(item => item.Observation)
-                .HasMaxLength(500);
+                .HasColumnType("TEXT").HasConversion((ValueConverter)PersonalDataConverter("OrderItems.Observation"));
 
             entity.Ignore(item => item.Total);
 

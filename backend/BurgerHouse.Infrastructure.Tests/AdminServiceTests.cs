@@ -21,7 +21,7 @@ public sealed class AdminServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await connection.OpenAsync();
-        db = new(new DbContextOptionsBuilder<BurgerHouseDbContext>().UseSqlite(connection).Options);
+        db = new(new DbContextOptionsBuilder<BurgerHouseDbContext>().UseSqlite(connection).Options, TestPersonalData.Protector);
         await db.Database.MigrateAsync();
         service = new(db);
     }

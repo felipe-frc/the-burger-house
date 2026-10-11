@@ -8,6 +8,7 @@ using BurgerHouse.Application.Payments.SynchronizeCheckoutPayment;
 using BurgerHouse.Infrastructure.Payments.PagBank;
 using BurgerHouse.Infrastructure.Persistence;
 using BurgerHouse.Infrastructure.Repositories;
+using BurgerHouse.Infrastructure.Privacy;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -52,6 +53,10 @@ var connectionString =
     ?? throw new InvalidOperationException(
         "Connection string 'DefaultConnection' was not found."
     );
+
+// Resolve before migrations/startup; no plaintext-writing fallback when the key is missing.
+builder.Services.AddSingleton<IPersonalDataProtector>(_ =>
+    new AesGcmPersonalDataProtector(builder.Configuration["Privacy:EncryptionKey"]));
 
 builder.Services.AddDbContext<BurgerHouseDbContext>(
     options =>

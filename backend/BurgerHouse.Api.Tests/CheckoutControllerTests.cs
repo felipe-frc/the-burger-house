@@ -172,7 +172,7 @@ public class CheckoutControllerTests
         public BurgerHouseDbContext Open() => new(
             new DbContextOptionsBuilder<BurgerHouseDbContext>()
                 .UseSqlite($"Data Source={_path};Pooling=False;Default Timeout=10")
-                .Options
+                .Options, TestPersonalData.Protector
         );
 
         public async Task<Payment> Payment()

@@ -212,7 +212,7 @@ public class CheckoutMigrationTests
     private static BurgerHouseDbContext CreateContext(string path) => new(
         new DbContextOptionsBuilder<BurgerHouseDbContext>()
             .UseSqlite($"Data Source={path};Pooling=False")
-            .Options);
+            .Options, TestPersonalData.Protector);
 
     private static async Task SeedPaymentBeforeFinalMigration(BurgerHouseDbContext db)
     {

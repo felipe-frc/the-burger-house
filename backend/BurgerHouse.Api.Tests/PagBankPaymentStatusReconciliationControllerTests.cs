@@ -30,7 +30,7 @@ public class PagBankPaymentStatusReconciliationControllerTests
                 .UseSqlite($"Data Source={path};Pooling=False")
                 .Options;
             int paymentId;
-            await using (var setup = new BurgerHouseDbContext(dbOptions))
+            await using (var setup = new BurgerHouseDbContext(dbOptions, TestPersonalData.Protector))
             {
                 await setup.Database.EnsureCreatedAsync();
                 var order = new Order(0, "pickup", "Cliente Teste", "11999990000", "cliente@teste.com", "52998224725");
@@ -51,7 +51,7 @@ public class PagBankPaymentStatusReconciliationControllerTests
                 paymentId = payment.Id;
             }
 
-            await using var db = new BurgerHouseDbContext(dbOptions);
+            await using var db = new BurgerHouseDbContext(dbOptions, TestPersonalData.Protector);
             using var http = new HttpClient(new Stub(_ => Task.FromResult(
                 new HttpResponseMessage(HttpStatusCode.OK)
                 {
