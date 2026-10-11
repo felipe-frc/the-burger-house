@@ -15,6 +15,123 @@ namespace BurgerHouse.Infrastructure.Tests.Payments.PagBank;
 public class PagBankPaymentReconciliationServiceTests
 {
     [Fact]
+    public async Task PendingBatchIsBoundedAndRotatesWithoutStarvingNewerPayments()
+    {
+        using var fixture = new Fixture();
+        await using var db = fixture.Open();
+        for (var i = 0; i < 6; i++)
+        {
+            var order = new Order(0, "pickup", "Cliente Teste", "11999990000", "cliente@teste.com", "52998224725");
+            order.AddItem(new OrderItem(1, 1, 43.90m));
+            db.Orders.Add(order);
+            await db.SaveChangesAsync();
+            var payment = new Payment(order.Id, order.Total, Guid.NewGuid().ToString("D"), PaymentMethod.Unknown);
+            payment.SetExternalCheckoutId($"CHEC_test_{i}");
+            db.Payments.Add(payment);
+            await db.SaveChangesAsync();
+        }
+        var recorder = new RecordingReconciliation();
+        var batch = new PendingPaymentReconciliationBatch(db, recorder);
+        var cursor = await batch.RunAsync(0, default);
+        Assert.Equal(5, recorder.Ids.Count);
+        Assert.Equal(recorder.Ids[^1], cursor);
+        Assert.Equal(0, await batch.RunAsync(cursor, default));
+        Assert.Equal(7, recorder.Ids.Distinct().Count());
+        Assert.Equal(7, recorder.Ids.Count);
+        recorder.Ids.Clear();
+        await batch.RunAsync(0, default);
+        Assert.Equal(fixture.PaymentId, recorder.Ids[0]);
+    }
+
+    private sealed class RecordingReconciliation : BurgerHouse.Application.Abstractions.Payments.IPaymentReconciliationService
+    {
+        public List<int> Ids { get; } = [];
+        public Task ReconcileAsync(int paymentId, CancellationToken cancellationToken = default)
+        {
+            Ids.Add(paymentId);
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task PendingBatchRecoversPixWithoutWebhookAndUpdatesAdminAndFinance()
+    {
+        using var fixture = new Fixture(false) { DiscoverOrder = true, ProviderMethod = "PIX" };
+        await fixture.Reconcile(pendingOnly: true);
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Approved, payment.Status);
+        Assert.Equal(PaymentMethod.Pix, payment.Method);
+        Assert.NotNull(payment.ApprovedAt);
+        Assert.Equal(ApprovalDateSource.Observed, payment.ApprovalDateSource);
+        Assert.Equal("CHAR_1", payment.ExternalPaymentId);
+        await fixture.Reconcile(pendingOnly: true);
+        Assert.Equal(1, fixture.CheckoutCalls);
+        Assert.Equal(1, fixture.OrderCalls);
+        Assert.Equal(1, fixture.LookupCalls);
+
+        await using var db = fixture.Open();
+        var admin = new BurgerHouse.Infrastructure.Admin.AdminService(db);
+        var detail = await admin.OrderAsync(payment.OrderId, default);
+        Assert.NotNull(detail);
+        Assert.Equal("Received", detail.Order.Status);
+        Assert.Equal("Approved", Assert.Single(detail.Payments).Status);
+        Assert.Equal("Pix", Assert.Single(detail.Payments).Method);
+        var json = JsonSerializer.Serialize(detail);
+        Assert.DoesNotContain("52998224725", json);
+        Assert.DoesNotContain("cliente@teste.com", json);
+        Assert.DoesNotContain("enc:v1:", json);
+        var range = new BurgerHouse.Application.Admin.DateRange(
+            payment.ApprovedAt!.Value.AddMinutes(-1), payment.ApprovedAt.Value.AddMinutes(1));
+        var summary = await admin.SummaryAsync(range, default);
+        Assert.Equal(payment.Amount, summary.GrossRevenue);
+        Assert.Equal(payment.Amount, summary.NetRevenue);
+        Assert.Equal(0, summary.RefundedAmount);
+        Assert.Equal("Pix", Assert.Single(await admin.MethodsAsync(range, default)).Method);
+    }
+
+    [Fact]
+    public async Task PendingBatchPreservesWaitingPayment()
+    {
+        using var fixture = new Fixture(false) { DiscoverOrder = true, ProviderStatus = "WAITING", ProviderMethod = "PIX" };
+        await fixture.Reconcile(pendingOnly: true);
+        var payment = await fixture.Payment();
+        Assert.Equal(PaymentStatus.Pending, payment.Status);
+        Assert.Null(payment.ApprovedAt);
+        Assert.Equal(OrderStatus.PendingPayment, await fixture.GetOrderStatus());
+    }
+
+    [Fact]
+    public async Task PendingBatchRetriesTemporaryProviderFailureWithoutCorruptingState()
+    {
+        using var fixture = new Fixture { ResponseStatus = HttpStatusCode.ServiceUnavailable };
+        await fixture.Reconcile(pendingOnly: true);
+        await fixture.AssertPending();
+        fixture.ResponseStatus = HttpStatusCode.OK;
+        await fixture.Reconcile(pendingOnly: true);
+        Assert.Equal(PaymentStatus.Approved, (await fixture.Payment()).Status);
+    }
+
+    [Theory]
+    [InlineData(1000)]
+    [InlineData(4390)]
+    public async Task PendingBatchDoesNotPollOrChangeRefundedPayments(int refunded)
+    {
+        using var fixture = new Fixture();
+        await fixture.Reconcile();
+        fixture.RefundedInCents = refunded;
+        await fixture.Reconcile();
+        var before = await fixture.Payment();
+        await fixture.Reconcile(pendingOnly: true);
+        Assert.Equal(2, fixture.LookupCalls);
+        var after = await fixture.Payment();
+        Assert.Equal(before.Status, after.Status);
+        Assert.Equal(before.ApprovedAt, after.ApprovedAt);
+        Assert.Equal(refunded / 100m, after.RefundedAmount);
+        await using var db = fixture.Open();
+        Assert.Equal(refunded / 100m, Assert.Single(await db.PaymentRefunds.ToListAsync()).Amount);
+    }
+
+    [Fact]
     public async Task PaidChargeApprovesPaymentAndUpdatesOrder()
     {
         using var fixture = new Fixture();
@@ -371,10 +488,10 @@ public class PagBankPaymentReconciliationServiceTests
         public BurgerHouseDbContext Open() => new(
             new DbContextOptionsBuilder<BurgerHouseDbContext>()
                 .UseSqlite($"Data Source={_path};Pooling=False;Default Timeout=10")
-                .Options
+                .Options, TestPersonalData.Protector
         );
 
-        public async Task Reconcile()
+        public async Task Reconcile(bool pendingOnly = false)
         {
             await using var db = Open();
             using var http = new HttpClient(new Stub(request =>
@@ -449,7 +566,10 @@ public class PagBankPaymentReconciliationServiceTests
                 NullLogger<PagBankPaymentReconciliationService>.Instance
             );
 
-            await service.ReconcileAsync(PaymentId);
+            if (pendingOnly)
+                await new PendingPaymentReconciliationBatch(db, service).RunAsync(0, default);
+            else
+                await service.ReconcileAsync(PaymentId);
         }
 
         public async Task<Payment> Payment()

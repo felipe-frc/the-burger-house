@@ -47,6 +47,13 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
             );
         }
 
+        // Never send control characters or silently repair an authentication credential.
+        if (_options.Token.Any(character => !char.IsAsciiLetterOrDigit(character) &&
+            character is not ('-' or '.' or '_' or '~' or '+' or '/' or '=')))
+        {
+            throw new InvalidOperationException("PagBank token has an invalid format.");
+        }
+
         ValidatePublicUrl(
             _options.RedirectUrl,
             "redirect"
@@ -143,9 +150,6 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
                         ),
                         new PagBankPaymentMethod(
                             "CREDIT_CARD"
-                        ),
-                        new PagBankPaymentMethod(
-                            "DEBIT_CARD"
                         )
                     ],
                     _options.RedirectUrl,
@@ -296,11 +300,14 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
             {
                 var body = await response.Content.ReadAsStringAsync(cancellationToken);
                 if (_environment?.IsDevelopment() == true)
-                    LogProviderError(response.StatusCode, body);
+                    LogProviderError(response.StatusCode, response.Content.Headers.ContentType?.MediaType, body);
             }
             catch (Exception exception) when (exception is HttpRequestException or IOException or OperationCanceledException)
             {
                 // Diagnostic reads must not replace the existing HTTP failure.
+                if (_environment?.IsDevelopment() == true)
+                    _logger?.LogWarning("PagBank checkout HTTP {StatusCode}; content-type={ContentType}; error body could not be read.",
+                        (int)response.StatusCode, SafeContentType(response.Content.Headers.ContentType?.MediaType));
             }
 
             throw new HttpRequestException(
@@ -327,52 +334,127 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
             );
     }
 
-    private void LogProviderError(System.Net.HttpStatusCode status, string body)
+    private static string SafeContentType(string? value) => value?.ToLowerInvariant() switch
     {
-        _logger?.LogWarning("PagBank checkout failed with HTTP {StatusCode}.", (int)status);
+        null => "[missing]",
+        "application/json" => "application/json",
+        "application/problem+json" => "application/problem+json",
+        "text/json" => "text/json",
+        "text/html" => "text/html",
+        "text/plain" => "text/plain",
+        "application/octet-stream" => "application/octet-stream",
+        _ => "[redacted]"
+    };
+
+    private static string SafePropertyName(string name)
+    {
+        // JSON keys are untrusted too: a provider can use a personal value as a key.
+        const string names = "error_messages errors error code parameter_name status type description " +
+            "message messages title detail details instance path timestamp data response result violations " +
+            "field fields reason reasons cause causes error_description error_code status_code";
+        return names.Split(' ').Contains(name, StringComparer.Ordinal) ? name : "[redacted]";
+    }
+
+    private static string PropertyNames(JsonElement value) => value.ValueKind == JsonValueKind.Object
+        ? string.Join(",", value.EnumerateObject().Select(property => SafePropertyName(property.Name)))
+        : "[none]";
+
+    private void LogProviderError(System.Net.HttpStatusCode status, string? contentType, string body)
+    {
+        var safeContentType = SafeContentType(contentType);
         try
         {
             using var document = JsonDocument.Parse(body);
             var root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object)
-                return;
-
-            if (root.TryGetProperty("error_messages", out var errors) &&
-                errors.ValueKind == JsonValueKind.Array)
+            _logger?.LogWarning("PagBank checkout HTTP {StatusCode}; content-type={ContentType}; root={RootKind}; properties={Properties}.",
+                (int)status, safeContentType, root.ValueKind, PropertyNames(root));
+            if (root.ValueKind == JsonValueKind.Array)
             {
-                foreach (var error in errors.EnumerateArray())
-                    LogTechnicalFields(error, status);
+                LogErrorArray(root, status, "root");
             }
-            else
+            else if (root.ValueKind == JsonValueKind.Object)
             {
-                LogTechnicalFields(root, status);
+                if (new[] { "code", "error", "parameter_name", "status", "type" }.Any(name => root.TryGetProperty(name, out _)))
+                    LogTechnicalFields(root, status, "root");
+                foreach (var property in root.EnumerateObject())
+                {
+                    if (property.Value.ValueKind == JsonValueKind.Array)
+                        LogErrorArray(property.Value, status, SafePropertyName(property.Name));
+                    else if (property.Value.ValueKind == JsonValueKind.Object)
+                        LogTechnicalFields(property.Value, status, SafePropertyName(property.Name));
+                }
             }
         }
         catch (JsonException)
         {
-            // Non-JSON error bodies are never logged.
+            _logger?.LogWarning("PagBank checkout error body is non-JSON; content-type={ContentType}; HTTP {StatusCode}.",
+                safeContentType, (int)status);
         }
     }
 
-    private void LogTechnicalFields(JsonElement error, System.Net.HttpStatusCode status)
+    private void LogErrorArray(JsonElement errors, System.Net.HttpStatusCode status, string container)
+    {
+        var index = 0;
+        foreach (var error in errors.EnumerateArray())
+        {
+            LogTechnicalFields(error, status, $"{container}[{index}]");
+            index++;
+        }
+    }
+
+    private void LogTechnicalFields(JsonElement error, System.Net.HttpStatusCode status, string location)
     {
         if (error.ValueKind != JsonValueKind.Object)
             return;
 
         _logger?.LogWarning(
-            "PagBank checkout HTTP {StatusCode}: error={Error}, description={Description}, parameter_name={ParameterName}.",
+            "PagBank checkout HTTP {StatusCode}; {Location} properties={Properties}; code={Code}, error={Error}, parameter_name={ParameterName}, status={ProviderStatus}, type={Type}, description={Description}.",
             (int)status,
+            location,
+            PropertyNames(error),
+            SafeTechnicalField(error, "code"),
             SafeTechnicalField(error, "error"),
-            SafeTechnicalField(error, "description"),
-            SafeTechnicalField(error, "parameter_name"));
+            SafeParameterName(error),
+            SafeTechnicalField(error, "status"),
+            SafeTechnicalField(error, "type"),
+            "[redacted]");
+    }
+
+    private static string? SafeParameterName(JsonElement error)
+    {
+        if (!error.TryGetProperty("parameter_name", out var field)) return null;
+        if (field.ValueKind != JsonValueKind.String) return "[redacted]";
+        var value = field.GetString()!;
+        // Only schema identifiers and bounded array indexes, never echoed values or arbitrary text.
+        const string identifiers = "customer name email tax_id phone phones country area number " +
+            "customer_modifiable items reference_id quantity unit_amount payment_methods type " +
+            "payment_methods_configs config_options option value installments_limit interest_free_installments " +
+            "redirect_url return_url notification_urls payment_notification_urls expiration_date " +
+            "shipping address street number complement locality city region region_code country postal_code " +
+            "amount currency value total paid refunded incremented";
+        var segments = value.Split(['.', '[', ']'], StringSplitOptions.RemoveEmptyEntries);
+        return value.Length is > 0 and <= 256 &&
+            value.All(c => char.IsAsciiLetterOrDigit(c) || c is '_' or '.' or '[' or ']') &&
+            segments.Length > 0 && segments.All(segment =>
+                identifiers.Split(' ').Contains(segment, StringComparer.Ordinal) ||
+                (segment.Length <= 3 && segment.All(char.IsAsciiDigit)))
+            ? value : "[redacted]";
     }
 
     private static string? SafeTechnicalField(JsonElement error, string property)
     {
-        if (!error.TryGetProperty(property, out var field) || field.ValueKind != JsonValueKind.String)
+        if (!error.TryGetProperty(property, out var field))
             return null;
+        if ((property == "code" || property == "status") && field.ValueKind == JsonValueKind.Number)
+        {
+            var code = field.GetRawText();
+            return code.Length <= 8 && code.All(char.IsAsciiDigit) ? code : "[redacted]";
+        }
+        if (field.ValueKind != JsonValueKind.String) return "[redacted]";
 
         var value = field.GetString()!;
+        if (property == "code" && value.Length is > 0 and <= 8 && value.All(char.IsAsciiDigit))
+            return value;
         // Provider descriptions can echo personal data. Only known technical vocabulary
         // is safe, including when reusing a historical checkout without customer data.
         const string vocabulary = "invalid required missing malformed unauthorized forbidden " +

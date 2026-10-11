@@ -140,9 +140,11 @@ public class PagBankCheckoutServiceTests
                 .ToArray();
 
         Assert.Equal(
-            ["PIX", "CREDIT_CARD", "DEBIT_CARD"],
+            ["PIX", "CREDIT_CARD"],
             paymentMethods
         );
+        // Debit requires prior account approval and must not be offered yet.
+        Assert.DoesNotContain("DEBIT_CARD", paymentMethods);
 
         Assert.Equal(
             "https://shop.example/return",
@@ -527,9 +529,12 @@ public class PagBankCheckoutServiceTests
         using var http = new HttpClient(new Stub(_ => Task.FromResult(Json(HttpStatusCode.BadRequest,
             """
             {"error_messages":[
-              {"error":"invalid_parameter","description":"must be between 10 and 60 characters","parameter_name":"customer.email","email":"cliente@teste.com"},
+              {"code":"40001","error":"invalid_parameter","description":"must be between 10 and 60 characters","parameter_name":"customer.email","email":"cliente@teste.com"},
               {"error":"local-test-token","description":"Cliente Teste cliente@teste.com 52998224725","parameter_name":"Bearer local-test-token"},
-              {"error":"invalid_parameter","description":"(34) 99999-9999","parameter_name":"customer.phone"}
+              {"error":"invalid_parameter","description":"(34) 99999-9999","parameter_name":"customer.phone"},
+              {"code":40002,"error":"invalid_parameter","description":"enc:v1:private","parameter_name":"items[0].unit_amount"},
+              {"code":"52998224725","error":"invalid_parameter","parameter_name":"customer.cliente@teste.com"},
+              {"code":"local-test-token","error":"invalid_parameter","parameter_name":"payment_methods_configs[0].config_options[0].option"}
             ],"Authorization":"Bearer local-test-token","payload":"secret"}
             """))));
 
@@ -546,12 +551,60 @@ public class PagBankCheckoutServiceTests
         {
             Assert.Contains("400", logs);
             Assert.Contains("invalid_parameter", logs);
-            Assert.Contains("must be between 10 and 60 characters", logs);
+            Assert.DoesNotContain("must be between 10 and 60 characters", logs);
             Assert.Contains("customer.email", logs);
+            Assert.Contains("code=40001", logs);
+            Assert.Contains("code=40002", logs);
+            Assert.Contains("parameter_name=items[0].unit_amount", logs);
+            Assert.Contains("parameter_name=payment_methods_configs[0].config_options[0].option", logs);
+            Assert.Equal(6, logger.Messages.Count(message => message.Contains("parameter_name=")));
             Assert.Contains("[redacted]", logs);
         }
-        foreach (var sensitive in new[] { Customer.Name, Customer.Email, Customer.TaxId, "local-test-token", "Authorization", "Bearer", "secret" })
+        foreach (var sensitive in new[] { Customer.Name, Customer.Email, Customer.TaxId, "local-test-token", "Authorization", "Bearer", "secret", "enc:v1:" })
             Assert.DoesNotContain(sensitive, logs);
+    }
+
+    [Theory]
+    [InlineData("{\"error_messages\":[{\"code\":40002,\"description\":\"private\",\"parameter_name\":\"payment_methods[2].type\"}]}", "application/json", "root=Object", "error_messages[0] properties=code,description,parameter_name", "parameter_name=payment_methods[2].type")]
+    [InlineData("[{\"error\":\"invalid_parameter\",\"status\":400,\"type\":\"invalid_request\"}]", "application/json", "root=Array", "root[0] properties=error,status,type", "status=400, type=invalid_request")]
+    [InlineData("{\"code\":40002,\"message\":\"private\",\"error\":\"invalid_parameter\"}", "application/problem+json", "root=Object", "properties=code,message,error", "code=40002")]
+    [InlineData("{\"errors\":[{\"parameter_name\":\"customer.phone.number\"}]}", "application/json", "root=Object", "errors[0] properties=parameter_name", "parameter_name=customer.phone.number")]
+    [InlineData("{\"error\":{\"code\":40002}}", "application/json", "root=Object", "error properties=code", "code=40002")]
+    [InlineData("<html>private</html>", "text/html", "error body is non-JSON", "content-type=text/html", "HTTP 400")]
+    [InlineData("", "text/plain", "error body is non-JSON", "content-type=text/plain", "HTTP 400")]
+    [InlineData("\"private\"", "application/json", "root=String", "properties=[none]", "HTTP 400")]
+    public async Task DiagnosticsDescribeShapeWithoutLoggingUnknownValues(string body, string mediaType, string expected, string shape, string technical)
+    {
+        var logger = new RecordingLogger();
+        using var http = new HttpClient(new Stub(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, mediaType)
+        })));
+        await Assert.ThrowsAsync<HttpRequestException>(() => Service(http, new TestEnvironment(), logger).GetOrCreateAsync(NewPayment(), Customer));
+        var logs = string.Join("\n", logger.Messages);
+        Assert.Contains(expected, logs);
+        Assert.Contains(shape, logs);
+        Assert.Contains(technical, logs);
+        Assert.Contains("content-type=" + mediaType, logs);
+        Assert.DoesNotContain("private", logs);
+    }
+
+    [Fact]
+    public async Task UntrustedPropertyNamesContentTypeAndTechnicalValuesAreRedacted()
+    {
+        var logger = new RecordingLogger();
+        using var http = new HttpClient(new Stub(_ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("""
+                {"cliente@teste.com":"private","errors":[{"52998224725":"private","status":"enc:v1:private","type":"Bearer private","description":"Cliente Teste","code":"11999990000"}]}
+                """, System.Text.Encoding.UTF8, "application/private")
+        })));
+        await Assert.ThrowsAsync<HttpRequestException>(() => Service(http, new TestEnvironment(), logger).GetOrCreateAsync(NewPayment(), Customer));
+        var logs = string.Join("\n", logger.Messages);
+        Assert.Contains("content-type=[redacted]", logs);
+        Assert.Contains("properties=[redacted],errors", logs);
+        foreach (var value in new[] { "private", Customer.Name, Customer.Email, Customer.TaxId, "11999990000", "enc:v1:", "Bearer" })
+            Assert.DoesNotContain(value, logs);
     }
 
     [Theory]
@@ -636,10 +689,34 @@ public class PagBankCheckoutServiceTests
         Assert.Equal(1, calls);
     }
 
+    [Theory]
+    [InlineData("\u0016")]
+    [InlineData("test\u0016value")]
+    [InlineData("test value")]
+    [InlineData("test\r\nvalue")]
+    [InlineData("test\u200bvalue")]
+    [InlineData(" test")]
+    [InlineData("test ")]
+    public void RejectsContaminatedTokenBeforeHttpWithoutEchoingCredential(string token)
+    {
+        var calls = 0;
+        using var http = new HttpClient(new Stub(_ =>
+        {
+            calls++;
+            return Task.FromResult(Json(HttpStatusCode.OK, "{}"));
+        }));
+        var error = Assert.Throws<InvalidOperationException>(() => Service(http, token: token));
+        Assert.Equal("PagBank token has an invalid format.", error.Message);
+        Assert.Null(error.InnerException);
+        Assert.DoesNotContain(token, error.Message, StringComparison.Ordinal);
+        Assert.Equal(0, calls);
+    }
+
     private static PagBankCheckoutService Service(
         HttpClient http,
         IHostEnvironment? environment = null,
-        ILogger<PagBankCheckoutService>? logger = null)
+        ILogger<PagBankCheckoutService>? logger = null,
+        string token = "local-test-token")
     {
         return new PagBankCheckoutService(
             http,
@@ -650,7 +727,7 @@ public class PagBankCheckoutServiceTests
                         "https://sandbox.api.pagseguro.com",
 
                     Token =
-                        "local-test-token",
+                        token,
 
                     RedirectUrl =
                         "https://shop.example/return",

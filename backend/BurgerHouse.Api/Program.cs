@@ -38,6 +38,14 @@ var frontendOrigins =
         .ToArray()
     ?? [];
 
+if (builder.Environment.IsDevelopment())
+{
+    frontendOrigins = frontendOrigins
+        .Append("http://localhost:5173")
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+}
+
 if (frontendOrigins.Length == 0)
 {
     throw new InvalidOperationException(
@@ -157,6 +165,12 @@ builder.Services.AddScoped<
 builder.Services.AddScoped<
     IPaymentReconciliationService,
     PagBankPaymentReconciliationService>();
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddScoped<PendingPaymentReconciliationBatch>();
+    builder.Services.AddHostedService<BurgerHouse.Api.DevelopmentPaymentReconciliationWorker>();
+}
 
 builder.Services.AddScoped<
     SynchronizeCheckoutPaymentHandler>();
