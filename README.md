@@ -1,6 +1,6 @@
 # 🍔 The Burger House
 
-Aplicação **full-stack de pedidos para hamburgueria**, desenvolvida com **HTML5, JavaScript Vanilla, Tailwind CSS, Vite, ASP.NET Core 9 e Entity Framework Core**, com cardápio digital, carrinho, entrega ou retirada, criação de pedidos no backend, checkout hospedado do PagBank, webhooks, reconciliação de pagamentos, integração com WhatsApp, testes automatizados e CI/CD.
+Aplicação **full-stack de pedidos para hamburgueria**, desenvolvida com **HTML5, JavaScript Vanilla, Tailwind CSS, Vite, ASP.NET Core 9 e Entity Framework Core**, com cardápio digital, carrinho, entrega ou retirada, criação e acompanhamento de pedidos no backend, painel administrativo, visão financeira, checkout hospedado do PagBank, webhooks, reconciliação de pagamentos, privacidade e criptografia de dados pessoais em repouso, integração com WhatsApp, testes automatizados e CI/CD.
 
 🌐 [Deploy](https://burger-shop-aiib.vercel.app/) • 📂 [Repositório](https://github.com/felipe-frc/the-burger-house) • 🧪 [GitHub Actions](https://github.com/felipe-frc/the-burger-house/actions) • 📦 [Releases](https://github.com/felipe-frc/the-burger-house/releases)
 
@@ -9,12 +9,12 @@ Aplicação **full-stack de pedidos para hamburgueria**, desenvolvida com **HTML
 ![Backend](https://img.shields.io/badge/backend-ASP.NET%20Core%209-512BD4?logo=dotnet&logoColor=white)
 ![Azure](https://img.shields.io/badge/API-Azure%20App%20Service-0078D4?logo=microsoftazure&logoColor=white)
 ![PagBank](https://img.shields.io/badge/payments-PagBank-00B368)
-![Version](https://img.shields.io/badge/version-2.7.0-blue)
+![Version](https://img.shields.io/badge/version-4.0.0-blue)
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?logo=javascript&logoColor=black)
 ![C#](https://img.shields.io/badge/C%23-.NET%209-512BD4?logo=dotnet&logoColor=white)
-![Vitest](https://img.shields.io/badge/Vitest-92%20passing-6E9F18?logo=vitest&logoColor=white)
-![.NET Tests](https://img.shields.io/badge/.NET%20tests-233%20passing-512BD4?logo=dotnet&logoColor=white)
-![Playwright](https://img.shields.io/badge/E2E-22%20passing-2EAD33?logo=playwright&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-186%20passing-6E9F18?logo=vitest&logoColor=white)
+![.NET Tests](https://img.shields.io/badge/.NET%20tests-456%20passing-512BD4?logo=dotnet&logoColor=white)
+![Playwright](https://img.shields.io/badge/E2E-42%20passing-2EAD33?logo=playwright&logoColor=white)
 ![Lighthouse](https://img.shields.io/badge/Lighthouse-95%20%7C%20100%20%7C%20100%20%7C%20100-4285F4)
 ![Security](https://img.shields.io/badge/npm%20audit-0%20vulnerabilities-brightgreen)
 
@@ -26,9 +26,9 @@ O **The Burger House** simula uma experiência real de compra em uma hamburgueri
 
 O cliente pode navegar pelo cardápio, adicionar produtos ao carrinho, escolher entre **entrega ou retirada**, consultar endereço por CEP, revisar o pedido, criar o pedido no backend, realizar o pagamento em checkout hospedado do PagBank e, após a aprovação, confirmar o atendimento pelo WhatsApp.
 
-O projeto começou como uma aplicação front-end e evoluiu para uma arquitetura full-stack. Atualmente, o frontend em JavaScript se comunica com uma API ASP.NET Core responsável por regras de pedidos, persistência, pagamentos e sincronização com o PagBank.
+O projeto começou como uma aplicação front-end e evoluiu para uma arquitetura full-stack. Atualmente, o frontend em JavaScript se comunica com uma API ASP.NET Core responsável por regras de pedidos, persistência, pagamentos e sincronização com o PagBank. A versão atual também inclui uma área administrativa para acompanhar pedidos, operação e dados financeiros.
 
-O fluxo de pagamentos utiliza o **checkout hospedado do PagBank**. O backend cria e mantém a identidade do pagamento localmente, recebe eventos por webhook e realiza reconciliação direta da cobrança antes de atualizar o estado do pedido. Consulte [configuração, checkout, webhook e reconciliação](docs/pagbank.md).
+O fluxo de pagamentos utiliza o **checkout hospedado do PagBank**. O backend cria e mantém a identidade do pagamento localmente, recebe eventos por webhook e realiza reconciliação direta da cobrança antes de atualizar o estado do pedido. Os dados pessoais necessários ao atendimento são minimizados na interface administrativa e protegidos em repouso com AES-256-GCM. Consulte [configuração, checkout, webhook e reconciliação](docs/pagbank.md) e [proteção de dados pessoais](docs/personal-data-protection.md).
 
 ### 🎯 O que este projeto demonstra
 
@@ -37,34 +37,39 @@ O fluxo de pagamentos utiliza o **checkout hospedado do PagBank**. O backend cri
 | JavaScript     | ES Modules, DOM, eventos, estado, serviços e regras de interface       |
 | C# / .NET      | ASP.NET Core 9, API REST, DI, handlers, serviços e validações          |
 | Arquitetura    | Separação em Domain, Application, Infrastructure e API                 |
-| Persistência   | Entity Framework Core + SQLite e migrations                            |
+| Persistência   | Entity Framework Core + SQLite, migrations e proteção de dados          |
 | Integração     | ViaCEP, PagBank, WhatsApp e comunicação frontend/backend               |
-| Pagamentos     | Checkout hospedado, webhooks, idempotência e reconciliação             |
-| Segurança      | Validação de URLs, assinatura de webhook, secrets externos e auditoria |
+| Pagamentos     | Checkout hospedado, PIX, cartão, webhooks, idempotência e reconciliação |
+| Segurança      | Autenticação Admin, secrets externos, minimização e AES-256-GCM         |
 | Testes         | Vitest, xUnit, Playwright, jsdom e axe-core                            |
 | Qualidade      | ESLint, Prettier, TypeScript `checkJs`, builds e quality gates         |
 | Acessibilidade | Navegação por teclado, ARIA, foco e auditoria automatizada             |
 | Performance    | Otimização de mídia e auditoria com Lighthouse                         |
 | CI/CD          | GitHub Actions, Vercel e Azure App Service                             |
 | Deploy         | Frontend na Vercel e backend no Azure                                  |
+| Administração   | Painel de pedidos, operação, financeiro e autenticação                  |
 
 ---
 
 ## ⭐ Destaques técnicos
 
-- **92/92 testes front-end** com Vitest
-- **233/233 testes backend** em projetos .NET
-- **22/22 execuções E2E** com Playwright: desktop + mobile
+- **186/186 testes front-end** com Vitest
+- **456/456 testes backend** em projetos .NET
+- **42/42 execuções E2E** com Playwright: desktop + mobile
 - Backend em **ASP.NET Core 9** organizado em camadas
 - Persistência com **Entity Framework Core + SQLite**
 - Criação de pedidos e pagamentos via API REST
 - Integração com **PagBank Hosted Checkout**
 - Processamento de **webhooks financeiros**
 - Reconciliação direta por `CHAR_...` antes de alterações críticas
+- Reconciliação por checkout → ordem → cobrança quando o `ExternalPaymentId` ainda não está disponível
 - Proteções de **idempotência** e consistência de estado
 - Separação entre identificadores `CHEC_...`, `ORDE_...` e `CHAR_...`
 - Checkout público limitado a hosts HTTPS esperados
 - Frontend e backend publicados separadamente em **Vercel + Azure App Service**
+- Área administrativa com autenticação, gestão operacional e visão financeira
+- Dados pessoais protegidos em repouso com **AES-256-GCM** e envelope `enc:v1`
+- Política de privacidade e minimização de dados no fluxo administrativo
 - Integração ViaCEP isolada em `scripts/services/viacep-service.js`
 - Regras do carrinho isoladas em `cart-service.js`
 - Estado compartilhado centralizado em `state.js`
@@ -85,14 +90,16 @@ O fluxo de pagamentos utiliza o **checkout hospedado do PagBank**. O backend cri
 | 🛒 Carrinho           | Adição, remoção, quantidade, subtotal, taxa, total e persistência    |
 | 🚚 Entrega / Retirada | Fluxos independentes com tratamento da taxa de entrega               |
 | 📍 Endereço           | Consulta ViaCEP, preenchimento automático e validações               |
-| 📦 Pedidos            | Criação e persistência pelo backend                                  |
-| 💳 Pagamentos         | Checkout hospedado do PagBank                                        |
+| 📦 Pedidos            | Criação, persistência e acompanhamento operacional pelo backend      |
+| 💳 Pagamentos         | PagBank Hosted Checkout com PIX e cartão de crédito                  |
 | 🔔 Webhooks           | Sincronização financeira do pagamento                                |
-| 🔄 Reconciliação      | Consulta direta da cobrança e atualização segura do estado           |
+| 🔄 Reconciliação      | Consulta segura e recuperação de pagamentos pendentes                |
 | ✅ Retorno            | Consulta do pagamento após retorno do checkout                       |
 | 💬 WhatsApp           | Confirmação final com mensagem estruturada                           |
 | 🌎 Idiomas            | Português/Inglês com persistência da preferência                     |
 | 🕒 Loja               | Status Aberto/Fechado calculado dinamicamente                        |
+| 🧑‍💼 Administração     | Autenticação, pedidos, fluxo operacional e visão financeira          |
+| 🔐 Privacidade         | Minimização de dados e criptografia AES-256-GCM em repouso           |
 
 ### 🍔 Cardápio
 
@@ -160,14 +167,16 @@ Na finalização:
 
 1. o frontend cria o pedido pela API
 2. o backend valida produtos, valores e regras
-3. um pagamento local é criado ou reutilizado
-4. o backend solicita um checkout hospedado ao PagBank
-5. o navegador é redirecionado para o checkout
-6. após o pagamento, o PagBank envia o evento financeiro ao webhook
-7. o backend valida, reconcilia e persiste o novo estado
-8. o cliente retorna ao site
-9. o frontend consulta o status do pagamento
-10. com o pagamento aprovado, o WhatsApp é aberto com a mensagem final do pedido
+3. os dados pessoais protegidos são persistidos no backend
+4. um pagamento local é criado ou reutilizado
+5. o backend solicita um checkout hospedado ao PagBank
+6. o navegador é redirecionado para o checkout
+7. após o pagamento, o PagBank envia o evento financeiro ao webhook
+8. o backend valida, reconcilia e persiste o novo estado
+9. em Development, pagamentos pendentes também podem ser reconciliados automaticamente em lotes controlados
+10. o cliente retorna ao site
+11. o frontend consulta o status do pagamento
+12. com o pagamento aprovado, o pedido entra no fluxo operacional e o WhatsApp pode ser aberto com a mensagem final
 
 ### 🌎 Internacionalização
 
@@ -269,6 +278,7 @@ A estrutura separa responsabilidades entre interface, aplicação, domínio, inf
 | `scripts/config.js`                  | Configurações gerais                  |
 | `scripts/main.js`                    | Inicialização da aplicação            |
 | `scripts/utils.js`                   | Funções utilitárias                   |
+| `scripts/admin/*`                    | Cliente, estado, ícones e views do painel administrativo |
 
 ### Backend
 
@@ -287,7 +297,7 @@ BurgerHouse.Infrastructure
 | `BurgerHouse.Api`            | Controllers, endpoints, configuração e webhooks |
 | `BurgerHouse.Application`    | Casos de uso, handlers e abstrações             |
 | `BurgerHouse.Domain`         | Entidades, enums, regras e transições de estado |
-| `BurgerHouse.Infrastructure` | EF Core, repositórios, PagBank e persistência   |
+| `BurgerHouse.Infrastructure` | EF Core, repositórios, PagBank, persistência, Admin e privacidade |
 | `*.Tests`                    | Testes automatizados por camada                 |
 
 ### Fluxo principal
@@ -303,13 +313,15 @@ Application / Domain
   ↓
 EF Core + SQLite
   ↓
+Proteção de dados pessoais (AES-256-GCM)
+  ↓
 PagBank Hosted Checkout
   ↓
-Webhook financeiro
-  ↓
-Validação + reconciliação
+Webhook financeiro / reconciliação
   ↓
 Payment / Order atualizados
+  ↓
+Painel administrativo / Financeiro
   ↓
 Retorno ao frontend
   ↓
@@ -325,6 +337,9 @@ the-burger-house/
 │   └── workflows/
 │       ├── frontend-ci.yml
 │       └── feat-backend-foundation_the-burger-house-api.yml
+│
+├── admin/
+│   └── index.html
 │
 ├── assets/
 │   ├── optimized/
@@ -350,7 +365,8 @@ the-burger-house/
 │   │   ├── pedido.png
 │   │   ├── endereco.png
 │   │   └── revisao.png
-│   └── pagbank.md
+│   ├── pagbank.md
+│   └── personal-data-protection.md
 │
 ├── public/
 │   └── robots.txt
@@ -358,6 +374,7 @@ the-burger-house/
 ├── scripts/
 │   ├── services/
 │   │   └── viacep-service.js
+│   ├── admin/
 │   ├── address.js
 │   ├── api.js
 │   ├── cart-service.js
@@ -372,19 +389,23 @@ the-burger-house/
 │   └── utils.js
 │
 ├── styles/
+│   ├── admin.css
+│   ├── privacy.css
 │   └── style.css
 │
 ├── tests/
 │   ├── e2e/
 │   └── ...
 │
+├── privacy.html
 ├── Dockerfile
 ├── package.json
 ├── package-lock.json
 ├── playwright.config.js
 ├── README.md
 ├── tailwind.config.js
-└── vercel.json
+├── vercel.json
+└── vite.config.js
 ```
 
 ---
@@ -435,10 +456,10 @@ Resumo final dos produtos, valores, modalidade, endereço e observações.
 
 | Métrica                   |   Resultado |
 | ------------------------- | ----------: |
-| Testes front-end (Vitest) |   **92/92** |
-| Testes backend (.NET)     | **233/233** |
+| Testes front-end (Vitest) | **186/186** |
+| Testes backend (.NET)     | **456/456** |
 | Testes com falha          |       **0** |
-| E2E Playwright            |   **22/22** |
+| E2E Playwright            |   **42/42** |
 | Vulnerabilidades npm      |       **0** |
 
 ### 📈 Cobertura e quality gates
@@ -486,6 +507,8 @@ Entre os cenários validados estão:
 - retorno do checkout
 - construção da mensagem do WhatsApp
 - preservação de Unicode na mensagem final
+- painel administrativo e seus estados
+- privacidade e minimização de dados
 
 ### 🧪 Backend .NET
 
@@ -502,6 +525,10 @@ Os testes estão distribuídos por camada:
 - processamento de eventos financeiros
 - reconciliação por cobrança
 - cenários de erro e respostas inválidas
+- autenticação e segurança administrativa
+- visão financeira e histórico de estornos
+- criptografia, persistência protegida e compatibilidade com legado
+- reconciliação automática de pagamentos pendentes em Development
 
 ### 🎭 Playwright
 
@@ -517,6 +544,9 @@ A suíte E2E valida os fluxos principais em desktop e mobile, incluindo:
 - acessibilidade da página inicial, carrinho, endereço e revisão
 - integração do fluxo de checkout sem expor dados sensíveis
 - confirmação final pelo WhatsApp
+- fluxos do painel administrativo
+- validações visuais do Admin
+- política de privacidade
 
 ---
 
@@ -589,6 +619,11 @@ Além da auditoria de dependências, o projeto possui proteções específicas n
 - operações financeiras são correlacionadas com IDs persistidos
 - eventos repetidos são tratados de forma idempotente
 - reconciliação inválida não sobrescreve o último estado local conhecido
+- endpoints administrativos exigem autenticação
+- CPF, e-mail e identificadores externos são minimizados no Admin
+- dados pessoais protegidos em repouso com AES-256-GCM
+- novos registros protegidos utilizam envelope versionado `enc:v1`
+- a chave `Privacy__EncryptionKey` é fornecida externamente e não é versionada
 
 ---
 
@@ -719,7 +754,13 @@ PagBank__RedirectUrl
 PagBank__NotificationUrl
 ```
 
-Consulte [`docs/pagbank.md`](docs/pagbank.md) para detalhes do checkout, webhook e reconciliação.
+A proteção de dados pessoais também exige uma chave externa de 32 bytes:
+
+```txt
+Privacy__EncryptionKey
+```
+
+Consulte [`docs/pagbank.md`](docs/pagbank.md) para detalhes do checkout, webhook e reconciliação e [`docs/personal-data-protection.md`](docs/personal-data-protection.md) para a estratégia de proteção de dados pessoais.
 
 ### Comandos disponíveis
 
@@ -774,6 +815,10 @@ dist/
 | ESLint + Prettier + Typecheck | Melhorar consistência e detecção antecipada de problemas            |
 | GitHub Actions                | Automatizar qualidade, build, testes e deploy                       |
 | Vercel + Azure                | Separar deploy do frontend e da API                                 |
+| Painel administrativo         | Separar operação interna do fluxo público do cliente                |
+| AES-256-GCM                    | Proteger dados pessoais em repouso com autenticação do ciphertext   |
+| Compatibilidade com legado     | Permitir evolução gradual sem reescrever registros antigos          |
+| Reconciliação em Development   | Recuperar pagamentos locais sem depender do webhook de outro ambiente |
 
 A camada de pagamentos foi projetada por abstrações. Isso permitiu a evolução do provedor de pagamento sem transportar regras específicas para o domínio da aplicação.
 
@@ -783,8 +828,9 @@ A camada de pagamentos foi projetada por abstrações. Isso permitiu a evoluçã
 
 | Versão                                                                       | Categoria           | Destaque                                                                                   |
 | ---------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------ |
-| **Em desenvolvimento**                                                       | 🚧 Full-stack       | Backend ASP.NET Core, persistência, pedidos, PagBank, webhooks, reconciliação e Azure      |
-| **v2.7.0**                                                                   | 🚀 Última publicada | Hardening técnico, testes, E2E desktop/mobile, acessibilidade, Lighthouse, SEO e segurança |
+| [**v4.0.0**](https://github.com/felipe-frc/the-burger-house/releases/tag/v4.0.0) | 🚀 Última publicada | Administração, financeiro, privacidade, criptografia e resiliência de pagamentos |
+| [v3.0.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v3.0.0) | 🚀 Major            | Evolução full-stack, backend ASP.NET Core, persistência, PagBank e Azure                  |
+| [v2.7.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.7.0) | 🛡️ Hardening        | Testes, E2E desktop/mobile, acessibilidade, Lighthouse, SEO e segurança                  |
 | [v2.6.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.6.0) | 🧪 Testes           | Testes E2E com Playwright                                                                  |
 | [v2.5.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.5.0) | ♻️ Refatoração      | Refatoração do carrinho e cobertura de testes                                              |
 | [v2.4.1](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.4.1) | 🛠️ Manutenção       | Documentação, CI e otimização da logo                                                      |
@@ -809,17 +855,18 @@ A camada de pagamentos foi projetada por abstrações. Isso permitiu a evoluçã
 
 - 🔎 Busca de produtos
 - 🧩 Filtros no cardápio
-- 📝 Observações específicas por item
 - 🚚 Cálculo de entrega por região ou faixa de CEP
-- 🔐 Autenticação
-- 🧑‍💼 Painel administrativo
-- 🧾 Histórico de pedidos
-- 📦 Acompanhamento do status do pedido
 - 🛍️ Gerenciamento de produtos pelo painel
 - 💾 Evolução do banco de produção para PostgreSQL
 - 📊 Observabilidade e health checks
 - 🚦 Rate limiting
 - 💸 Fluxos administrativos de cancelamento e reembolso
+- 🔑 Gerenciamento da chave de criptografia com Azure Key Vault
+- 🔄 Estratégia de rotação de chaves
+- 🔐 Reproteção dos registros legados ainda armazenados em plaintext
+- 🧹 Política automatizada de retenção e anonimização de dados
+- 💾 Revisão da estratégia de backups anteriores à criptografia
+- 🧽 Limpeza e minimização adicional de dados persistidos no navegador
 
 ---
 
@@ -830,8 +877,9 @@ A camada de pagamentos foi projetada por abstrações. Isso permitiu a evoluçã
 - O checkout de pagamento é hospedado pelo PagBank
 - A aplicação não armazena dados de cartão
 - Tokens e credenciais do gateway não devem ser versionados
-- O webhook é o mecanismo principal de sincronização financeira
-- A consulta de status pode reconciliar pagamentos que já possuam `ExternalPaymentId`
+- O webhook permanece como mecanismo principal de sincronização financeira em produção
+- A reconciliação também consegue recuperar pagamentos a partir do checkout quando a cobrança ainda não está persistida localmente
+- Em Development, um worker controlado reconcilia pagamentos pendentes em lotes de até cinco registros
 - O carrinho é persistido no `localStorage`
 - A preferência de idioma também é persistida no navegador
 - A confirmação final pelo WhatsApp ocorre após a aprovação do pagamento
@@ -841,6 +889,9 @@ A camada de pagamentos foi projetada por abstrações. Isso permitiu a evoluçã
 - A fonte principal dos estilos permanece em `styles/style.css`
 - No Azure, o banco SQLite persistente utiliza o diretório `/home`
 - Configurações específicas de Sandbox não devem ser tratadas como configuração de produção real
+- A chave `Privacy__EncryptionKey` é obrigatória para novas gravações protegidas e não deve ser versionada
+- Registros legados em plaintext continuam legíveis até uma futura estratégia de reproteção
+- Perder a chave de criptografia torna os registros protegidos irrecuperáveis
 
 ---
 
