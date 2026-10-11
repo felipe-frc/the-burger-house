@@ -12,7 +12,19 @@ export function card(label, value, symbol = "revenue", information = false) {
 export const badge = (status) =>
   `<span class="badge badge-${Object.hasOwn(statusLabels, status) ? status.toLowerCase() : "unknown"}">${esc(statusLabels[status] || "Não informado")}</span>`;
 export function shell(route) {
-  return `<header class="topbar">${brand()}<button id="menu-toggle" aria-label="Menu" aria-expanded="false" aria-controls="admin-nav">${icon("menu")}<span class="menu-text">Menu</span></button><span class="owner">${icon("user")}Proprietário</span><button id="logout">${icon("logout")}Sair</button></header><div class="layout"><nav class="sidebar" id="admin-nav" aria-label="Administração">${[
+  return `<header class="topbar">${brand()}<button id="menu-toggle" aria-label="Menu" aria-expanded="false" aria-controls="admin-nav">${icon("menu")}<span class="menu-text">Menu</span></button><span class="owner">${icon("user")}Proprietário</span><button id="notifications-toggle" aria-label="Notificações" aria-expanded="false" aria-controls="notifications-panel">${icon("bell")}<span id="notification-count" aria-label="Não lidas">0</span></button><button id="logout">${icon("logout")}Sair</button></header><button id="notifications-overlay" aria-label="Fechar notificações" tabindex="-1" hidden></button><section id="notifications-panel" aria-label="Central de notificações" hidden><div class="notification-heading"><h2>Notificações</h2><button id="notifications-close" aria-label="Fechar central de notificações">×</button></div><div class="notification-filters" role="group" aria-label="Filtrar notificações">${[
+    ["all", "Todas"],
+    ["orders", "Pedidos"],
+    ["payments", "Pagamentos"],
+    ["status", "Status"],
+  ]
+    .map(
+      ([value, label]) =>
+        `<button data-notification-filter="${value}" aria-pressed="${value === "all"}">${label}</button>`,
+    )
+    .join(
+      "",
+    )}</div><div class="notification-actions"><button id="notifications-read">Marcar como lidas</button><button id="notifications-clear">Limpar lista</button></div><ol id="notification-list"></ol></section><div class="layout"><nav class="sidebar" id="admin-nav" aria-label="Administração">${[
     ["dashboard", "Dashboard", "home"],
     ["orders", "Pedidos", "orders"],
     ["finance", "Financeiro", "finance"],
@@ -29,6 +41,16 @@ export function shell(route) {
 }
 export function login() {
   return `<main id="content" class="login">${brand()}<form id="login-form"><div class="login-intro"><span class="section-icon">${icon("lock")}</span><div class="eyebrow">Acesso privado</div><h1>Bem-vindo à casa.</h1><p class="muted">Entre para acompanhar pedidos e cuidar da operação.</p></div><label>E-mail<input name="email" type="email" autocomplete="username" maxlength="254" required></label><label>Senha<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label><p id="login-error" class="error" role="alert"></p><button>Entrar ${icon("arrow")}</button></form></main>`;
+}
+export function notificationHistory(items) {
+  return (
+    items
+      .map(
+        (item) =>
+          `<li class="${item.read ? "" : "notification-unread"}"><span class="notification-icon notification-${["orders", "payments", "status"].includes(item.category) ? item.category : "orders"}">${icon(item.category === "payments" ? "coins" : item.category === "status" ? "chef" : "orders")}</span><div><div class="notification-meta"><strong>Pedido #${Number(item.orderId)}</strong><time datetime="${esc(item.time)}">${esc(new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(new Date(item.time)))}</time></div><h3>${esc(item.title)}</h3><p>${esc(item.message)}</p>${item.read ? "" : '<span class="badge">Não lida</span>'}</div></li>`,
+      )
+      .join("") || "<li>Nenhuma notificação nesta sessão.</li>"
+  );
 }
 export function orderTable(orders) {
   return `<div class="table-scroll" tabindex="0" aria-label="Pedidos"><table><thead><tr><th>Pedido / horário</th><th>Cliente</th><th>Tipo</th><th>Itens</th><th>Pagamento</th><th>Total</th><th>Status</th></tr></thead><tbody>${

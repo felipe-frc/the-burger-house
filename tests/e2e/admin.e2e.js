@@ -1,6 +1,82 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { mockAdmin, login, navigate } from "./admin-helpers.js";
+import { order } from "../admin-fixtures.js";
+
+test("session notifications are accessible, transient and track payment transitions", async ({
+  page,
+}, testInfo) => {
+  await page.clock.install({ time: new Date("2026-10-11T12:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-10-11T12:00:01Z"));
+  await mockAdmin(page);
+  await login(page);
+  await expect(page.locator("#revenue-chart figure")).toBeVisible();
+  const poll = async () => {
+    // The chart is updated last in each polling cycle. Do not advance time
+    // while its HTTP requests are still in flight.
+    await page.evaluate(() => {
+      const chart = document.getElementById("revenue-chart");
+      chart.dataset.refreshed = "false";
+      const observer = new MutationObserver(() => {
+        chart.dataset.refreshed = "true";
+        observer.disconnect();
+      });
+      observer.observe(chart, { childList: true });
+    });
+    await page.clock.fastForward(15000);
+    await expect(page.locator("#revenue-chart")).toHaveAttribute("data-refreshed", "true");
+  };
+  let current = { ...order, id: 109, status: "PendingPayment", paymentStatus: "Pending" };
+  await page.route("**/api/admin/orders?**", (route) =>
+    route.fulfill({ json: { items: [order, current], total: 2, pageSize: 20, pageNumber: 1 } }),
+  );
+  await poll();
+  await expect(page.locator("#admin-message")).toContainText("Aguardando pagamento");
+  await expect(page.locator("#notification-count")).toHaveText("1");
+  await page.getByRole("button", { name: "Notificações", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#notifications-panel")).toBeVisible();
+  await expect(page.locator("#notification-list")).toContainText("Pedido #109");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  const panel = await page.locator("#notifications-panel").boundingBox();
+  expect(panel.width).toBeLessThanOrEqual(420);
+  expect(panel.height).toBe(page.viewportSize().height);
+  if (page.viewportSize().width <= 640) {
+    await expect(page.locator("#notifications-overlay")).toBeVisible();
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.locator("#notifications-clear")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(page.locator("#notifications-close")).toBeFocused();
+  }
+  await page.screenshot({ path: testInfo.outputPath("notifications.png") });
+  await page.clock.fastForward(7000);
+  await expect(page.locator("#admin-message")).toBeEmpty();
+  current = { ...current, status: "Received", paymentStatus: "Approved" };
+  await poll();
+  await expect(page.locator("#admin-message")).toContainText("Pagamento aprovado");
+  await expect(page.locator("#notification-count")).toHaveText("2");
+  await page.locator('[data-notification-filter="payments"]').click();
+  await expect(page.locator("#notification-list")).not.toContainText("Aguardando pagamento");
+  await page.locator('[data-notification-filter="orders"]').click();
+  await expect(page.locator("#notification-list")).toContainText("Aguardando pagamento");
+  await page.locator('[data-notification-filter="all"]').click();
+  await page.locator("#notifications-close").click();
+  await page.getByRole("button", { name: "Fechar notificação", exact: true }).click();
+  await expect(page.locator("#admin-message")).toBeEmpty();
+  await page.locator("#notifications-toggle").click();
+  await page.getByRole("button", { name: "Marcar como lidas" }).click();
+  await expect(page.locator("#notification-count")).toHaveText("0");
+  await page.getByRole("button", { name: "Limpar lista" }).click();
+  await poll();
+  await expect(page.locator("#notification-list")).toContainText("Nenhuma notificação");
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#notifications-panel")).toBeHidden();
+  await expect(page.locator("#notifications-toggle")).toBeFocused();
+  await page.locator("#notifications-toggle").click();
+  // Axe uses timers internally; resume only after the deterministic toast checks.
+  await page.clock.resume();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+});
 
 test("private routes redirect and invalid login reveals no account details", async ({ page }) => {
   await mockAdmin(page);

@@ -1,5 +1,6 @@
 // Small, local SVG set. Decorative icons never replace a control's accessible name.
 const paths = {
+  bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/>',
   home: '<path d="m3 10 9-7 9 7"/><path d="M5 9v12h5v-7h4v7h5V9"/>',
   orders:
     '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2M9 9h6M9 13h6M9 17h4"/>',

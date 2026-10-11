@@ -67,24 +67,79 @@ export function createPoller(task, delay = 15000) {
   };
 }
 export function createOrderNotifier(storage = globalThis.sessionStorage) {
-  const key = "burger-owner-seen-orders";
-  let seen;
-  try {
-    seen = new Set(JSON.parse(storage.getItem(key) || "null"));
-  } catch {
-    seen = new Set();
-  }
+  const key = "burger-owner-order-states";
+  let seen = new Map();
   let initialized = false;
   try {
-    initialized = storage.getItem(key) !== null;
+    const saved = JSON.parse(storage.getItem(key) || "null");
+    if (Array.isArray(saved)) {
+      seen = new Map(
+        saved
+          .filter(
+            ([id, state]) =>
+              Number.isSafeInteger(id) &&
+              id > 0 &&
+              state &&
+              Object.hasOwn(statusLabels, state.status),
+          )
+          .map(([id, state]) => [
+            id,
+            {
+              status: state.status,
+              paymentStatus: Object.hasOwn(statusLabels, state.paymentStatus)
+                ? state.paymentStatus
+                : null,
+            },
+          ]),
+      );
+      initialized = true;
+    }
   } catch {
-    /* Storage may be disabled. */
+    /* Storage may be disabled or invalid; use memory. */
   }
   return {
     detect(orders) {
-      const paid = orders.filter((o) => o.status === "Received" && o.paymentStatus === "Approved");
-      const added = initialized ? paid.filter((o) => !seen.has(o.id)) : [];
-      paid.forEach((o) => seen.add(o.id));
+      const added = [];
+      for (const order of orders) {
+        if (
+          !Number.isSafeInteger(order.id) ||
+          order.id <= 0 ||
+          !Object.hasOwn(statusLabels, order.status)
+        )
+          continue;
+        const previous = seen.get(order.id);
+        let title, message, category;
+        if (initialized) {
+          if (order.paymentStatus === "Approved" && previous?.paymentStatus !== "Approved") {
+            title = "Pagamento aprovado";
+            category = "payments";
+            message = `${Object.hasOwn(methodLabels, order.paymentMethod) ? methodLabels[order.paymentMethod] : "Pagamento"} • ${money(Number.isFinite(order.total) ? order.total : null)}`;
+          } else if (!previous && order.paymentStatus === "Pending") {
+            title = "Aguardando pagamento";
+            category = "orders";
+            message = "Novo pedido recebido.";
+          } else if (previous && previous.status !== order.status) {
+            title = "Status atualizado";
+            category = "status";
+            message = statusLabels[order.status];
+          }
+        }
+        if (title)
+          added.push({
+            orderId: order.id,
+            title,
+            message,
+            category,
+            time: new Date().toISOString(),
+          });
+        // Explicit projection: never retain customer fields or provider identifiers.
+        seen.set(order.id, {
+          status: order.status,
+          paymentStatus: Object.hasOwn(statusLabels, order.paymentStatus)
+            ? order.paymentStatus
+            : null,
+        });
+      }
       initialized = true;
       try {
         storage.setItem(key, JSON.stringify([...seen]));
@@ -98,6 +153,7 @@ export function createOrderNotifier(storage = globalThis.sessionStorage) {
       initialized = false;
       try {
         storage.removeItem(key);
+        storage.removeItem("burger-owner-seen-orders");
       } catch {
         /* No stored session. */
       }

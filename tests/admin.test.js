@@ -126,16 +126,137 @@ it("poller is single, nonoverlapping and stops even during pending request", asy
   await vi.advanceTimersByTimeAsync(30000);
   expect(task).toHaveBeenCalledTimes(1);
 });
-it("notifies only new approved received orders, retaining ids across reloads", () => {
+it("notifies transitions once and retains only safe states across reloads", () => {
   const notify = createOrderNotifier();
   expect(notify.detect([order])).toEqual([]);
   const newer = { ...order, id: 109 };
-  expect(notify.detect([order, newer])).toEqual([newer]);
+  expect(notify.detect([order, newer])).toEqual([
+    expect.objectContaining({ orderId: 109, title: "Pagamento aprovado" }),
+  ]);
   expect(createOrderNotifier().detect([order, newer])).toEqual([]);
-  expect(notify.detect([{ ...order, id: 110, paymentStatus: "Pending" }])).toEqual([]);
-  expect(sessionStorage.getItem("burger-owner-seen-orders")).not.toContain(order.customerName);
+  const pending = {
+    ...order,
+    id: 110,
+    status: "PendingPayment",
+    paymentStatus: "Pending",
+    customerEmail: "private@example.com",
+    externalPaymentId: "CHAR_private",
+    customerTaxId: "private-cpf",
+    customerPhone: "private-phone",
+    street: "private-address",
+    externalCheckoutId: "CHEC_private",
+    token: "private-token",
+    observation: "enc:v1:private",
+  };
+  expect(notify.detect([pending])).toEqual([
+    expect.objectContaining({ orderId: 110, title: "Aguardando pagamento" }),
+  ]);
+  expect(notify.detect([pending])).toEqual([]);
+  const approved = {
+    ...pending,
+    status: "Received",
+    paymentStatus: "Approved",
+    paymentMethod: "Pix",
+    total: 71.8,
+  };
+  const events = notify.detect([approved]);
+  expect(events).toEqual([
+    expect.objectContaining({
+      orderId: 110,
+      title: "Pagamento aprovado",
+      message: expect.stringContaining("PIX • R$"),
+    }),
+  ]);
+  expect(events[0].message).toContain("71,80");
+  expect(notify.detect([approved])).toEqual([]);
+  expect(notify.detect([{ ...approved, status: "Preparing" }])).toEqual([
+    expect.objectContaining({ title: "Status atualizado", message: "Em preparo" }),
+  ]);
+  expect(notify.detect([{ ...approved, status: "Preparing" }])).toEqual([]);
+  const stored = sessionStorage.getItem("burger-owner-order-states");
+  for (const forbidden of [order.customerName, "private@example.com", "CHAR_private", "71.8"])
+    expect(stored).not.toContain(forbidden);
+  for (const forbidden of [
+    order.customerName,
+    "private",
+    "enc:v1",
+    "ExternalPaymentId",
+    "CheckoutId",
+    "ChargeId",
+  ]) {
+    expect(JSON.stringify(events)).not.toContain(forbidden);
+    expect(stored).not.toContain(forbidden);
+  }
   notify.clear();
   expect(sessionStorage.length).toBe(0);
+});
+
+it("notification center tracks unread events; toast expires and can be dismissed", async () => {
+  vi.useFakeTimers();
+  const request = setup();
+  await app.start();
+  let state = {
+    ...order,
+    id: 109,
+    status: "PendingPayment",
+    paymentStatus: "Pending",
+    customerName: "PRIVATE",
+    customerEmail: "private@example.com",
+  };
+  request.mockImplementation(async (path) =>
+    path.startsWith("orders?") ? { items: [order, state], total: 2, pageSize: 20 } : mockData(path),
+  );
+  await vi.advanceTimersByTimeAsync(15000);
+  expect(document.getElementById("admin-message").textContent).toContain("Aguardando pagamento");
+  expect(document.getElementById("notification-count").textContent).toBe("1");
+  document.getElementById("notifications-toggle").click();
+  expect(document.getElementById("notifications-panel").hidden).toBe(false);
+  expect(document.getElementById("notification-list").textContent).toContain("#109");
+  expect(document.getElementById("notification-list").textContent).not.toContain("PRIVATE");
+  await vi.advanceTimersByTimeAsync(7000);
+  expect(document.getElementById("admin-message").textContent).toBe("");
+  state = { ...state, status: "Received", paymentStatus: "Approved" };
+  await vi.advanceTimersByTimeAsync(8000);
+  expect(document.getElementById("notification-count").textContent).toBe("2");
+  const filter = (value) => document.querySelector(`[data-notification-filter="${value}"]`).click();
+  filter("payments");
+  expect(document.getElementById("notification-list").textContent).toContain("Pagamento aprovado");
+  expect(document.getElementById("notification-list").textContent).not.toContain(
+    "Aguardando pagamento",
+  );
+  expect(document.querySelector("#notification-list time").textContent).toMatch(/^\d{2}:\d{2}$/);
+  filter("orders");
+  expect(document.getElementById("notification-list").textContent).toContain(
+    "Aguardando pagamento",
+  );
+  filter("status");
+  expect(document.getElementById("notification-list").textContent).toContain("Nenhuma");
+  filter("all");
+  expect(document.getElementById("admin-message").textContent).toContain("Pagamento aprovado");
+  document.querySelector('#admin-message [aria-label="Fechar notificação"]').click();
+  expect(document.getElementById("admin-message").textContent).toBe("");
+  state = { ...state, status: "Preparing" };
+  await vi.advanceTimersByTimeAsync(15000);
+  filter("status");
+  expect(document.getElementById("notification-list").textContent).toContain("Status atualizado");
+  expect(document.getElementById("notification-list").textContent).not.toContain(
+    "Pagamento aprovado",
+  );
+  filter("all");
+  expect(document.querySelector("#notification-list li").textContent).toContain(
+    "Status atualizado",
+  );
+  document.getElementById("notifications-read").click();
+  expect(document.getElementById("notification-count").textContent).toBe("0");
+  document.getElementById("notifications-clear").click();
+  expect(document.getElementById("notification-list").textContent).toContain("Nenhuma");
+  await vi.advanceTimersByTimeAsync(15000);
+  expect(document.getElementById("notification-count").textContent).toBe("0");
+  document
+    .getElementById("notifications-close")
+    .dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  expect(document.getElementById("notifications-panel").hidden).toBe(true);
+  expect(document.activeElement.id).toBe("notifications-toggle");
 });
 it("supports denied browser storage without repeated alerts", () => {
   const storage = {

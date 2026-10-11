@@ -1,5 +1,5 @@
 import { createAdminClient, AdminError } from "./client.js";
-import { createOrderNotifier, createPoller, money, statusLabels, methodLabels } from "./model.js";
+import { createOrderNotifier, createPoller, statusLabels } from "./model.js";
 import * as views from "./views.js";
 import { isStoreOpenNow } from "../utils.js";
 import { STORE_OPEN_HOUR, STORE_CLOSE_HOUR } from "../config.js";
@@ -15,11 +15,90 @@ export function createAdminApp(root, request = createAdminClient()) {
   let notificationCursor = null,
     newPaidCount = 0;
   const notifier = createOrderNotifier();
+  let notifications = [],
+    notificationFilter = "all",
+    toastQueue = [],
+    toastTimer;
+  function renderNotifications() {
+    const count = root.querySelector("#notification-count");
+    if (count) count.textContent = String(notifications.filter((item) => !item.read).length);
+    const list = root.querySelector("#notification-list");
+    if (list)
+      list.innerHTML = views.notificationHistory(
+        notifications.filter(
+          (item) => notificationFilter === "all" || item.category === notificationFilter,
+        ),
+      );
+    root
+      .querySelectorAll("[data-notification-filter]")
+      .forEach((button) =>
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.notificationFilter === notificationFilter),
+        ),
+      );
+  }
+  const mobileDrawer = () => globalThis.matchMedia?.("(max-width: 640px)").matches;
+  function setDrawer(open, focus = true) {
+    const panel = root.querySelector("#notifications-panel");
+    if (!panel) return;
+    panel.hidden = !open;
+    panel.setAttribute("role", mobileDrawer() ? "dialog" : "region");
+    if (open && mobileDrawer()) panel.setAttribute("aria-modal", "true");
+    else panel.removeAttribute("aria-modal");
+    root.querySelector("#notifications-toggle").setAttribute("aria-expanded", String(open));
+    root.querySelector("#notifications-overlay").hidden = !open;
+    root.querySelectorAll(".topbar, .layout").forEach((element) => {
+      element.inert = Boolean(open && mobileDrawer());
+    });
+    root.classList.toggle("notifications-open", open);
+    if (focus) root.querySelector(open ? "#notifications-close" : "#notifications-toggle").focus();
+  }
+  function dismissToast() {
+    clearTimeout(toastTimer);
+    document.getElementById("admin-message")?.replaceChildren();
+    if (toastQueue.length && !disposed) showNextToast();
+  }
+  function showNextToast() {
+    const el = document.getElementById("admin-message");
+    if (!el || !toastQueue.length || disposed) return;
+    const text = document.createElement("div");
+    toastQueue
+      .shift()
+      .split("\n")
+      .forEach((line, index) => {
+        const part = document.createElement(index === 1 ? "strong" : "p");
+        part.textContent = line;
+        text.append(part);
+      });
+    const close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "×";
+    close.setAttribute("aria-label", "Fechar notificação");
+    close.onclick = dismissToast;
+    el.replaceChildren(text, close);
+    toastTimer = setTimeout(dismissToast, 7000);
+  }
   const message = (text) => {
     if (disposed) return;
-    const el = document.getElementById("admin-message");
-    if (el) el.textContent = text;
+    if (!text) {
+      toastQueue = [];
+      dismissToast();
+      return;
+    }
+    toastQueue.push(text);
+    toastQueue = toastQueue.slice(-50);
+    if (!document.getElementById("admin-message")?.hasChildNodes()) showNextToast();
   };
+  function resetNotifications() {
+    setDrawer(false, false);
+    root.classList.remove("notifications-open");
+    notifications = [];
+    notificationFilter = "all";
+    notifier.clear();
+    message("");
+    renderNotifications();
+  }
   const content = () => root.querySelector("#content");
   const setContent = (html) => {
     content().innerHTML = html;
@@ -44,6 +123,7 @@ export function createAdminApp(root, request = createAdminClient()) {
     }
   });
   async function refreshNotifications() {
+    const observed = new Map();
     let afterId = 0,
       until = "",
       more;
@@ -59,19 +139,26 @@ export function createAdminApp(root, request = createAdminClient()) {
       newPaidCount = batch.newPaidOrders;
       const count = root.querySelector("#order-count");
       if (count) count.textContent = String(newPaidCount);
-      const added = notifier.detect(batch.items);
-      if (added.length)
-        message(
-          added
-            .map(
-              (o) =>
-                `Novo pedido pago · #${o.id} · ${money(o.total)} · ${methodLabels[o.paymentMethod] || "Pagamento"}`,
-            )
-            .join("\n"),
-        );
+      batch.items.forEach((order) => observed.set(order.id, order));
       afterId = batch.nextAfterId;
       more = afterId != null;
     } while (more && authenticated);
+    // The notification endpoint covers approvals only. Read existing order pages
+    // for pending and operational transitions, independently of visible filters.
+    let currentPage = 1;
+    let result;
+    do {
+      result = await request(`orders?sort=newest&page=${currentPage}`);
+      if (!authenticated || disposed) return;
+      result.items.forEach((order) => observed.set(order.id, order));
+      currentPage++;
+    } while (result.items.length && (currentPage - 1) * result.pageSize < result.total);
+    for (const event of notifier.detect([...observed.values()])) {
+      notifications.unshift({ ...event, read: false });
+      notifications = notifications.slice(0, 50);
+      message(`Pedido #${event.orderId}\n${event.title}\n${event.message}`);
+    }
+    renderNotifications();
     notificationCursor = until;
   }
   function updateDashboard(data) {
@@ -89,7 +176,7 @@ export function createAdminApp(root, request = createAdminClient()) {
     if (error instanceof AdminError && error.status === 401 && authenticated) {
       authenticated = false;
       poller.stop();
-      notifier.clear();
+      resetNotifications();
       notificationCursor = null;
       go("/admin/", true);
       message("Sessão expirada. Entre novamente.");
@@ -101,7 +188,9 @@ export function createAdminApp(root, request = createAdminClient()) {
       );
   }
   function shell() {
+    root.classList.remove("notifications-open");
     root.innerHTML = views.shell(route);
+    renderNotifications();
   }
   async function loginView() {
     root.innerHTML = views.login();
@@ -198,12 +287,30 @@ export function createAdminApp(root, request = createAdminClient()) {
         const open = button.getAttribute("aria-expanded") !== "true";
         button.setAttribute("aria-expanded", String(open));
         root.querySelector("#admin-nav").classList.toggle("open", open);
+      } else if (
+        ["notifications-toggle", "notifications-close", "notifications-overlay"].includes(button.id)
+      ) {
+        const toggle = root.querySelector("#notifications-toggle");
+        const open =
+          button.id === "notifications-toggle" && toggle.getAttribute("aria-expanded") !== "true";
+        setDrawer(open);
+      } else if (button.dataset.notificationFilter) {
+        notificationFilter = button.dataset.notificationFilter;
+        renderNotifications();
+      } else if (button.id === "notifications-read") {
+        notifications.forEach((item) => {
+          item.read = true;
+        });
+        renderNotifications();
+      } else if (button.id === "notifications-clear") {
+        notifications = [];
+        renderNotifications();
       } else if (button.id === "logout") {
         button.disabled = true;
         await request("auth/logout", { method: "POST" });
         authenticated = false;
         poller.stop();
-        notifier.clear();
+        resetNotifications();
         notificationCursor = null;
         message("");
         await go("/admin/", true);
@@ -242,7 +349,7 @@ export function createAdminApp(root, request = createAdminClient()) {
         await request("auth/me");
         if (disposed) return;
         authenticated = true;
-        notifier.clear();
+        resetNotifications();
         notificationCursor = null;
         await refreshNotifications();
         message("");
@@ -298,9 +405,35 @@ export function createAdminApp(root, request = createAdminClient()) {
     }
   }
   const pop = () => go(location.pathname, true);
+  const keydown = (event) => {
+    const panel = root.querySelector("#notifications-panel");
+    if (panel && !panel.hidden && mobileDrawer() && event.key === "Tab") {
+      const buttons = [...panel.querySelectorAll("button")];
+      const first = buttons[0],
+        last = buttons.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+    if (
+      event.key === "Escape" &&
+      root.querySelector("#notifications-toggle")?.getAttribute("aria-expanded") === "true"
+    )
+      root.querySelector("#notifications-close")?.click();
+  };
+  const resize = () => {
+    const panel = root.querySelector("#notifications-panel");
+    if (panel && !panel.hidden) setDrawer(true, false);
+  };
   root.addEventListener("click", click);
+  root.addEventListener("keydown", keydown);
   root.addEventListener("submit", submit);
   globalThis.addEventListener("popstate", pop);
+  globalThis.addEventListener("resize", resize);
   return {
     async start() {
       try {
@@ -317,13 +450,17 @@ export function createAdminApp(root, request = createAdminClient()) {
       await go(location.pathname, true);
     },
     stop() {
+      setDrawer(false, false);
+      message("");
       disposed = true;
       authenticated = false;
       ++version;
       poller.stop();
       root.removeEventListener("click", click);
+      root.removeEventListener("keydown", keydown);
       root.removeEventListener("submit", submit);
       globalThis.removeEventListener("popstate", pop);
+      globalThis.removeEventListener("resize", resize);
     },
     go,
   };
