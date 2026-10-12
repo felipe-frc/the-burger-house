@@ -18,16 +18,16 @@ public static class AdminSecurity
         services.AddScoped<IAdminService, AdminService>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AdminLoginProtection>();
-        // PostConfigure also hardens host-provided automatic forwarding (for example IIS).
+        // Preserve restricted host trust (TLS may terminate before Linux/Kestrel).
+        // The automatic cloud flag alone clears trust lists; never interpret that as trust-all.
         services.AddOptions<ForwardedHeadersOptions>().PostConfigure(options =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
             options.ForwardLimit = configuration.GetValue<int?>("Admin:ForwardedHeaders:ForwardLimit") ?? 1;
-            options.KnownProxies.Clear();
-            options.KnownNetworks.Clear();
-            // Preserve ASP.NET Core's loopback defaults; never leave both lists empty.
-            options.KnownProxies.Add(IPAddress.IPv6Loopback);
-            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Loopback, 8));
+            if (!options.KnownProxies.Contains(IPAddress.IPv6Loopback))
+                options.KnownProxies.Add(IPAddress.IPv6Loopback);
+            if (!options.KnownNetworks.Any(network => network.Contains(IPAddress.Loopback)))
+                options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Loopback, 8));
             foreach (var value in configuration.GetSection("Admin:ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
             {
                 if (!IPAddress.TryParse(value, out var proxy) || proxy.Equals(IPAddress.Any) || proxy.Equals(IPAddress.IPv6Any))
@@ -40,7 +40,10 @@ public static class AdminSecurity
                     throw new InvalidOperationException("Invalid trusted Admin proxy network configuration.");
                 options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(network.BaseAddress, network.PrefixLength));
             }
-        }).Validate(options => options.ForwardLimit is >= 1 and <= 5,
+        }).Validate(options => options.KnownProxies.All(proxy => !proxy.Equals(IPAddress.Any) && !proxy.Equals(IPAddress.IPv6Any)) &&
+            options.KnownNetworks.All(network => network.PrefixLength > 0),
+            "Admin forwarding cannot trust every proxy or network.")
+        .Validate(options => options.ForwardLimit is >= 1 and <= 5,
             "Admin forwarding requires a finite hop limit between 1 and 5.").ValidateOnStart();
         var keys = services.AddDataProtection().SetApplicationName("TheBurgerHouse.Owner");
         var keyPath = configuration["Admin:DataProtectionPath"];

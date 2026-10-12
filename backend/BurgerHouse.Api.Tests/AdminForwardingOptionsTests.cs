@@ -11,6 +11,42 @@ namespace BurgerHouse.Api.Tests;
 public sealed class AdminForwardingOptionsTests
 {
     [Fact]
+    public void RestrictedHostTrustSurvivesAdminConfiguration()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var proxy = IPAddress.Parse("198.18.1.5");
+        services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.KnownProxies.Add(proxy);
+            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Parse("198.18.0.0"), 24));
+        });
+        services.AddOwnerAdministration(new ConfigurationBuilder().Build(), false);
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
+        Assert.Contains(proxy, options.KnownProxies);
+        Assert.Contains(options.KnownNetworks, network => network.Contains(IPAddress.Parse("198.18.0.5")));
+        Assert.DoesNotContain(options.KnownNetworks, network => network.Contains(IPAddress.Parse("203.0.113.1")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HostCannotSupplyUnrestrictedTrust(bool network)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            if (network) options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Any, 0));
+            else options.KnownProxies.Add(IPAddress.Any);
+        });
+        services.AddOwnerAdministration(new ConfigurationBuilder().Build(), false);
+        using var provider = services.BuildServiceProvider();
+        Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value);
+    }
+
+    [Fact]
     public void HostDefaultsCannotEnableTrustAllOrUnlimitedForwarding()
     {
         var services = new ServiceCollection();

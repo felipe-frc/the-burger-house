@@ -1,7 +1,8 @@
 namespace BurgerHouse.Api.Admin;
 
-public sealed class AdminErrorsMiddleware(RequestDelegate next)
+public sealed class AdminErrorsMiddleware(RequestDelegate next, ILogger<AdminErrorsMiddleware> logger)
 {
+    private const string InsecureAntiforgeryRequest = "The antiforgery system has the configuration value AntiforgeryOptions.Cookie.SecurePolicy = Always, but the current request is not an SSL request.";
     public async Task InvokeAsync(HttpContext context)
     {
         if (!context.Request.Path.StartsWithSegments("/api/admin")) { await next(context); return; }
@@ -16,7 +17,14 @@ public sealed class AdminErrorsMiddleware(RequestDelegate next)
             {
                 ArgumentException => 400, KeyNotFoundException => 404, InvalidOperationException => 409, _ => 500
             };
-            // Do not serialize/log exceptions that may contain personal data or SQL parameters.
+            // Only a known framework diagnostic is allowlisted. Never log the exception object.
+            var diagnostic = exception is InvalidOperationException && exception.Message == InsecureAntiforgeryRequest
+                ? "Secure antiforgery requires HTTPS; verify trusted proxy scheme forwarding."
+                : "Exception message redacted; inspect the failing operation in a private environment.";
+            var path = context.GetEndpoint() is Microsoft.AspNetCore.Routing.RouteEndpoint endpoint
+                ? endpoint.RoutePattern.RawText : "/api/admin/[unmatched]";
+            logger.LogError("Admin request failed; exception_type={ExceptionType}; message={TechnicalMessage}; path={RequestPath}",
+                exception.GetType().Name, diagnostic, path);
             var message = context.Response.StatusCode switch
             {
                 400 => "Dados ou período inválidos.", 404 => "Registro não encontrado.",

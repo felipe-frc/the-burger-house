@@ -35,7 +35,10 @@ public sealed class AdminSecurityTests : IAsyncLifetime
             builder.UseSetting("Admin:ForwardedHeaders:KnownNetworks:0", "198.51.100.128/25");
             builder.ConfigureServices(services =>
             {
-                services.AddSingleton<IStartupFilter, TestPeerFilter>();
+                // A restricted network supplied by the hosting layer, not an Internet-wide trust list.
+                services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(options =>
+                    options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Parse("198.18.0.0"), 24)));
+                services.Insert(0, ServiceDescriptor.Singleton<IStartupFilter, TestPeerFilter>());
                 services.AddSingleton<TimeProvider>(new LoginClock());
             });
             builder.ConfigureLogging(logging => logging.ClearProviders());
@@ -265,6 +268,66 @@ public sealed class AdminSecurityTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
     }
     [Fact]
+    public async Task HostTrustedTlsOffloadSupportsCsrfLoginAndSeparateClientBuckets()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Peer", "198.18.0.5");
+        client.DefaultRequestHeaders.Add("X-Test-Transport", "http");
+        client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "192.0.2.99, 203.0.113.10");
+        var tokenResponse = await client.GetAsync("/api/admin/auth/login");
+        Assert.Equal(HttpStatusCode.OK, tokenResponse.StatusCode);
+        Assert.False(string.IsNullOrEmpty((await tokenResponse.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("csrfToken").GetString()));
+        Assert.Equal("https", Assert.Single(tokenResponse.Headers.GetValues("X-Test-Observed-Scheme")));
+        Assert.Equal("203.0.113.10", Assert.Single(tokenResponse.Headers.GetValues("X-Test-Observed-Peer")));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/admin/auth/me")).StatusCode);
+        for (var i = 0; i < 10; i++) Assert.Equal(HttpStatusCode.Unauthorized, (await Login(secret: "wrong")).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await Login()).StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Forwarded-For");
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.20");
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/admin/auth/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task AutomaticHostForwardingAndAdminBranchDoNotConsumeTwoHops()
+    {
+        await using var automaticApp = app.WithWebHostBuilder(builder =>
+            builder.UseSetting("ForwardedHeaders_Enabled", "true"));
+        using var automaticClient = automaticApp.CreateClient(new() { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+        automaticClient.DefaultRequestHeaders.Add("X-Test-Peer", "198.18.0.5");
+        automaticClient.DefaultRequestHeaders.Add("X-Test-Transport", "http");
+        automaticClient.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https, https");
+        // The next address is also trusted, so a second middleware would incorrectly consume another hop.
+        automaticClient.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.99, 198.18.0.20");
+        var response = await automaticClient.GetAsync("/api/admin/auth/login");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("198.18.0.20", Assert.Single(response.Headers.GetValues("X-Test-Observed-Peer")));
+        Assert.Equal("https", Assert.Single(response.Headers.GetValues("X-Test-Observed-Scheme")));
+        // Prove the host middleware is active outside the Admin branch as well.
+        var publicResponse = await automaticClient.GetAsync("/");
+        Assert.Equal("198.18.0.20", Assert.Single(publicResponse.Headers.GetValues("X-Test-Observed-Peer")));
+        automaticClient.DefaultRequestHeaders.Remove("X-Test-Peer");
+        automaticClient.DefaultRequestHeaders.Add("X-Test-Peer", "203.0.113.10");
+        var untrusted = await automaticClient.GetAsync("/api/admin/auth/login");
+        Assert.Equal(HttpStatusCode.Conflict, untrusted.StatusCode);
+        Assert.Equal("203.0.113.10", Assert.Single(untrusted.Headers.GetValues("X-Test-Observed-Peer")));
+        Assert.Equal("http", Assert.Single(untrusted.Headers.GetValues("X-Test-Observed-Scheme")));
+    }
+
+    [Fact]
+    public async Task UntrustedTlsOffloadCannotSpoofSchemeOrClientAddress()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Transport", "http");
+        client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "192.0.2.99");
+        var response = await client.GetAsync("/api/admin/auth/login");
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("http", Assert.Single(response.Headers.GetValues("X-Test-Observed-Scheme")));
+        Assert.Equal("203.0.113.10", Assert.Single(response.Headers.GetValues("X-Test-Observed-Peer")));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/admin/auth/me")).StatusCode);
+    }
+
+    [Fact]
     public async Task Ipv4AndMappedIpv6UseSameQuota()
     {
         for (var i = 0; i < 10; i++) Assert.Equal(HttpStatusCode.Unauthorized, (await Login(secret: "wrong")).StatusCode);
@@ -326,9 +389,11 @@ internal sealed class TestPeerFilter : IStartupFilter
         app.Use(async (context, continuation) =>
         {
             context.Connection.RemoteIpAddress = IPAddress.Parse(context.Request.Headers["X-Test-Peer"].FirstOrDefault() ?? "203.0.113.10");
+            if (context.Request.Headers["X-Test-Transport"] == "http") context.Request.Scheme = "http";
             context.Response.OnStarting(() =>
             {
                 context.Response.Headers["X-Test-Observed-Peer"] = context.Connection.RemoteIpAddress?.ToString();
+                context.Response.Headers["X-Test-Observed-Scheme"] = context.Request.Scheme;
                 return Task.CompletedTask;
             });
             await continuation();

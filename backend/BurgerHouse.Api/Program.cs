@@ -232,9 +232,14 @@ if (args.Contains("--create-owner"))
     return;
 }
 
-// Only Admin opts into explicit forwarding here; public payment routes are unchanged.
-app.UseWhen(context => context.Request.Path.StartsWithSegments("/api/admin"),
-    admin => admin.UseForwardedHeaders());
+// The host's automatic middleware runs before this pipeline. A UseWhen branch can
+// otherwise register a second instance and consume another hop from the same headers.
+if (!string.Equals(builder.Configuration["ForwardedHeaders_Enabled"], "true", StringComparison.OrdinalIgnoreCase))
+{
+    // Without automatic forwarding, only Admin opts in; public routes are unchanged.
+    app.UseWhen(context => context.Request.Path.StartsWithSegments("/api/admin"),
+        admin => admin.UseForwardedHeaders());
+}
 
 app.UseHttpsRedirection();
 
