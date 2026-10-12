@@ -288,6 +288,55 @@ public sealed class AdminSecurityTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/admin/auth/me")).StatusCode);
     }
 
+    [Theory]
+    [InlineData("10.12.3.4", false)]
+    [InlineData("172.20.3.4", false)]
+    [InlineData("192.168.3.4", false)]
+    [InlineData("::ffff:10.12.3.4", true)]
+    [InlineData("::ffff:172.20.3.4", true)]
+    [InlineData("::ffff:192.168.3.4", true)]
+    public async Task AppServiceHttpTransportRecognizesHttpsWithoutTrustingInternetPeers(string proxy, bool automatic)
+    {
+        await using var azureApp = app.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("WEBSITE_INSTANCE_ID", "test-instance");
+            builder.UseSetting("WEBSITE_SITE_NAME", "test-site");
+            builder.UseSetting("Admin:ForwardedHeaders:UseAzureAppServiceNetworks", "true");
+            builder.UseSetting("ForwardedHeaders_Enabled", automatic ? "true" : "false");
+        });
+        client.Dispose();
+        client = azureApp.CreateClient(new() { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
+        client.DefaultRequestHeaders.Add("X-Test-Peer", proxy);
+        client.DefaultRequestHeaders.Add("X-Test-Transport", "http");
+        client.DefaultRequestHeaders.Add("X-Forwarded-Proto", "https");
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "192.0.2.99, 203.0.113.10");
+        var response = await client.GetAsync("/api/admin/auth/login");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.False(string.IsNullOrEmpty((await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("csrfToken").GetString()));
+        Assert.Equal("True", Assert.Single(response.Headers.GetValues("X-Test-Observed-IsHttps")));
+        Assert.Equal("203.0.113.10", Assert.Single(response.Headers.GetValues("X-Test-Observed-Peer")));
+        Assert.Contains(response.Headers.GetValues("Set-Cookie"), cookie => cookie.Contains("secure", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/admin/auth/me")).StatusCode);
+        for (var i = 0; i < 10; i++) Assert.Equal(HttpStatusCode.Unauthorized, (await Login(secret: "wrong")).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await Login()).StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Forwarded-For");
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.20");
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+
+        // A second pass would consume the attacker-controlled leftmost hop because 10/8 is trusted.
+        client.DefaultRequestHeaders.Remove("X-Forwarded-For");
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.99, 10.20.30.40");
+        response = await client.GetAsync("/api/admin/auth/login");
+        Assert.Equal("10.20.30.40", Assert.Single(response.Headers.GetValues("X-Test-Observed-Peer")));
+
+        client.DefaultRequestHeaders.Remove("X-Test-Peer");
+        client.DefaultRequestHeaders.Add("X-Test-Peer", "203.0.113.50");
+        response = await client.GetAsync("/api/admin/auth/login");
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("False", Assert.Single(response.Headers.GetValues("X-Test-Observed-IsHttps")));
+        Assert.Equal("203.0.113.50", Assert.Single(response.Headers.GetValues("X-Test-Observed-Peer")));
+    }
+
     [Fact]
     public async Task AutomaticHostForwardingAndAdminBranchDoNotConsumeTwoHops()
     {
@@ -394,6 +443,7 @@ internal sealed class TestPeerFilter : IStartupFilter
             {
                 context.Response.Headers["X-Test-Observed-Peer"] = context.Connection.RemoteIpAddress?.ToString();
                 context.Response.Headers["X-Test-Observed-Scheme"] = context.Request.Scheme;
+                context.Response.Headers["X-Test-Observed-IsHttps"] = context.Request.IsHttps.ToString();
                 return Task.CompletedTask;
             });
             await continuation();

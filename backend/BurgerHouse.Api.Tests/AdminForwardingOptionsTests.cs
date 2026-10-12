@@ -11,6 +11,36 @@ namespace BurgerHouse.Api.Tests;
 public sealed class AdminForwardingOptionsTests
 {
     [Fact]
+    public void AppServiceNetworkTrustRequiresExplicitOptIn()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["WEBSITE_INSTANCE_ID"] = "test-instance", ["WEBSITE_SITE_NAME"] = "test-site"
+        }).Build();
+        services.AddOwnerAdministration(configuration, false);
+        using var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
+        Assert.DoesNotContain(options.KnownNetworks, network => network.Contains(IPAddress.Parse("10.12.3.4")));
+    }
+
+    [Fact]
+    public void AppServiceNetworkTrustCannotBeEnabledOutsideAppService()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Admin:ForwardedHeaders:UseAzureAppServiceNetworks"] = "true",
+            ["WEBSITE_INSTANCE_ID"] = null, ["WEBSITE_SITE_NAME"] = null
+        }).Build();
+        services.AddOwnerAdministration(configuration, false);
+        using var provider = services.BuildServiceProvider();
+        Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value);
+    }
+
+    [Fact]
     public void RestrictedHostTrustSurvivesAdminConfiguration()
     {
         var services = new ServiceCollection();

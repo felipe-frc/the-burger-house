@@ -28,6 +28,22 @@ public static class AdminSecurity
                 options.KnownProxies.Add(IPAddress.IPv6Loopback);
             if (!options.KnownNetworks.Any(network => network.Contains(IPAddress.Loopback)))
                 options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Loopback, 8));
+            if (configuration.GetValue<bool>("Admin:ForwardedHeaders:UseAzureAppServiceNetworks"))
+            {
+                // Opt-in deployment boundary: Kestrel must only be reachable through App Service ingress.
+                // WEBSITE_* are process configuration, never request headers or proof of a client's identity.
+                if (string.IsNullOrWhiteSpace(configuration["WEBSITE_INSTANCE_ID"]) ||
+                    string.IsNullOrWhiteSpace(configuration["WEBSITE_SITE_NAME"]))
+                    throw new InvalidOperationException("Azure App Service forwarding requires App Service hosting.");
+                // Official App Service guidance; stable network ranges, not ephemeral proxy addresses.
+                // https://learn.microsoft.com/azure/app-service/configure-language-dotnetcore#detect-https-session
+                foreach (var (address, prefix) in new[] { ("10.0.0.0", 8), ("172.16.0.0", 12), ("192.168.0.0", 16) })
+                {
+                    var ip = IPAddress.Parse(address);
+                    options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(ip, prefix));
+                    options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(ip.MapToIPv6(), prefix + 96));
+                }
+            }
             foreach (var value in configuration.GetSection("Admin:ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
             {
                 if (!IPAddress.TryParse(value, out var proxy) || proxy.Equals(IPAddress.Any) || proxy.Equals(IPAddress.IPv6Any))
