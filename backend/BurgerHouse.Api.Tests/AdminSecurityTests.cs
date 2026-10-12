@@ -419,6 +419,109 @@ public sealed class AdminSecurityTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
     }
     [Fact]
+    public async Task ChangePasswordRequiresCurrentPasswordAndKeepsSessionWhenRejected()
+    {
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+        await Token("me");
+
+        var response = await client.PostAsJsonAsync("/api/admin/auth/change-password", new
+        {
+            currentPassword = "wrong-current-password",
+            newPassword = "New-test-password-123!"
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/admin/auth/me")).StatusCode);
+
+        using var fresh = app.CreateClient(new()
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
+        });
+
+        var token = await fresh.GetFromJsonAsync<JsonElement>("/api/admin/auth/login");
+        fresh.DefaultRequestHeaders.Add("X-CSRF-TOKEN", token.GetProperty("csrfToken").GetString());
+
+        Assert.Equal(HttpStatusCode.OK, (await fresh.PostAsJsonAsync("/api/admin/auth/login", new
+        {
+            email = "owner@example.invalid",
+            password
+        })).StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangePasswordRevokesExistingSessionsAndReplacesCredential()
+    {
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+        await Token("me");
+
+        const string newPassword = "New-test-password-123!";
+
+        var response = await client.PostAsJsonAsync("/api/admin/auth/change-password", new
+        {
+            currentPassword = password,
+            newPassword
+        });
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/admin/auth/me")).StatusCode);
+
+        using var oldPasswordClient = app.CreateClient(new()
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
+        });
+
+        var oldToken = await oldPasswordClient.GetFromJsonAsync<JsonElement>("/api/admin/auth/login");
+        oldPasswordClient.DefaultRequestHeaders.Add(
+            "X-CSRF-TOKEN",
+            oldToken.GetProperty("csrfToken").GetString());
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await oldPasswordClient.PostAsJsonAsync(
+            "/api/admin/auth/login",
+            new
+            {
+                email = "owner@example.invalid",
+                password
+            })).StatusCode);
+
+        using var newPasswordClient = app.CreateClient(new()
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
+        });
+
+        var newToken = await newPasswordClient.GetFromJsonAsync<JsonElement>("/api/admin/auth/login");
+        newPasswordClient.DefaultRequestHeaders.Add(
+            "X-CSRF-TOKEN",
+            newToken.GetProperty("csrfToken").GetString());
+
+        Assert.Equal(HttpStatusCode.OK, (await newPasswordClient.PostAsJsonAsync(
+            "/api/admin/auth/login",
+            new
+            {
+                email = "owner@example.invalid",
+                password = newPassword
+            })).StatusCode);
+    }
+
+    [Fact]
+    public async Task ChangePasswordRejectsShortNewPassword()
+    {
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+        await Token("me");
+
+        var response = await client.PostAsJsonAsync("/api/admin/auth/change-password", new
+        {
+            currentPassword = password,
+            newPassword = "short"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/admin/auth/me")).StatusCode);
+    }
+
+    [Fact]
     public async Task FirstOwnerIsUniqueHashOnlyAndCannotBeCreatedAgain()
     {
         using var scope = app.Services.CreateScope();

@@ -39,6 +39,10 @@ function setup(authenticated = true) {
       signed = false;
       return null;
     }
+    if (path === "auth/change-password") {
+      signed = false;
+      return null;
+    }
     return mockData(path);
   });
   app = createAdminApp(document.getElementById("root"), request);
@@ -381,6 +385,53 @@ it("separates gross revenue refunds and negative net without inventing historica
     "Histórico global incompleto",
   );
   expect(views.historyNotice({ ...summary, estimatedApprovals: 1 })).toContain("estimativa legada");
+});
+it("security rejects mismatched new passwords without calling the API", async () => {
+  const request = setup();
+  await app.start();
+  await app.go("/admin/security");
+
+  expect(document.body.textContent).toContain("Alterar senha");
+
+  document.querySelector('[name="currentPassword"]').value = "current-test-password";
+  document.querySelector('[name="newPassword"]').value = "New-test-password-123!";
+  document.querySelector('[name="confirmPassword"]').value = "Different-password-123!";
+
+  submit("#change-password-form");
+  await flush();
+
+  expect(document.getElementById("password-error").textContent).toBe(
+    "As novas senhas não coincidem.",
+  );
+  expect(request.mock.calls.some(([path]) => path === "auth/change-password")).toBe(false);
+  expect(location.pathname).toBe("/admin/security");
+});
+
+it("security changes password and returns to login after sessions are revoked", async () => {
+  const request = setup();
+  await app.start();
+  await app.go("/admin/security");
+
+  document.querySelector('[name="currentPassword"]').value = "current-test-password";
+  document.querySelector('[name="newPassword"]').value = "New-test-password-123!";
+  document.querySelector('[name="confirmPassword"]').value = "New-test-password-123!";
+
+  submit("#change-password-form");
+  await flush();
+
+  expect(request).toHaveBeenCalledWith("auth/change-password", {
+    method: "POST",
+    body: {
+      currentPassword: "current-test-password",
+      newPassword: "New-test-password-123!",
+    },
+  });
+
+  expect(location.pathname).toBe("/admin/");
+  expect(document.querySelector('[name="password"]')).not.toBeNull();
+  expect(document.getElementById("admin-message").textContent).toContain(
+    "Senha alterada. Entre novamente.",
+  );
 });
 it("edits only allowed product fields and shows read-only store source", async () => {
   const request = setup();

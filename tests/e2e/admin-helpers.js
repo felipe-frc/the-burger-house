@@ -24,6 +24,10 @@ export async function mockAdmin(page) {
       signed = false;
       return route.fulfill({ status: 204 });
     }
+    if (path === "auth/change-password") {
+      signed = false;
+      return route.fulfill({ status: 204 });
+    }
     if (request.method() === "PATCH") {
       if (path.endsWith("/status")) status = request.postDataJSON().status;
       return route.fulfill({ status: 204 });

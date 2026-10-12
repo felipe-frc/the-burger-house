@@ -30,6 +30,7 @@ export function shell(route) {
     ["finance", "Financeiro", "finance"],
     ["products", "Produtos", "products"],
     ["store", "Loja", "store"],
+    ["security", "Segurança", "lock"],
   ]
     .map(
       ([path, label, symbol]) =>
@@ -41,6 +42,12 @@ export function shell(route) {
 }
 export function login() {
   return `<main id="content" class="login">${brand()}<form id="login-form"><div class="login-intro"><span class="section-icon">${icon("lock")}</span><div class="eyebrow">Acesso privado</div><h1>Bem-vindo à casa.</h1><p class="muted">Entre para acompanhar pedidos e cuidar da operação.</p></div><label>E-mail<input name="email" type="email" autocomplete="username" maxlength="254" required></label><label>Senha<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label><p id="login-error" class="error" role="alert"></p><button>Entrar ${icon("arrow")}</button></form></main>`;
+}
+export function security() {
+  return (
+    title("Segurança", "Gerencie a senha de acesso ao painel administrativo.") +
+    `<section class="panel"><div class="section-header">${sectionTitle("Alterar senha", "lock")}</div><form id="change-password-form"><label>Senha atual<input name="currentPassword" type="password" autocomplete="current-password" maxlength="128" required></label><label>Nova senha<input name="newPassword" type="password" autocomplete="new-password" minlength="14" maxlength="128" required></label><label>Confirmar nova senha<input name="confirmPassword" type="password" autocomplete="new-password" minlength="14" maxlength="128" required></label><p class="muted">Use uma senha única com pelo menos 14 caracteres. Ao alterá-la, todas as sessões administrativas serão encerradas.</p><p id="password-error" class="error" role="alert"></p><button>Alterar senha ${icon("check")}</button></form></section>`
+  );
 }
 export function notificationHistory(items) {
   return (

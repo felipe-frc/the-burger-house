@@ -35,6 +35,25 @@ public sealed class AdminAuthController(IAdminIdentity identity, IAntiforgery an
         });
         return Ok(new { role = "Owner" });
     }
+    [HttpPost("change-password")]
+    public async Task<IActionResult> ChangePassword(ChangePasswordRequest request, CancellationToken ct)
+    {
+        var ownerId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var changed = await identity.ChangePasswordAsync(
+            ownerId,
+            request.CurrentPassword,
+            request.NewPassword,
+            ct);
+
+        if (!changed)
+            return Unauthorized(new { error = "Senha atual inválida." });
+
+        await HttpContext.SignOutAsync(AdminSecurity.Scheme);
+
+        return NoContent();
+    }
+
     [HttpGet("me")]
     public IActionResult Me() => Ok(new { role = "Owner", csrfToken = antiforgery.GetAndStoreTokens(HttpContext).RequestToken });
     [HttpPost("logout")]
@@ -46,3 +65,6 @@ public sealed class AdminAuthController(IAdminIdentity identity, IAntiforgery an
     }
 }
 public sealed record LoginRequest([Required, StringLength(254)] string Email, [Required, StringLength(128)] string Password);
+public sealed record ChangePasswordRequest(
+    [Required, StringLength(128)] string CurrentPassword,
+    [Required, StringLength(128, MinimumLength = 14)] string NewPassword);

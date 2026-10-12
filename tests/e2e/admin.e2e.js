@@ -138,6 +138,36 @@ test("products allow controlled edits and store remains read-only", async ({ pag
   await expect(page.getByText("18h às 23h", { exact: true })).toBeVisible();
   await expect(page.getByText("somente leitura", { exact: false })).toBeVisible();
 });
+test("owner changes password and is required to sign in again", async ({ page }) => {
+  const calls = await mockAdmin(page);
+
+  await login(page);
+  await navigate(page, "Segurança");
+
+  await expect(page.getByRole("heading", { name: "Segurança", exact: true })).toBeVisible();
+
+  await page.getByLabel("Senha atual", { exact: true }).fill("synthetic-test-password");
+  await page.getByLabel("Nova senha", { exact: true }).fill("New-synthetic-password-123!");
+  await page
+    .getByLabel("Confirmar nova senha", { exact: true })
+    .fill("New-synthetic-password-123!");
+
+  await page.getByRole("button", { name: /Alterar senha/ }).click();
+
+  await expect(page).toHaveURL(/\/admin\/$/);
+  await expect(page.getByLabel("Senha", { exact: true })).toBeVisible();
+  await expect(page.locator("#admin-message")).toContainText("Senha alterada. Entre novamente.");
+
+  expect(
+    calls.some(
+      (call) =>
+        call.path === "auth/change-password" &&
+        call.method === "POST" &&
+        call.body.currentPassword === "synthetic-test-password" &&
+        call.body.newPassword === "New-synthetic-password-123!",
+    ),
+  ).toBe(true);
+});
 test("logout removes protected screen and subsequent access requires login", async ({ page }) => {
   await mockAdmin(page);
   await login(page);

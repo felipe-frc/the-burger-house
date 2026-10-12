@@ -39,6 +39,24 @@ public sealed class AdminIdentity(BurgerHouseDbContext db) : IAdminIdentity
         db.Set<AdminSession>().AnyAsync(s => s.Id == Hash(sessionId) && s.AdminUserId == ownerId && s.ExpiresAt > now, ct);
     public async Task RevokeSessionAsync(string sessionId, CancellationToken ct) =>
         await db.Set<AdminSession>().Where(s => s.Id == Hash(sessionId)).ExecuteDeleteAsync(ct);
+    public async Task<bool> ChangePasswordAsync(int ownerId, string currentPassword, string newPassword, CancellationToken ct)
+    {
+        if (newPassword.Length is < 14 or > 128)
+            throw new ArgumentException("Use a unique password of 14 to 128 characters.");
+
+        var user = await db.Set<AdminUser>().SingleOrDefaultAsync(u => u.Id == ownerId, ct);
+        if (user is null) return false;
+
+        var verification = Hasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword);
+        if (verification == PasswordVerificationResult.Failed) return false;
+
+        user.ReplaceHash(Hasher.HashPassword(user, newPassword));
+
+        await db.Set<AdminSession>().Where(s => s.AdminUserId == ownerId).ExecuteDeleteAsync(ct);
+        await db.SaveChangesAsync(ct);
+
+        return true;
+    }
     private static string Hash(string id) => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(id)));
     public async Task CreateFirstOwnerAsync(string email, string password, CancellationToken ct)
     {

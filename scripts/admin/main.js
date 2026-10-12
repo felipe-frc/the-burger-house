@@ -198,7 +198,9 @@ export function createAdminApp(root, request = createAdminClient()) {
   }
   async function go(path, replace = false) {
     if (disposed) return;
-    const target = /^\/admin\/(dashboard|orders(?:\/\d+)?|finance|products|store)$/.test(path)
+    const target = /^\/admin\/(dashboard|orders(?:\/\d+)?|finance|products|store|security)$/.test(
+      path,
+    )
       ? path
       : "/admin/";
     route = authenticated ? (target === "/admin/" ? "/admin/dashboard" : target) : "/admin/";
@@ -239,12 +241,14 @@ export function createAdminApp(root, request = createAdminClient()) {
       } else if (route === "/admin/products") {
         const data = await request("products");
         if (current === version) setContent(views.products(data));
-      } else {
+      } else if (route === "/admin/store") {
         const data = await request("store");
         if (current === version)
           setContent(
             views.store(data, isStoreOpenNow(), `${STORE_OPEN_HOUR}h às ${STORE_CLOSE_HOUR}h`),
           );
+      } else if (route === "/admin/security") {
+        setContent(views.security());
       }
       if (!disposed) poller.start();
     } catch (error) {
@@ -354,6 +358,25 @@ export function createAdminApp(root, request = createAdminClient()) {
         await refreshNotifications();
         message("");
         await go("/admin/dashboard", true);
+      } else if (form.id === "change-password-form") {
+        const currentPassword = String(fields.get("currentPassword"));
+        const newPassword = String(fields.get("newPassword"));
+        const confirmPassword = String(fields.get("confirmPassword"));
+
+        if (newPassword !== confirmPassword)
+          throw new AdminError("As novas senhas não coincidem.", 400);
+
+        await request("auth/change-password", {
+          method: "POST",
+          body: { currentPassword, newPassword },
+        });
+
+        authenticated = false;
+        poller.stop();
+        resetNotifications();
+        notificationCursor = null;
+        await go("/admin/", true);
+        message("Senha alterada. Entre novamente.");
       } else if (form.id === "order-filters") {
         orderQuery = new URLSearchParams({
           search: String(fields.get("search")),
@@ -399,6 +422,13 @@ export function createAdminApp(root, request = createAdminClient()) {
             : error instanceof AdminError
               ? error.message
               : "Não foi possível entrar. Tente novamente.";
+      } else if (form.id === "change-password-form") {
+        form.querySelector("#password-error").textContent =
+          error instanceof AdminError && error.status === 401
+            ? "Senha atual inválida."
+            : error instanceof AdminError
+              ? error.message
+              : "Não foi possível alterar a senha. Tente novamente.";
       } else handleError(error);
     } finally {
       button.disabled = false;
