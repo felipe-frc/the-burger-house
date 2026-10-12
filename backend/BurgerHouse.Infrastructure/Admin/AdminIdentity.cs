@@ -41,8 +41,7 @@ public sealed class AdminIdentity(BurgerHouseDbContext db) : IAdminIdentity
         await db.Set<AdminSession>().Where(s => s.Id == Hash(sessionId)).ExecuteDeleteAsync(ct);
     public async Task<bool> ChangePasswordAsync(int ownerId, string currentPassword, string newPassword, CancellationToken ct)
     {
-        if (newPassword.Length is < 14 or > 128)
-            throw new ArgumentException("Use a unique password of 14 to 128 characters.");
+        ValidatePassword(newPassword);
 
         var user = await db.Set<AdminUser>().SingleOrDefaultAsync(u => u.Id == ownerId, ct);
         if (user is null) return false;
@@ -50,12 +49,43 @@ public sealed class AdminIdentity(BurgerHouseDbContext db) : IAdminIdentity
         var verification = Hasher.VerifyHashedPassword(user, user.PasswordHash, currentPassword);
         if (verification == PasswordVerificationResult.Failed) return false;
 
-        user.ReplaceHash(Hasher.HashPassword(user, newPassword));
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
-        await db.Set<AdminSession>().Where(s => s.AdminUserId == ownerId).ExecuteDeleteAsync(ct);
+        user.ReplaceHash(Hasher.HashPassword(user, newPassword));
         await db.SaveChangesAsync(ct);
 
+        await db.Set<AdminSession>()
+            .Where(s => s.AdminUserId == ownerId)
+            .ExecuteDeleteAsync(ct);
+
+        await transaction.CommitAsync(ct);
+
         return true;
+    }
+
+    public async Task ResetOwnerPasswordAsync(string newPassword, CancellationToken ct)
+    {
+        ValidatePassword(newPassword);
+
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+
+        var user = await db.Set<AdminUser>().SingleOrDefaultAsync(ct)
+            ?? throw new InvalidOperationException("Owner does not exist.");
+
+        user.ReplaceHash(Hasher.HashPassword(user, newPassword));
+        await db.SaveChangesAsync(ct);
+
+        await db.Set<AdminSession>()
+            .Where(s => s.AdminUserId == user.Id)
+            .ExecuteDeleteAsync(ct);
+
+        await transaction.CommitAsync(ct);
+    }
+
+    private static void ValidatePassword(string password)
+    {
+        if (password.Length is < 14 or > 128)
+            throw new ArgumentException("Use a unique password of 14 to 128 characters.");
     }
     private static string Hash(string id) => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(id)));
     public async Task CreateFirstOwnerAsync(string email, string password, CancellationToken ct)

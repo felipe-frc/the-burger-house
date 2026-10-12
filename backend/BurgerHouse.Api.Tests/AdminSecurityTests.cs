@@ -522,6 +522,88 @@ public sealed class AdminSecurityTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ResetOwnerPasswordRevokesSessionsAndReplacesCredential()
+    {
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+
+        const string newPassword = "Recovered-test-password-123!";
+
+        using (var scope = app.Services.CreateScope())
+        {
+            var identity = scope.ServiceProvider.GetRequiredService<IAdminIdentity>();
+            await identity.ResetOwnerPasswordAsync(newPassword, default);
+        }
+
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await client.GetAsync("/api/admin/auth/me")).StatusCode);
+
+        using var oldPasswordClient = app.CreateClient(new()
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
+        });
+
+        var oldToken = await oldPasswordClient.GetFromJsonAsync<JsonElement>("/api/admin/auth/login");
+        oldPasswordClient.DefaultRequestHeaders.Add(
+            "X-CSRF-TOKEN",
+            oldToken.GetProperty("csrfToken").GetString());
+
+        Assert.Equal(HttpStatusCode.Unauthorized,
+            (await oldPasswordClient.PostAsJsonAsync("/api/admin/auth/login", new
+            {
+                email = "owner@example.invalid",
+                password
+            })).StatusCode);
+
+        using var newPasswordClient = app.CreateClient(new()
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
+        });
+
+        var newToken = await newPasswordClient.GetFromJsonAsync<JsonElement>("/api/admin/auth/login");
+        newPasswordClient.DefaultRequestHeaders.Add(
+            "X-CSRF-TOKEN",
+            newToken.GetProperty("csrfToken").GetString());
+
+        Assert.Equal(HttpStatusCode.OK,
+            (await newPasswordClient.PostAsJsonAsync("/api/admin/auth/login", new
+            {
+                email = "owner@example.invalid",
+                password = newPassword
+            })).StatusCode);
+    }
+
+    [Fact]
+    public async Task ResetOwnerPasswordRejectsShortPasswordWithoutChangingCredential()
+    {
+        using var scope = app.Services.CreateScope();
+        var identity = scope.ServiceProvider.GetRequiredService<IAdminIdentity>();
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            identity.ResetOwnerPasswordAsync("short", default));
+
+        Assert.NotNull(await identity.AuthenticateAsync(
+            "owner@example.invalid",
+            password,
+            default));
+    }
+
+    [Fact]
+    public async Task ResetOwnerPasswordFailsWhenOwnerDoesNotExist()
+    {
+        using var scope = app.Services.CreateScope();
+        var identity = scope.ServiceProvider.GetRequiredService<IAdminIdentity>();
+        var db = scope.ServiceProvider.GetRequiredService<BurgerHouseDbContext>();
+
+        await db.Set<AdminSession>().ExecuteDeleteAsync();
+        await db.Set<AdminUser>().ExecuteDeleteAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            identity.ResetOwnerPasswordAsync("Recovered-test-password-123!", default));
+    }
+
+    [Fact]
     public async Task FirstOwnerIsUniqueHashOnlyAndCannotBeCreatedAgain()
     {
         using var scope = app.Services.CreateScope();

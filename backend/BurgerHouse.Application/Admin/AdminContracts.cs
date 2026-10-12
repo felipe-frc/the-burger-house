@@ -11,6 +11,7 @@ public interface IAdminIdentity
     Task RevokeSessionAsync(string sessionId, CancellationToken ct);
     Task CreateFirstOwnerAsync(string email, string password, CancellationToken ct);
     Task<bool> ChangePasswordAsync(int ownerId, string currentPassword, string newPassword, CancellationToken ct);
+    Task ResetOwnerPasswordAsync(string newPassword, CancellationToken ct);
 }
 public record Page<T>(IReadOnlyList<T> Items, int Total, int PageNumber, int PageSize = 20);
 public record OrderRow(int Id, DateTime CreatedAt, string CustomerName, string OrderType, int ItemCount,

@@ -116,7 +116,7 @@ public static class AdminSecurity
         if (Console.IsInputRedirected) throw new InvalidOperationException("Use an interactive private terminal to provision the Owner.");
         Console.Write("Owner email: ");
         var email = Console.ReadLine() ?? "";
-        Console.Write("Unique password (14–128 characters; hidden): ");
+        Console.Write("Unique password (14-128 characters; hidden): ");
         var password = new System.Text.StringBuilder();
         while (true)
         {
@@ -131,5 +131,88 @@ public static class AdminSecurity
             .CreateFirstOwnerAsync(email, password.ToString(), CancellationToken.None);
         password.Clear();
         Console.WriteLine("Owner created. No HTTP server started.");
+    }
+
+    public static async Task ResetOwnerPasswordAsync(IServiceProvider services)
+    {
+        if (Console.IsInputRedirected)
+            throw new InvalidOperationException(
+                "Use an interactive private terminal to reset the Owner password.");
+
+        Console.Write("New Owner password (14-128 characters; hidden): ");
+
+        var password = new System.Text.StringBuilder();
+
+        while (true)
+        {
+            var key = Console.ReadKey(true);
+
+            if (key.Key == ConsoleKey.Enter)
+                break;
+
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                if (password.Length > 0)
+                    password.Length--;
+
+                continue;
+            }
+
+            if (!char.IsControl(key.KeyChar) && password.Length < 129)
+                password.Append(key.KeyChar);
+        }
+
+        Console.WriteLine();
+        Console.Write("Confirm new password (hidden): ");
+
+        var confirmation = new System.Text.StringBuilder();
+
+        while (true)
+        {
+            var key = Console.ReadKey(true);
+
+            if (key.Key == ConsoleKey.Enter)
+                break;
+
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                if (confirmation.Length > 0)
+                    confirmation.Length--;
+
+                continue;
+            }
+
+            if (!char.IsControl(key.KeyChar) && confirmation.Length < 129)
+                confirmation.Append(key.KeyChar);
+        }
+
+        Console.WriteLine();
+
+        try
+        {
+            if (!password.ToString().Equals(
+                    confirmation.ToString(),
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Password confirmation does not match.");
+            }
+
+            using var scope = services.CreateScope();
+
+            await scope.ServiceProvider
+                .GetRequiredService<IAdminIdentity>()
+                .ResetOwnerPasswordAsync(
+                    password.ToString(),
+                    CancellationToken.None);
+
+            Console.WriteLine(
+                "Owner password reset. All administrative sessions were revoked.");
+        }
+        finally
+        {
+            password.Clear();
+            confirmation.Clear();
+        }
     }
 }
