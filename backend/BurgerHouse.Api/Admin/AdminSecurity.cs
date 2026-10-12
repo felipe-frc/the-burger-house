@@ -4,6 +4,8 @@ using BurgerHouse.Application.Admin;
 using BurgerHouse.Infrastructure.Admin;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
 
 namespace BurgerHouse.Api.Admin;
 
@@ -15,6 +17,31 @@ public static class AdminSecurity
         services.AddScoped<IAdminIdentity, AdminIdentity>();
         services.AddScoped<IAdminService, AdminService>();
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<AdminLoginProtection>();
+        // PostConfigure also hardens host-provided automatic forwarding (for example IIS).
+        services.AddOptions<ForwardedHeadersOptions>().PostConfigure(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.ForwardLimit = configuration.GetValue<int?>("Admin:ForwardedHeaders:ForwardLimit") ?? 1;
+            options.KnownProxies.Clear();
+            options.KnownNetworks.Clear();
+            // Preserve ASP.NET Core's loopback defaults; never leave both lists empty.
+            options.KnownProxies.Add(IPAddress.IPv6Loopback);
+            options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(IPAddress.Loopback, 8));
+            foreach (var value in configuration.GetSection("Admin:ForwardedHeaders:KnownProxies").Get<string[]>() ?? [])
+            {
+                if (!IPAddress.TryParse(value, out var proxy) || proxy.Equals(IPAddress.Any) || proxy.Equals(IPAddress.IPv6Any))
+                    throw new InvalidOperationException("Invalid trusted Admin proxy configuration.");
+                options.KnownProxies.Add(proxy);
+            }
+            foreach (var value in configuration.GetSection("Admin:ForwardedHeaders:KnownNetworks").Get<string[]>() ?? [])
+            {
+                if (!System.Net.IPNetwork.TryParse(value, out var network) || network.PrefixLength == 0)
+                    throw new InvalidOperationException("Invalid trusted Admin proxy network configuration.");
+                options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(network.BaseAddress, network.PrefixLength));
+            }
+        }).Validate(options => options.ForwardLimit is >= 1 and <= 5,
+            "Admin forwarding requires a finite hop limit between 1 and 5.").ValidateOnStart();
         var keys = services.AddDataProtection().SetApplicationName("TheBurgerHouse.Owner");
         var keyPath = configuration["Admin:DataProtectionPath"];
         if (!string.IsNullOrWhiteSpace(keyPath)) keys.PersistKeysToFileSystem(new DirectoryInfo(keyPath));
@@ -57,8 +84,8 @@ public static class AdminSecurity
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = 429;
-            // Global partition intentionally does not trust caller-supplied proxy/IP headers.
-            options.AddPolicy("OwnerLogin", _ => RateLimitPartition.GetFixedWindowLimiter("owner-login", _ => new()
+            options.AddPolicy("OwnerLogin", context => RateLimitPartition.GetFixedWindowLimiter(
+                AdminLoginProtection.ClientAddress(context.Connection.RemoteIpAddress), _ => new()
             {
                 PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
             }));

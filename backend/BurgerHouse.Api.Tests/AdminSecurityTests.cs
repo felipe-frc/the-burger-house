@@ -1,10 +1,13 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using BurgerHouse.Api.Admin;
 using BurgerHouse.Application.Admin;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,6 +31,13 @@ public sealed class AdminSecurityTests : IAsyncLifetime
             builder.UseSetting("PagBank:Token", "test-placeholder");
             builder.UseSetting("PagBank:RedirectUrl", "https://example.invalid/");
             builder.UseSetting("PagBank:NotificationUrl", "https://example.invalid/webhook");
+            builder.UseSetting("Admin:ForwardedHeaders:KnownProxies:0", "198.51.100.1");
+            builder.UseSetting("Admin:ForwardedHeaders:KnownNetworks:0", "198.51.100.128/25");
+            builder.ConfigureServices(services =>
+            {
+                services.AddSingleton<IStartupFilter, TestPeerFilter>();
+                services.AddSingleton<TimeProvider>(new LoginClock());
+            });
             builder.ConfigureLogging(logging => logging.ClearProviders());
         });
         client = app.CreateClient(new() { BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false });
@@ -229,6 +239,72 @@ public sealed class AdminSecurityTests : IAsyncLifetime
             new { email = "missing@example.invalid", password = "incorrect-test-only" })).StatusCode);
     }
     [Fact]
+    public async Task ExhaustingOnePeerDoesNotBlockAnotherPeer()
+    {
+        for (var i = 0; i < 10; i++) Assert.Equal(HttpStatusCode.Unauthorized, (await Login(secret: "wrong")).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await Login()).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Test-Peer", "203.0.113.20");
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+    }
+    [Theory]
+    [InlineData("198.51.100.1")]
+    [InlineData("198.51.100.130")]
+    public async Task TrustedForwardingPartitionsByRightmostClientAndPreservesSeparateQuota(string proxy)
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Peer", proxy);
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "192.0.2.99, 203.0.113.10");
+        for (var i = 0; i < 10; i++)
+        {
+            var response = await Login(secret: "wrong");
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.Equal("203.0.113.10", Assert.Single(response.Headers.GetValues("X-Test-Observed-Peer")));
+        }
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await Login()).StatusCode);
+        client.DefaultRequestHeaders.Remove("X-Forwarded-For");
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.20");
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+    }
+    [Fact]
+    public async Task Ipv4AndMappedIpv6UseSameQuota()
+    {
+        for (var i = 0; i < 10; i++) Assert.Equal(HttpStatusCode.Unauthorized, (await Login(secret: "wrong")).StatusCode);
+        client.DefaultRequestHeaders.Add("X-Test-Peer", "::ffff:203.0.113.10");
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await Login()).StatusCode);
+    }
+    [Fact]
+    public async Task ExplicitAdminForwardingDoesNotChangePublicRequests()
+    {
+        client.DefaultRequestHeaders.Add("X-Test-Peer", "198.51.100.1");
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "203.0.113.20");
+        var response = await client.GetAsync("/");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("198.51.100.1", Assert.Single(response.Headers.GetValues("X-Test-Observed-Peer")));
+    }
+    [Theory]
+    [InlineData("owner@example.invalid")]
+    [InlineData("missing@example.invalid")]
+    public async Task ProgressiveDenialsHaveSameBodyForUnknownAccountWrongPasswordAndCooldown(string email)
+    {
+        for (var i = 0; i < 6; i++)
+        {
+            var response = await Login(email, "wrong");
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.Equal("{\"error\":\"Credenciais inválidas.\"}", await response.Content.ReadAsStringAsync());
+            Assert.False(response.Headers.Contains("Retry-After"));
+            Assert.False(response.Headers.Contains("Set-Cookie"));
+        }
+    }
+    [Fact]
+    public async Task NormalizedPairCooldownRejectsEvenCorrectPasswordUntilElapsedAndSuccessResetsIt()
+    {
+        for (var i = 0; i < 5; i++) Assert.Equal(HttpStatusCode.Unauthorized, (await Login(secret: "wrong")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Login(" OWNER@EXAMPLE.INVALID ")).StatusCode);
+        ((LoginClock)app.Services.GetRequiredService<TimeProvider>()).Advance(TimeSpan.FromSeconds(2));
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await Login(secret: "wrong")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Login()).StatusCode);
+    }
+    [Fact]
     public async Task FirstOwnerIsUniqueHashOnlyAndCannotBeCreatedAgain()
     {
         using var scope = app.Services.CreateScope();
@@ -240,4 +316,30 @@ public sealed class AdminSecurityTests : IAsyncLifetime
         await Assert.ThrowsAsync<InvalidOperationException>(() => identity.CreateFirstOwnerAsync("other@example.invalid", password, default));
         Assert.NotNull(await identity.AuthenticateAsync(" OWNER@EXAMPLE.INVALID ", password, default));
     }
+}
+
+// Only TestServer controls the transport peer; no production header supplies this value.
+internal sealed class TestPeerFilter : IStartupFilter
+{
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
+    {
+        app.Use(async (context, continuation) =>
+        {
+            context.Connection.RemoteIpAddress = IPAddress.Parse(context.Request.Headers["X-Test-Peer"].FirstOrDefault() ?? "203.0.113.10");
+            context.Response.OnStarting(() =>
+            {
+                context.Response.Headers["X-Test-Observed-Peer"] = context.Connection.RemoteIpAddress?.ToString();
+                return Task.CompletedTask;
+            });
+            await continuation();
+        });
+        next(app);
+    };
+}
+
+internal sealed class LoginClock : TimeProvider
+{
+    private DateTimeOffset now = DateTimeOffset.UtcNow;
+    public override DateTimeOffset GetUtcNow() => now;
+    public void Advance(TimeSpan elapsed) => now += elapsed;
 }

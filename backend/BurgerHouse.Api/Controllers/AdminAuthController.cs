@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace BurgerHouse.Api.Controllers;
 
 [ApiController, Route("api/admin/auth"), Authorize(Policy = "Owner"), AutoValidateAntiforgeryToken]
-public sealed class AdminAuthController(IAdminIdentity identity, IAntiforgery antiforgery, TimeProvider clock) : ControllerBase
+public sealed class AdminAuthController(IAdminIdentity identity, IAntiforgery antiforgery, TimeProvider clock, AdminLoginProtection protection) : ControllerBase
 {
     [AllowAnonymous, HttpGet("login")]
     public IActionResult LoginToken() => Ok(new { csrfToken = antiforgery.GetAndStoreTokens(HttpContext).RequestToken });
@@ -19,7 +19,8 @@ public sealed class AdminAuthController(IAdminIdentity identity, IAntiforgery an
     [AllowAnonymous, HttpPost("login"), EnableRateLimiting("OwnerLogin")]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
     {
-        var owner = await identity.AuthenticateAsync(request.Email, request.Password, ct);
+        var owner = await protection.AuthenticateAsync(HttpContext.Connection.RemoteIpAddress, request.Email,
+            () => identity.AuthenticateAsync(request.Email, request.Password, ct), ct);
         if (owner is null) return Unauthorized(new { error = "Credenciais inválidas." });
         var expires = clock.GetUtcNow().AddHours(8);
         var session = await identity.CreateSessionAsync(owner.Id, expires.UtcDateTime, ct);

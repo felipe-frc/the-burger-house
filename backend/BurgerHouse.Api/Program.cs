@@ -232,6 +232,10 @@ if (args.Contains("--create-owner"))
     return;
 }
 
+// Only Admin opts into explicit forwarding here; public payment routes are unchanged.
+app.UseWhen(context => context.Request.Path.StartsWithSegments("/api/admin"),
+    admin => admin.UseForwardedHeaders());
+
 app.UseHttpsRedirection();
 
 app.UseCors(
