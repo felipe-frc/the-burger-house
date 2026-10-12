@@ -292,9 +292,11 @@ public sealed class AdminSecurityTests : IAsyncLifetime
     [InlineData("10.12.3.4", false)]
     [InlineData("172.20.3.4", false)]
     [InlineData("192.168.3.4", false)]
+    [InlineData("169.254.130.1", false)]
     [InlineData("::ffff:10.12.3.4", true)]
     [InlineData("::ffff:172.20.3.4", true)]
     [InlineData("::ffff:192.168.3.4", true)]
+    [InlineData("::ffff:169.254.130.1", true)]
     public async Task AppServiceHttpTransportRecognizesHttpsWithoutTrustingInternetPeers(string proxy, bool automatic)
     {
         await using var azureApp = app.WithWebHostBuilder(builder =>

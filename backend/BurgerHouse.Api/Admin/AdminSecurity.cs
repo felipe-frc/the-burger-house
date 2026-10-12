@@ -37,7 +37,7 @@ public static class AdminSecurity
                     throw new InvalidOperationException("Azure App Service forwarding requires App Service hosting.");
                 // Official App Service guidance; stable network ranges, not ephemeral proxy addresses.
                 // https://learn.microsoft.com/azure/app-service/configure-language-dotnetcore#detect-https-session
-                foreach (var (address, prefix) in new[] { ("10.0.0.0", 8), ("172.16.0.0", 12), ("192.168.0.0", 16) })
+                foreach (var (address, prefix) in new[] { ("10.0.0.0", 8), ("172.16.0.0", 12), ("192.168.0.0", 16), ("169.254.0.0", 16) })
                 {
                     var ip = IPAddress.Parse(address);
                     options.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(ip, prefix));
