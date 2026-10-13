@@ -151,16 +151,124 @@ public sealed class AdminServiceTests : IAsyncLifetime
     public async Task OnlySequentialTransitionsForPaidOrders(string type)
     {
         var order = await Seed(type: type);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(order.Id, OrderStatus.Received, OrderStatus.Completed, default));
-        await service.AdvanceAsync(order.Id, OrderStatus.Received, OrderStatus.Preparing, default);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(order.Id, OrderStatus.Received, OrderStatus.Preparing, default));
-        await service.AdvanceAsync(order.Id, OrderStatus.Preparing, OrderStatus.ReadyForPickup, default);
-        if (type == "delivery") await service.AdvanceAsync(order.Id, OrderStatus.ReadyForPickup, OrderStatus.OutForDelivery, default);
-        await service.AdvanceAsync(order.Id, order.Status, OrderStatus.Completed, default);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(order.Id, OrderStatus.Completed, OrderStatus.Received, default));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(order.Id, OrderStatus.Received, OrderStatus.Completed, owner.Id, DateTime.UtcNow, default));
+        await service.AdvanceAsync(order.Id, OrderStatus.Received, OrderStatus.Preparing, owner.Id, DateTime.UtcNow, default);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(order.Id, OrderStatus.Received, OrderStatus.Preparing, owner.Id, DateTime.UtcNow, default));
+        await service.AdvanceAsync(order.Id, OrderStatus.Preparing, OrderStatus.ReadyForPickup, owner.Id, DateTime.UtcNow, default);
+        if (type == "delivery") await service.AdvanceAsync(order.Id, OrderStatus.ReadyForPickup, OrderStatus.OutForDelivery, owner.Id, DateTime.UtcNow, default);
+        await service.AdvanceAsync(order.Id, order.Status, OrderStatus.Completed, owner.Id, DateTime.UtcNow, default);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(order.Id, OrderStatus.Completed, OrderStatus.Received, owner.Id, DateTime.UtcNow, default));
         var pending = await Seed(PaymentStatus.Pending);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(pending.Id, OrderStatus.PendingPayment, OrderStatus.Received, default));
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.AdvanceAsync(999, OrderStatus.Received, OrderStatus.Preparing, default));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(pending.Id, OrderStatus.PendingPayment, OrderStatus.Received, owner.Id, DateTime.UtcNow, default));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.AdvanceAsync(999, OrderStatus.Received, OrderStatus.Preparing, owner.Id, DateTime.UtcNow, default));
+    }
+    [Fact]
+    public async Task OrderStatusChangesCreateAuditLog()
+    {
+        var order =
+            await Seed();
+
+        var utcNow =
+            new DateTime(
+                2026,
+                10,
+                13,
+                13,
+                0,
+                0,
+                DateTimeKind.Utc
+            );
+
+        await service.AdvanceAsync(
+            order.Id,
+            OrderStatus.Received,
+            OrderStatus.Preparing,
+            owner.Id,
+            utcNow,
+            default
+        );
+
+        var log =
+            await db.AdminAuditLogs.SingleAsync(
+                log =>
+                    log.Action ==
+                    "OrderStatusChanged"
+            );
+
+        Assert.Equal(
+            owner.Id,
+            log.AdminUserId
+        );
+
+        Assert.Equal(
+            "Admin",
+            log.ActorType
+        );
+
+        Assert.Equal(
+            "OrderStatusChanged",
+            log.Action
+        );
+
+        Assert.Equal(
+            "Order",
+            log.EntityType
+        );
+
+        Assert.Equal(
+            order.Id.ToString(),
+            log.EntityId
+        );
+
+        Assert.Equal(
+            utcNow,
+            log.CreatedAtUtc
+        );
+
+        using var document =
+            System.Text.Json.JsonDocument.Parse(
+                log.Changes
+            );
+
+        var status =
+            document.RootElement
+                .GetProperty("status");
+
+        Assert.Equal(
+            "Received",
+            status.GetProperty("from").GetString()
+        );
+
+        Assert.Equal(
+            "Preparing",
+            status.GetProperty("to").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task RejectedOrderStatusChangeDoesNotCreateAuditLog()
+    {
+        var order =
+            await Seed();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () =>
+                service.AdvanceAsync(
+                    order.Id,
+                    OrderStatus.Received,
+                    OrderStatus.Completed,
+                    owner.Id,
+                    DateTime.UtcNow,
+                    default
+                )
+        );
+
+        Assert.DoesNotContain(
+            await db.AdminAuditLogs.ToListAsync(),
+            log =>
+                log.Action ==
+                "OrderStatusChanged"
+        );
     }
     [Theory]
     [InlineData(-1, 0)]

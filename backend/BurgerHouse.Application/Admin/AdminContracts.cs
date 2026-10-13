@@ -54,7 +54,7 @@ public interface IAdminService
     Task<NotificationBatch> NotificationsAsync(DateTime? since, DateTime until, int afterId, CancellationToken ct);
     Task<Page<OrderRow>> OrdersAsync(OrderFilter filter, CancellationToken ct);
     Task<OrderDetail?> OrderAsync(int id, CancellationToken ct);
-    Task AdvanceAsync(int id, OrderStatus expected, OrderStatus next, CancellationToken ct);
+    Task AdvanceAsync(int id, OrderStatus expected, OrderStatus next, int adminUserId, DateTime utcNow, CancellationToken ct);
     Task<IReadOnlyList<ProductRow>> ProductsAsync(CancellationToken ct);
     Task UpdateProductAsync(int id, decimal price, decimal? cost, bool active, int adminUserId, DateTime utcNow, CancellationToken ct);
     Task<FinanceSummary> SummaryAsync(DateRange range, CancellationToken ct);

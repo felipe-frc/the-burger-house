@@ -148,18 +148,90 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
             delivery ? o.HouseNumber : null, delivery ? o.Neighborhood : null, delivery ? o.City : null,
             delivery ? o.Complement : null, o.Observation, o.DeliveryFee, items, payments);
     }
-    public async Task AdvanceAsync(int id, OrderStatus expected, OrderStatus next, CancellationToken ct)
+    public async Task AdvanceAsync(
+        int id,
+        OrderStatus expected,
+        OrderStatus next,
+        int adminUserId,
+        DateTime utcNow,
+        CancellationToken ct)
     {
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
-        var order = await db.Orders.SingleOrDefaultAsync(o => o.Id == id, ct) ?? throw new KeyNotFoundException();
-        if (order.Status != expected) throw new InvalidOperationException("Order changed.");
-        if (!await db.Payments.AnyAsync(p => p.OrderId == id && p.Status == PaymentStatus.Approved, ct))
-            throw new InvalidOperationException("Payment is not approved.");
+        if (adminUserId <= 0)
+            throw new ArgumentException(
+                "Invalid admin user.",
+                nameof(adminUserId)
+            );
+
+        if (utcNow.Kind != DateTimeKind.Utc)
+            throw new ArgumentException(
+                "Audit timestamp must be UTC.",
+                nameof(utcNow)
+            );
+
+        await using var transaction =
+            await db.Database.BeginTransactionAsync(ct);
+
+        var order =
+            await db.Orders.SingleOrDefaultAsync(
+                o => o.Id == id,
+                ct
+            )
+            ?? throw new KeyNotFoundException();
+
+        if (order.Status != expected)
+            throw new InvalidOperationException(
+                "Order changed."
+            );
+
+        if (!await db.Payments.AnyAsync(
+                p =>
+                    p.OrderId == id &&
+                    p.Status == PaymentStatus.Approved,
+                ct))
+            throw new InvalidOperationException(
+                "Payment is not approved."
+            );
+
         order.AdvanceStatus(next);
-        try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateConcurrencyException) { throw new InvalidOperationException("Order changed."); }
+
+        var changes =
+            JsonSerializer.Serialize(
+                new
+                {
+                    status = new
+                    {
+                        from = expected.ToString(),
+                        to = next.ToString()
+                    }
+                }
+            );
+
+        db.AdminAuditLogs.Add(
+            new AdminAuditLog(
+                adminUserId,
+                "Admin",
+                "OrderStatusChanged",
+                "Order",
+                id.ToString(),
+                changes,
+                utcNow
+            )
+        );
+
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new InvalidOperationException(
+                "Order changed."
+            );
+        }
+
         await transaction.CommitAsync(ct);
     }
+
     public async Task<IReadOnlyList<ProductRow>> ProductsAsync(CancellationToken ct) =>
         await db.Products.AsNoTracking().OrderBy(p => p.Id).Select(p => new ProductRow(p.Id, p.Name, p.Price, p.CostPrice, p.IsActive)).ToListAsync(ct);
     public async Task UpdateProductAsync(

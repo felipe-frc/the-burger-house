@@ -29,10 +29,25 @@ public sealed class AdminController(IAdminService service, TimeProvider clock) :
     [HttpPatch("orders/{id:int:min(1)}/status")]
     public async Task<IActionResult> Status(int id, StatusRequest request, CancellationToken ct)
     {
-        if (!Enum.TryParse<OrderStatus>(request.ExpectedStatus, out var expected) || !Enum.IsDefined(expected) ||
-            !Enum.TryParse<OrderStatus>(request.Status, out var next) || !Enum.IsDefined(next))
+        if (!Enum.TryParse<OrderStatus>(request.ExpectedStatus, out var expected) ||
+            !Enum.IsDefined(expected) ||
+            !Enum.TryParse<OrderStatus>(request.Status, out var next) ||
+            !Enum.IsDefined(next))
             return BadRequest(new { error = "Status inválido." });
-        await service.AdvanceAsync(id, expected, next, ct);
+
+        var adminUserId = int.Parse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)!
+        );
+
+        await service.AdvanceAsync(
+            id,
+            expected,
+            next,
+            adminUserId,
+            clock.GetUtcNow().UtcDateTime,
+            ct
+        );
+
         return NoContent();
     }
     [HttpGet("products")]
