@@ -4,6 +4,7 @@ using BurgerHouse.Application.Orders.CreateOrder;
 using BurgerHouse.Application.Payments.CreateHostedCheckout;
 using BurgerHouse.Application.Payments.GetPaymentStatus;
 using BurgerHouse.Application.Payments.PrepareCheckoutPayment;
+using BurgerHouse.Application.Payments.ProcessPaymentWebhook;
 using BurgerHouse.Application.Payments.SynchronizeCheckoutPayment;
 
 using BurgerHouse.Infrastructure.Payments.PagBank;
@@ -65,7 +66,10 @@ var connectionString =
 
 // Resolve before migrations/startup; no plaintext-writing fallback when the key is missing.
 builder.Services.AddSingleton<IPersonalDataProtector>(_ =>
-    new AesGcmPersonalDataProtector(builder.Configuration["Privacy:EncryptionKey"]));
+    new AesGcmPersonalDataProtector(
+        builder.Configuration["Privacy:EncryptionKey"]
+    )
+);
 
 builder.Services.AddDbContext<BurgerHouseDbContext>(
     options =>
@@ -176,17 +180,26 @@ builder.Services.AddScoped<
     GetPaymentStatusHandler>();
 
 builder.Services.AddScoped<
+    ProcessPaymentWebhookHandler>();
+
+builder.Services.AddScoped<
     IPaymentReconciliationService,
     PagBankPaymentReconciliationService>();
 
 if (builder.Environment.IsDevelopment())
 {
-    builder.Services.AddScoped<PendingPaymentReconciliationBatch>();
-    builder.Services.AddHostedService<BurgerHouse.Api.DevelopmentPaymentReconciliationWorker>();
+    builder.Services.AddScoped<
+        PendingPaymentReconciliationBatch>();
+
+    builder.Services.AddHostedService<
+        BurgerHouse.Api.DevelopmentPaymentReconciliationWorker>();
 }
 
-builder.Services.AddScoped<PendingPaymentExpirationBatch>();
-builder.Services.AddHostedService<BurgerHouse.Api.PendingPaymentExpirationWorker>();
+builder.Services.AddScoped<
+    PendingPaymentExpirationBatch>();
+
+builder.Services.AddHostedService<
+    BurgerHouse.Api.PendingPaymentExpirationWorker>();
 
 builder.Services.AddScoped<
     SynchronizeCheckoutPaymentHandler>();
@@ -199,13 +212,20 @@ builder.Services.AddHttpClient<PagBankCheckoutService>(
 
 builder.Services.AddScoped<IHostedCheckoutGateway>(
     provider =>
-        provider.GetRequiredService<PagBankCheckoutService>()
+        provider.GetRequiredService<
+            PagBankCheckoutService>()
 );
 
 builder.Services.AddHttpClient<PagBankPaymentLookup>(
     client =>
         client.Timeout =
             TimeSpan.FromSeconds(15)
+);
+
+builder.Services.AddScoped<IPaymentProviderLookup>(
+    provider =>
+        provider.GetRequiredService<
+            PagBankPaymentLookup>()
 );
 
 builder.Services.AddHttpClient<PagBankWebhookSignatureValidator>(
@@ -259,12 +279,18 @@ if (args.Contains("--reset-owner-password"))
 
 // The host's automatic middleware runs before this pipeline. A UseWhen branch can
 // otherwise register a second instance and consume another hop from the same headers.
-if (!string.Equals(builder.Configuration["ForwardedHeaders_Enabled"], "true", StringComparison.OrdinalIgnoreCase))
+if (!string.Equals(
+        builder.Configuration["ForwardedHeaders_Enabled"],
+        "true",
+        StringComparison.OrdinalIgnoreCase
+    ))
 {
     // Without automatic forwarding, only Admin opts in; public routes are unchanged.
     app.UseWhen(
         context =>
-            context.Request.Path.StartsWithSegments("/api/admin"),
+            context.Request.Path.StartsWithSegments(
+                "/api/admin"
+            ),
         admin =>
             admin.UseForwardedHeaders()
     );
