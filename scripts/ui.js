@@ -397,7 +397,10 @@ function renderMenuCategory(category) {
       </div>
 
       <div class="products-list-container">
-        ${category.items.map(renderProductCard).join("")}
+        ${category.items
+          .filter((product) => product.isActive !== false)
+          .map(renderProductCard)
+          .join("")}
       </div>
     </section>
   `;

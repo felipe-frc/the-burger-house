@@ -249,3 +249,31 @@ export const MENU_CATEGORIES = [
 export const MENU_PRODUCTS = MENU_CATEGORIES.flatMap((category) => category.items);
 
 export const MENU_PRODUCT_BY_ID = new Map(MENU_PRODUCTS.map((item) => [item.id, item]));
+
+export function applyPublicCatalog(rows) {
+  if (!Array.isArray(rows)) return;
+
+  const catalogByCode = new Map(
+    rows
+      .filter(
+        (row) =>
+          row &&
+          typeof row.code === "string" &&
+          typeof row.price === "number" &&
+          typeof row.isActive === "boolean",
+      )
+      .map((row) => [row.code, row]),
+  );
+
+  MENU_PRODUCTS.forEach((product) => {
+    const remote = catalogByCode.get(product.id);
+
+    if (!remote) {
+      product.isActive = false;
+      return;
+    }
+
+    product.price = remote.price;
+    product.isActive = remote.isActive;
+  });
+}

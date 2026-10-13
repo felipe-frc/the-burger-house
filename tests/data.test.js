@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MENU_CATEGORIES, MENU_PRODUCT_BY_ID, MENU_PRODUCTS } from "../scripts/data.js";
+import {
+  applyPublicCatalog,
+  MENU_CATEGORIES,
+  MENU_PRODUCT_BY_ID,
+  MENU_PRODUCTS,
+} from "../scripts/data.js";
 
 describe("menu data", () => {
   it("has menu categories with products", () => {
@@ -38,6 +43,43 @@ describe("menu data", () => {
     });
   });
 
+  it("applies backend price and availability to static menu metadata", () => {
+    const crown = MENU_PRODUCT_BY_ID.get("burger-joia-da-coroa");
+    const praiano = MENU_PRODUCT_BY_ID.get("burger-praiano");
+
+    const previousCrownPrice = crown.price;
+    const previousCrownActive = crown.isActive;
+    const previousPraianoActive = praiano.isActive;
+
+    try {
+      applyPublicCatalog([
+        {
+          code: "burger-joia-da-coroa",
+          price: 59.9,
+          isActive: true,
+        },
+        {
+          code: "burger-praiano",
+          price: 43.9,
+          isActive: false,
+        },
+      ]);
+
+      expect(crown.price).toBe(59.9);
+      expect(crown.isActive).toBe(true);
+      expect(praiano.isActive).toBe(false);
+    } finally {
+      crown.price = previousCrownPrice;
+      crown.isActive = previousCrownActive;
+      praiano.isActive = previousPraianoActive;
+
+      MENU_PRODUCTS.forEach((product) => {
+        if (product.isActive === false && product !== praiano) {
+          delete product.isActive;
+        }
+      });
+    }
+  });
   it("maps every product by id", () => {
     MENU_PRODUCTS.forEach((product) => {
       expect(MENU_PRODUCT_BY_ID.get(product.id)).toEqual(product);

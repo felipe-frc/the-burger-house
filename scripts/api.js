@@ -36,6 +36,11 @@ async function request(path, options = {}) {
   return data;
 }
 
+export async function getPublicProducts() {
+  return request("/api/products", {
+    method: "GET",
+  });
+}
 export async function createOrder(orderPayload) {
   return request("/api/orders", {
     method: "POST",

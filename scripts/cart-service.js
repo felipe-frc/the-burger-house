@@ -6,6 +6,38 @@ export function findProductById(productId) {
   return MENU_PRODUCT_BY_ID.get(productId);
 }
 
+export function reconcileCartWithCatalog(cart, catalog) {
+  if (!Array.isArray(cart) || !Array.isArray(catalog)) {
+    return [];
+  }
+
+  const catalogByCode = new Map(
+    catalog
+      .filter(
+        (product) =>
+          product &&
+          typeof product.code === "string" &&
+          typeof product.price === "number" &&
+          typeof product.isActive === "boolean",
+      )
+      .map((product) => [product.code, product]),
+  );
+
+  return cart.flatMap((item) => {
+    const current = catalogByCode.get(item.id);
+
+    if (!current || !current.isActive) {
+      return [];
+    }
+
+    return [
+      {
+        ...item,
+        price: current.price,
+      },
+    ];
+  });
+}
 export function getCartSubtotal(cart = getCart()) {
   return cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
 }

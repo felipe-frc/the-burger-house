@@ -30,6 +30,7 @@ let getCartTotalWithDelivery;
 let getDeliveryFee;
 let increaseCartItemQuantity;
 let removeProductFromCart;
+let reconcileCartWithCatalog;
 let DELIVERY_FEE;
 let ORDER_TYPES;
 
@@ -59,6 +60,7 @@ beforeAll(async () => {
   getDeliveryFee = cartService.getDeliveryFee;
   increaseCartItemQuantity = cartService.increaseCartItemQuantity;
   removeProductFromCart = cartService.removeProductFromCart;
+  reconcileCartWithCatalog = cartService.reconcileCartWithCatalog;
 
   DELIVERY_FEE = config.DELIVERY_FEE;
   ORDER_TYPES = state.ORDER_TYPES;
@@ -69,6 +71,51 @@ beforeEach(() => {
 });
 
 describe("cart-service", () => {
+  it("reconciles cart prices with the current public catalog", () => {
+    const cart = [
+      {
+        id: "burger-praiano",
+        name: "O Praiano",
+        price: 40,
+        quantity: 2,
+      },
+      {
+        id: "side-fritas-cheddar",
+        name: "Fritas Cheddar & Bacon",
+        price: 24.9,
+        quantity: 1,
+      },
+    ];
+
+    const catalog = [
+      {
+        code: "burger-praiano",
+        price: 43.9,
+        isActive: true,
+      },
+      {
+        code: "side-fritas-cheddar",
+        price: 24.9,
+        isActive: false,
+      },
+    ];
+
+    const reconciled =
+      reconcileCartWithCatalog(
+        cart,
+        catalog
+      );
+
+    expect(reconciled).toEqual([
+      {
+        id: "burger-praiano",
+        name: "O Praiano",
+        price: 43.9,
+        quantity: 2,
+      },
+    ]);
+  });
+
   it("deve encontrar um produto pelo id", () => {
     const product = findProductById("burger-praiano");
 

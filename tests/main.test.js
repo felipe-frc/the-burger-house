@@ -24,9 +24,31 @@ const mocks = vi.hoisted(() => ({
   setupCategoryNavigation: vi.fn(),
   updateStoreStatus: vi.fn(),
 
+  getPublicProducts: vi.fn(async () => []),
+  applyPublicCatalog: vi.fn(),
+  getCart: vi.fn(() => []),
+  setCart: vi.fn(),
+  reconcileCartWithCatalog: vi.fn(() => []),
+
   languageChangeCallback: null,
 }));
 
+vi.mock("../scripts/api.js", () => ({
+  getPublicProducts: mocks.getPublicProducts,
+}));
+
+vi.mock("../scripts/data.js", () => ({
+  applyPublicCatalog: mocks.applyPublicCatalog,
+}));
+
+vi.mock("../scripts/state.js", () => ({
+  getCart: mocks.getCart,
+  setCart: mocks.setCart,
+}));
+
+vi.mock("../scripts/cart-service.js", () => ({
+  reconcileCartWithCatalog: mocks.reconcileCartWithCatalog,
+}));
 vi.mock("../scripts/address.js", () => ({
   bindAddressEvents: mocks.bindAddressEvents,
   updateOrderTypeUI: mocks.updateOrderTypeUI,
@@ -81,6 +103,15 @@ describe("main", () => {
     await loadMainModule();
 
     document.dispatchEvent(new Event("DOMContentLoaded"));
+
+    await vi.waitFor(() => {
+      expect(mocks.renderMenu).toHaveBeenCalledOnce();
+    });
+
+    expect(mocks.getPublicProducts).toHaveBeenCalledOnce();
+    expect(mocks.applyPublicCatalog).toHaveBeenCalledWith([]);
+    expect(mocks.reconcileCartWithCatalog).toHaveBeenCalledWith([], []);
+    expect(mocks.setCart).toHaveBeenCalledWith([]);
 
     expect(mocks.getCurrentLanguage).toHaveBeenCalledOnce();
 
