@@ -33,6 +33,8 @@ public record RevenuePoint(string Date, decimal Revenue);
 public record MethodSummary(string Method, int Count, decimal Revenue, decimal Percentage);
 public record TransactionRow(int OrderId, string CustomerName, DateTime Date, string Method, decimal Amount, string Status,
     DateTime? ApprovedAt, string ApprovalDateSource, decimal RefundedAmount);
+public record AuditLogRow(DateTime CreatedAtUtc, string Actor, string Action,
+    string EntityType, string EntityId, string Changes);
 public record Dashboard(FinanceSummary Today, FinanceSummary Week, FinanceSummary Month, FinanceSummary Last30Days,
     int OpenOrders, int NewPaidOrders, IReadOnlyList<OrderRow> RecentOrders);
 public record OrderFilter(string? Status = null, string? Search = null, string Sort = "newest", int Page = 1);
@@ -61,4 +63,5 @@ public interface IAdminService
     Task<IReadOnlyList<RevenuePoint>> RevenueAsync(DateRange range, CancellationToken ct);
     Task<IReadOnlyList<MethodSummary>> MethodsAsync(DateRange range, CancellationToken ct);
     Task<Page<TransactionRow>> TransactionsAsync(DateRange range, int page, CancellationToken ct);
+    Task<IReadOnlyList<AuditLogRow>> AuditLogsAsync(DateRange range, CancellationToken ct);
 }

@@ -560,6 +560,114 @@ public sealed class AdminServiceTests : IAsyncLifetime
         );
     }
     [Fact]
+    public async Task FinanceAuditReturnsPeriodEventsNewestFirst()
+    {
+        var localDay =
+            DateRange.LocalToday(
+                DateTime.UtcNow
+            );
+
+        var range =
+            DateRange.FromDates(
+                localDay,
+                localDay
+            );
+
+        var older =
+            range.Start.AddHours(1);
+
+        var newer =
+            range.Start.AddHours(2);
+
+        db.AdminAuditLogs.AddRange(
+            new AdminAuditLog(
+                owner.Id,
+                "Admin",
+                "ProductUpdated",
+                "Product",
+                "1",
+                """{"price":{"from":30,"to":31}}""",
+                older
+            ),
+            new AdminAuditLog(
+                null,
+                "Provider",
+                "PaymentSynchronized",
+                "Payment",
+                "9",
+                """{"status":{"from":"Pending","to":"Approved"}}""",
+                newer
+            ),
+            new AdminAuditLog(
+                null,
+                "System",
+                "OutsidePeriod",
+                "Order",
+                "99",
+                "{}",
+                range.Start.AddDays(-1)
+            )
+        );
+
+        await db.SaveChangesAsync();
+
+        var rows =
+            await service.AuditLogsAsync(
+                range,
+                default
+            );
+
+        Assert.Equal(
+            2,
+            rows.Count
+        );
+
+        Assert.Equal(
+            "PagBank",
+            rows[0].Actor
+        );
+
+        Assert.Equal(
+            "PaymentSynchronized",
+            rows[0].Action
+        );
+
+        Assert.Equal(
+            newer,
+            rows[0].CreatedAtUtc
+        );
+
+        Assert.Equal(
+            $"Administrador #{owner.Id}",
+            rows[1].Actor
+        );
+
+        Assert.Equal(
+            "ProductUpdated",
+            rows[1].Action
+        );
+
+        var json =
+            System.Text.Json.JsonSerializer.Serialize(
+                rows
+            );
+
+        Assert.DoesNotContain(
+            "owner@example.invalid",
+            json
+        );
+
+        Assert.DoesNotContain(
+            "CHAR_",
+            json
+        );
+
+        Assert.DoesNotContain(
+            "OutsidePeriod",
+            json
+        );
+    }
+    [Fact]
     public async Task MigrationPreservesPreviousRecordsAndRollbackPreservesOrders()
     {
         await db.GetService<IMigrator>().MigrateAsync("20261004130831_AddOrderFulfillmentDetails");

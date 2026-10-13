@@ -51,6 +51,24 @@ export const detail = {
 export const products = [
   { id: 1, name: "O Praiano", price: 30, costPrice: 10, margin: 20, isActive: true },
 ];
+export const auditLogs = [
+  {
+    createdAtUtc: "2026-10-05T21:10:00Z",
+    actor: "Administrador #1",
+    action: "ProductUpdated",
+    entityType: "Product",
+    entityId: "1",
+    changes: '{"price":{"from":30,"to":32}}',
+  },
+  {
+    createdAtUtc: "2026-10-05T21:05:00Z",
+    actor: "PagBank",
+    action: "PaymentSynchronized",
+    entityType: "Payment",
+    entityId: "9",
+    changes: '{"status":{"from":"Pending","to":"Approved"}}',
+  },
+];
 export const points = [
   { date: "2026-10-04", revenue: 0 },
   { date: "2026-10-05", revenue: 120 },
@@ -73,7 +91,8 @@ export function mockData(path) {
   if (path.startsWith("finance/revenue")) return structuredClone(points);
   if (path.startsWith("finance/payment-methods"))
     return [{ method: "Pix", count: 2, revenue: 120, percentage: 100 }];
-  if (path.startsWith("finance/transactions"))
+  if (path.startsWith("finance/audit"))
+    return structuredClone(auditLogs);  if (path.startsWith("finance/transactions"))
     return {
       items: [
         {

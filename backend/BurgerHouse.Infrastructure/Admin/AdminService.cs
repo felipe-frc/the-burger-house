@@ -72,6 +72,64 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
             r.Method.ToString(), r.Amount, r.Status.ToString(), r.ApprovedAt,
             r.ApprovalDateSource.ToString(), r.RefundedAmount)).ToList(), total, page);
     }
+    public async Task<IReadOnlyList<AuditLogRow>> AuditLogsAsync(
+        DateRange range,
+        CancellationToken ct)
+    {
+        var rows =
+            await db.AdminAuditLogs
+                .AsNoTracking()
+                .Where(log =>
+                    log.CreatedAtUtc >= range.Start &&
+                    log.CreatedAtUtc < range.End
+                )
+                .OrderByDescending(log =>
+                    log.CreatedAtUtc
+                )
+                .ThenByDescending(log =>
+                    log.Id
+                )
+                .Take(50)
+                .Select(log =>
+                    new
+                    {
+                        log.CreatedAtUtc,
+                        log.AdminUserId,
+                        log.ActorType,
+                        log.Action,
+                        log.EntityType,
+                        log.EntityId,
+                        log.Changes
+                    }
+                )
+                .ToListAsync(ct);
+
+        return rows
+            .Select(row =>
+                new AuditLogRow(
+                    row.CreatedAtUtc,
+                    row.ActorType switch
+                    {
+                        "Admin" when row.AdminUserId.HasValue =>
+                            $"Administrador #{row.AdminUserId.Value}",
+
+                        "Provider" =>
+                            "PagBank",
+
+                        "System" =>
+                            "Sistema",
+
+                        _ =>
+                            row.ActorType
+                    },
+                    row.Action,
+                    row.EntityType,
+                    row.EntityId,
+                    row.Changes
+                )
+            )
+            .ToList();
+    }
     public async Task<Dashboard> DashboardAsync(DateTime utcNow, CancellationToken ct)
     {
         var today = DateRange.LocalToday(utcNow);

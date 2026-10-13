@@ -155,14 +155,69 @@ export function transactionTable(page) {
   return `<div class="table-scroll" tabindex="0" aria-label="Transações"><table><thead><tr><th>Data de atualização</th><th>Pedido</th><th>Cliente</th><th>Método</th><th>Valor original</th><th>Aprovação</th><th>Estorno acumulado</th><th>Status</th></tr></thead><tbody>${page.items.map((p) => `<tr><td>${esc(dateTime(p.date))}</td><td><a data-nav href="/admin/orders/${p.orderId}">#${p.orderId}</a></td><td>${esc(p.customerName)}</td><td>${esc(methodLabels[p.method] || "Não informado")}</td><td>${esc(money(p.amount))}</td><td>${p.approvedAt ? esc(dateTime(p.approvedAt)) : "Desconhecida"}<br><small>${p.approvalDateSource === "LegacyEstimate" ? "Estimativa legada" : p.approvalDateSource === "Observed" ? "Observação local" : "Sem data confiável"}</small></td><td>${esc(money(p.refundedAmount))}</td><td>${badge(p.status)}</td></tr>`).join("") || '<tr><td colspan="8">Nenhuma transação neste período.</td></tr>'}</tbody></table></div>${pagination(page)}`;
 }
 
+const auditActionLabels = {
+  ProductUpdated: "Produto atualizado",
+  OrderStatusChanged: "Status do pedido atualizado",
+  PaymentSynchronized: "Pagamento sincronizado",
+};
+
+const auditEntityLabels = {
+  Product: "Produto",
+  Order: "Pedido",
+  Payment: "Pagamento",
+};
+
+function auditChangeValue(value) {
+  if (value === null || value === undefined) return "vazio";
+  if (typeof value === "boolean") return value ? "sim" : "não";
+  return String(value);
+}
+
+function auditChanges(changes) {
+  try {
+    const parsed = JSON.parse(changes);
+
+    const labels = {
+      price: "preço",
+      costPrice: "custo",
+      isActive: "ativo",
+      status: "status",
+      method: "método",
+      refundedAmount: "valor estornado",
+      orderStatus: "status do pedido",
+      externalPaymentLinked: "pagamento externo vinculado",
+    };
+
+    const rows = Object.entries(parsed).map(([key, value]) => {
+      if (
+        value &&
+        typeof value === "object" &&
+        Object.hasOwn(value, "from") &&
+        Object.hasOwn(value, "to")
+      ) {
+        return `${labels[key] || key}: ${auditChangeValue(value.from)} → ${auditChangeValue(value.to)}`;
+      }
+
+      return `${labels[key] || key}: ${auditChangeValue(value)}`;
+    });
+
+    return rows.join(" · ") || "Sem detalhes";
+  } catch {
+    return "Detalhes indisponíveis";
+  }
+}
+
+export function auditTable(rows = []) {
+  return `<div class="table-scroll" tabindex="0" aria-label="Trilha de auditoria"><table><thead><tr><th>Data</th><th>Responsável</th><th>Evento</th><th>Registro</th><th>Alterações</th></tr></thead><tbody>${rows.map((row) => `<tr><td>${esc(dateTime(row.createdAtUtc))}</td><td>${esc(row.actor)}</td><td>${esc(auditActionLabels[row.action] || row.action)}</td><td>${esc(auditEntityLabels[row.entityType] || row.entityType)} #${esc(row.entityId)}</td><td>${esc(auditChanges(row.changes))}</td></tr>`).join("") || '<tr><td colspan="5">Nenhum evento de auditoria neste período.</td></tr>'}</tbody></table></div>`;
+}
 export function finance(data) {
   return (
     title("Financeiro", "Entenda o desempenho da operação e acompanhe receitas e custos.") +
     `<div class="cards">${card("Receita bruta hoje", money(data.today.grossRevenue), "revenue")}${card("Receita bruta · 7 dias", money(data.week.grossRevenue), "trend")}${card("Receita bruta · 30 dias", money(data.last30Days.grossRevenue), "calendar")}${card("Receita bruta do mês", money(data.month.grossRevenue), "coins")}</div>${periodForm("7d", true)}<p class="muted">Receita bruta pela aprovação, preservada após estornos. Estornos pela primeira observação do incremento na aplicação, não pela data garantida de execução no PagBank. Receita líquida = bruta menos estornos observados no período; pode ser negativa. Chargebacks não são deduzidos sem dados financeiros confiáveis. Datas em São Paulo. Aprovações novas também usam a primeira observação local.</p><div id="finance-results"></div>`
   );
 }
-export function financeResults(summary, points, methods, transactions) {
-  return `<div class="cards">${card("Receita bruta no período", money(summary.grossRevenue), "revenue")}${card("Estornos observados", money(summary.refundedAmount), "coins")}${card("Receita líquida no período", money(summary.netRevenue), "revenue")}${card("Pedidos pagos", summary.paidOrders, "cart")}${card("Ticket médio", money(summary.averageTicket), "ticket")}${card("Lucro bruto estimado", money(summary.grossProfit), "coins", true)}</div>${coverage(summary)}${historyNotice(summary)}<section class="panel"><div class="section-header">${sectionTitle("Receita bruta por dia", "revenue")}</div>${chart(points)}</section><section class="panel"><div class="section-header">${sectionTitle("Formas de pagamento", "coins")}</div>${paymentMethods(methods)}</section><section class="panel"><div class="section-header">${sectionTitle("Transações", "orders")}</div>${transactionTable(transactions)}</section>`;
+export function financeResults(summary, points, methods, transactions, auditLogs = []) {
+  return `<div class="cards">${card("Receita bruta no período", money(summary.grossRevenue), "revenue")}${card("Estornos observados", money(summary.refundedAmount), "coins")}${card("Receita líquida no período", money(summary.netRevenue), "revenue")}${card("Pedidos pagos", summary.paidOrders, "cart")}${card("Ticket médio", money(summary.averageTicket), "ticket")}${card("Lucro bruto estimado", money(summary.grossProfit), "coins", true)}</div>${coverage(summary)}${historyNotice(summary)}<section class="panel"><div class="section-header">${sectionTitle("Receita bruta por dia", "revenue")}</div>${chart(points)}</section><section class="panel"><div class="section-header">${sectionTitle("Formas de pagamento", "coins")}</div>${paymentMethods(methods)}</section><section class="panel"><div class="section-header">${sectionTitle("Transações", "orders")}</div>${transactionTable(transactions)}</section><section class="panel"><div class="section-header">${sectionTitle("Trilha de auditoria", "lock")}</div><p class="muted">Últimos eventos administrativos, do sistema e do provedor de pagamento no período selecionado.</p>${auditTable(auditLogs)}</section>`;
 }
 export function store(data, isOpen, hours) {
   return (

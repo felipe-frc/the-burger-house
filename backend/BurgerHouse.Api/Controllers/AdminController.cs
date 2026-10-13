@@ -82,6 +82,15 @@ public sealed class AdminController(IAdminService service, TimeProvider clock) :
     [HttpGet("finance/transactions")]
     public Task<Page<TransactionRow>> Transactions([FromQuery] PeriodRequest filter, int page = 1, CancellationToken ct = default) =>
         service.TransactionsAsync(Range(filter), page, ct);
+
+    [HttpGet("finance/audit")]
+    public Task<IReadOnlyList<AuditLogRow>> Audit(
+        [FromQuery] PeriodRequest filter,
+        CancellationToken ct) =>
+        service.AuditLogsAsync(
+            Range(filter),
+            ct
+        );
     private DateRange Range(PeriodRequest request)
     {
         var today = DateRange.LocalToday(clock.GetUtcNow().UtcDateTime);

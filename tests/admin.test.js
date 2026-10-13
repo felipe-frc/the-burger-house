@@ -357,6 +357,17 @@ it("finance filters custom periods and shows methods coverage and transactions",
   await app.go("/admin/finance");
   expect(document.body.textContent).toContain("Lucro bruto estimado");
   expect(document.body.textContent).toContain("PIX");
+  expect(document.body.textContent).toContain("Trilha de auditoria");
+  expect(document.body.textContent).toContain("Administrador #1");
+  expect(document.body.textContent).toContain("Produto atualizado");
+  expect(document.body.textContent).toContain("Pagamento sincronizado");
+  expect(document.body.textContent).toContain("preço: 30 → 32");
+  expect(
+    request.mock.calls.some(
+      ([path]) =>
+        path.startsWith("finance/audit?period=7d")
+    )
+  ).toBe(true);
   document.querySelector('[name="period"]').value = "custom";
   submit("#period-form");
   await flush();
@@ -385,6 +396,32 @@ it("separates gross revenue refunds and negative net without inventing historica
     "Histórico global incompleto",
   );
   expect(views.historyNotice({ ...summary, estimatedApprovals: 1 })).toContain("estimativa legada");
+});
+it("audit trail escapes values and tolerates malformed change details", () => {
+  const html = views.auditTable([
+    {
+      createdAtUtc: "2026-10-05T21:10:00Z",
+      actor: "<img src=x onerror=alert(1)>",
+      action: "ProductUpdated",
+      entityType: "Product",
+      entityId: "<script>alert(1)</script>",
+      changes: '{"price":{"from":"<b>10</b>","to":12}}',
+    },
+    {
+      createdAtUtc: "2026-10-05T21:05:00Z",
+      actor: "Sistema",
+      action: "UnknownAction",
+      entityType: "Order",
+      entityId: "2",
+      changes: "{invalid-json",
+    },
+  ]);
+
+  expect(html).not.toContain("<img");
+  expect(html).not.toContain("<script>");
+  expect(html).not.toContain("<b>");
+  expect(html).toContain("Produto atualizado");
+  expect(html).toContain("Detalhes indisponíveis");
 });
 it("security rejects mismatched new passwords without calling the API", async () => {
   const request = setup();

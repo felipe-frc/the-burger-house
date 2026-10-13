@@ -262,11 +262,12 @@ export function createAdminApp(root, request = createAdminClient()) {
         views.orderTable(result.items) + views.pagination(result);
   }
   async function loadFinance(current = version) {
-    const [summary, points, methods, transactions] = await Promise.all([
+    const [summary, points, methods, transactions, auditLogs] = await Promise.all([
       request(`finance/summary?${periodQuery}`),
       request(`finance/revenue?${periodQuery}`),
       request(`finance/payment-methods?${periodQuery}`),
       request(`finance/transactions?${periodQuery}&page=${page}`),
+      request(`finance/audit?${periodQuery}`),
     ]);
     if (current !== version) return;
     root.querySelector("#finance-results").innerHTML = views.financeResults(
@@ -274,6 +275,7 @@ export function createAdminApp(root, request = createAdminClient()) {
       points,
       methods,
       transactions,
+      auditLogs,
     );
   }
   async function click(event) {
