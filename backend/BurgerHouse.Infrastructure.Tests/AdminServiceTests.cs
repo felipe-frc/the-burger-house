@@ -446,6 +446,120 @@ public sealed class AdminServiceTests : IAsyncLifetime
         await Assert.ThrowsAsync<ArgumentException>(() => service.OrdersAsync(new(Sort: "bad"), default));
     }
     [Fact]
+    public async Task ProductAndAuditRollBackTogetherWhenAuditInsertFails()
+    {
+        var before =
+            await db.Products
+                .AsNoTracking()
+                .SingleAsync(
+                    product =>
+                        product.Id == 1
+                );
+
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE TRIGGER fail_admin_audit_product " +
+            "BEFORE INSERT ON AdminAuditLogs " +
+            "BEGIN " +
+            "SELECT RAISE(ABORT, 'simulated audit failure'); " +
+            "END;"
+        );
+
+        await Assert.ThrowsAsync<DbUpdateException>(
+            () =>
+                service.UpdateProductAsync(
+                    before.Id,
+                    before.Price + 1m,
+                    before.CostPrice,
+                    !before.IsActive,
+                    owner.Id,
+                    DateTime.UtcNow,
+                    default
+                )
+        );
+
+        db.ChangeTracker.Clear();
+
+        var after =
+            await db.Products
+                .AsNoTracking()
+                .SingleAsync(
+                    product =>
+                        product.Id == before.Id
+                );
+
+        Assert.Equal(
+            before.Price,
+            after.Price
+        );
+
+        Assert.Equal(
+            before.CostPrice,
+            after.CostPrice
+        );
+
+        Assert.Equal(
+            before.IsActive,
+            after.IsActive
+        );
+
+        Assert.Empty(
+            await db.AdminAuditLogs
+                .AsNoTracking()
+                .ToListAsync()
+        );
+    }
+
+    [Fact]
+    public async Task OrderStatusAndAuditRollBackTogetherWhenAuditInsertFails()
+    {
+        var order =
+            await Seed();
+
+        var beforeStatus =
+            order.Status;
+
+        await db.Database.ExecuteSqlRawAsync(
+            "CREATE TRIGGER fail_admin_audit_order " +
+            "BEFORE INSERT ON AdminAuditLogs " +
+            "BEGIN " +
+            "SELECT RAISE(ABORT, 'simulated audit failure'); " +
+            "END;"
+        );
+
+        await Assert.ThrowsAsync<DbUpdateException>(
+            () =>
+                service.AdvanceAsync(
+                    order.Id,
+                    OrderStatus.Received,
+                    OrderStatus.Preparing,
+                    owner.Id,
+                    DateTime.UtcNow,
+                    default
+                )
+        );
+
+        db.ChangeTracker.Clear();
+
+        var after =
+            await db.Orders
+                .AsNoTracking()
+                .SingleAsync(
+                    current =>
+                        current.Id == order.Id
+                );
+
+        Assert.Equal(
+            beforeStatus,
+            after.Status
+        );
+
+        Assert.Empty(
+            await db.AdminAuditLogs
+                .AsNoTracking()
+                .ToListAsync()
+        );
+    }
+    [Fact]
     public async Task MigrationPreservesPreviousRecordsAndRollbackPreservesOrders()
     {
         await db.GetService<IMigrator>().MigrateAsync("20261004130831_AddOrderFulfillmentDetails");

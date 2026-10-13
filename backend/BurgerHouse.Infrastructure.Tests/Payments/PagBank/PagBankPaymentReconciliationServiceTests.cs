@@ -402,7 +402,15 @@ public class PagBankPaymentReconciliationServiceTests
         await fixture.Reconcile();
         await fixture.AssertPending();
         Assert.Null((await fixture.Payment()).ExternalPaymentId);
-    }
+
+        await using var auditDb =
+            fixture.Open();
+
+        Assert.Empty(
+            await auditDb.AdminAuditLogs
+                .AsNoTracking()
+                .ToListAsync()
+        );    }
 
     [Theory]
     [InlineData(PaymentStatus.Rejected)]
@@ -503,7 +511,15 @@ public class PagBankPaymentReconciliationServiceTests
         await fixture.Reconcile();
 
         await fixture.AssertPending();
-    }
+
+        await using var auditDb =
+            fixture.Open();
+
+        Assert.Empty(
+            await auditDb.AdminAuditLogs
+                .AsNoTracking()
+                .ToListAsync()
+        );    }
 
     [Fact]
     public async Task ConcurrentReconciliationsLeaveOneConsistentResult()
