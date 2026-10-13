@@ -1,6 +1,7 @@
 using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Orders.CreateOrder;
+using BurgerHouse.Application.Payments.CreateHostedCheckout;
 using BurgerHouse.Application.Payments.GetPaymentStatus;
 using BurgerHouse.Application.Payments.PrepareCheckoutPayment;
 using BurgerHouse.Application.Payments.SynchronizeCheckoutPayment;
@@ -159,10 +160,17 @@ builder.Services.AddScoped<
     PaymentRepository>();
 
 builder.Services.AddScoped<
+    IUnitOfWork,
+    EfUnitOfWork>();
+
+builder.Services.AddScoped<
     CreateOrderHandler>();
 
 builder.Services.AddScoped<
     PrepareCheckoutPaymentHandler>();
+
+builder.Services.AddScoped<
+    CreateHostedCheckoutHandler>();
 
 builder.Services.AddScoped<
     GetPaymentStatusHandler>();
@@ -254,8 +262,12 @@ if (args.Contains("--reset-owner-password"))
 if (!string.Equals(builder.Configuration["ForwardedHeaders_Enabled"], "true", StringComparison.OrdinalIgnoreCase))
 {
     // Without automatic forwarding, only Admin opts in; public routes are unchanged.
-    app.UseWhen(context => context.Request.Path.StartsWithSegments("/api/admin"),
-        admin => admin.UseForwardedHeaders());
+    app.UseWhen(
+        context =>
+            context.Request.Path.StartsWithSegments("/api/admin"),
+        admin =>
+            admin.UseForwardedHeaders()
+    );
 }
 
 app.UseHttpsRedirection();
