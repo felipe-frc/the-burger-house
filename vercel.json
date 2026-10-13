@@ -1,6 +1,6 @@
 {
   "framework": null,
-  "outputDirectory": ".",
+  "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/admin/:path*",
