@@ -17,6 +17,53 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.19");
 
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.AdminAuditLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ActorType")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("AdminUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Changes")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdminUserId");
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    b.HasIndex("EntityType", "EntityId", "CreatedAtUtc");
+
+                    b.ToTable("AdminAuditLogs", (string)null);
+                });
+
             modelBuilder.Entity("BurgerHouse.Domain.Entities.AdminSession", b =>
                 {
                     b.Property<string>("Id")
@@ -399,6 +446,14 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                             Name = "Guaraná Antarctica",
                             Price = 5.90m
                         });
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.AdminAuditLog", b =>
+                {
+                    b.HasOne("BurgerHouse.Domain.Entities.AdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("AdminUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("BurgerHouse.Domain.Entities.AdminSession", b =>

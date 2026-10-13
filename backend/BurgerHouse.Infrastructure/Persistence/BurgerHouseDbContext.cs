@@ -38,6 +38,8 @@ public class BurgerHouseDbContext : DbContext
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<PaymentRefund> PaymentRefunds => Set<PaymentRefund>();
 
+    public DbSet<AdminAuditLog> AdminAuditLogs => Set<AdminAuditLog>();
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
@@ -52,6 +54,50 @@ public class BurgerHouseDbContext : DbContext
             entity.Property(r => r.CumulativeRefundedAmount).HasPrecision(10, 2);
             entity.HasIndex(r => new { r.PaymentId, r.CumulativeRefundedAmount }).IsUnique();
             entity.HasIndex(r => r.CreatedAt);
+        });
+
+        modelBuilder.Entity<AdminAuditLog>(entity =>
+        {
+            entity.ToTable("AdminAuditLogs");
+
+            entity.HasKey(log => log.Id);
+
+            entity.Property(log => log.ActorType)
+                .IsRequired()
+                .HasMaxLength(40);
+
+            entity.Property(log => log.Action)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(log => log.EntityType)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(log => log.EntityId)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(log => log.Changes)
+                .IsRequired()
+                .HasColumnType("TEXT");
+
+            entity.Property(log => log.CreatedAtUtc)
+                .IsRequired();
+
+            entity.HasIndex(log => log.CreatedAtUtc);
+
+            entity.HasIndex(log => new
+            {
+                log.EntityType,
+                log.EntityId,
+                log.CreatedAtUtc
+            });
+
+            entity.HasOne<AdminUser>()
+                .WithMany()
+                .HasForeignKey(log => log.AdminUserId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<AdminUser>(entity =>
