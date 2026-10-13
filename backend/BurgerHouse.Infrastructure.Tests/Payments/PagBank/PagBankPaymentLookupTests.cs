@@ -97,6 +97,147 @@ public class PagBankPaymentLookupTests
         await Assert.ThrowsAsync<TaskCanceledException>(() => Lookup(http).GetAsync("CHAR_1"));
     }
 
+    [Theory]
+    [InlineData("ACTIVE")]
+    [InlineData("EXPIRED")]
+    public async Task ReadsCorrelatedCheckoutStatus(string status)
+    {
+        HttpRequestMessage? captured = null;
+
+        var payload =
+            JsonSerializer.Serialize(
+                new
+                {
+                    id = "CHEC_1",
+                    reference_id = "payment:17",
+                    status
+                }
+            );
+
+        using var http =
+            new HttpClient(
+                new Stub(request =>
+                {
+                    captured = request;
+
+                    return Task.FromResult(
+                        Json(
+                            HttpStatusCode.OK,
+                            payload
+                        )
+                    );
+                })
+            );
+
+        var actual =
+            await Lookup(http)
+                .GetCheckoutStatusAsync(
+                    "CHEC_1",
+                    17
+                );
+
+        Assert.Equal(
+            status,
+            actual
+        );
+
+        Assert.Equal(
+            HttpMethod.Get,
+            captured!.Method
+        );
+
+        Assert.Equal(
+            "https://sandbox.api.pagseguro.com/checkouts/CHEC_1",
+            captured.RequestUri!.ToString()
+        );
+    }
+
+    [Fact]
+    public async Task CheckoutStatusReturnsNullForNotFound()
+    {
+        using var http =
+            new HttpClient(
+                new Stub(_ =>
+                    Task.FromResult(
+                        Json(
+                            HttpStatusCode.NotFound,
+                            "{}"
+                        )
+                    )
+                )
+            );
+
+        var result =
+            await Lookup(http)
+                .GetCheckoutStatusAsync(
+                    "CHEC_MISSING",
+                    17
+                );
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task CheckoutStatusRejectsCorrelationMismatch()
+    {
+        using var http =
+            new HttpClient(
+                new Stub(_ =>
+                    Task.FromResult(
+                        Json(
+                            HttpStatusCode.OK,
+                            """
+                            {
+                              "id": "CHEC_1",
+                              "reference_id": "payment:999",
+                              "status": "EXPIRED"
+                            }
+                            """
+                        )
+                    )
+                )
+            );
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () =>
+                Lookup(http)
+                    .GetCheckoutStatusAsync(
+                        "CHEC_1",
+                        17
+                    )
+        );
+    }
+
+    [Fact]
+    public async Task CheckoutStatusPropagatesProviderFailure()
+    {
+        using var http =
+            new HttpClient(
+                new Stub(_ =>
+                    Task.FromResult(
+                        Json(
+                            HttpStatusCode.ServiceUnavailable,
+                            "{}"
+                        )
+                    )
+                )
+            );
+
+        var exception =
+            await Assert.ThrowsAsync<HttpRequestException>(
+                () =>
+                    Lookup(http)
+                        .GetCheckoutStatusAsync(
+                            "CHEC_1",
+                            17
+                        )
+            );
+
+        Assert.Equal(
+            HttpStatusCode.ServiceUnavailable,
+            exception.StatusCode
+        );
+    }
     private static PagBankPaymentLookup Lookup(HttpClient http) =>
         new(http, Options.Create(new PagBankOptions
         {

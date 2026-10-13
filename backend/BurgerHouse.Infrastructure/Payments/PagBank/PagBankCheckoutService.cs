@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -44,6 +45,13 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
         {
             throw new InvalidOperationException(
                 "PagBank token was not configured."
+            );
+        }
+
+        if (_options.CheckoutExpirationMinutes <= 0)
+        {
+            throw new InvalidOperationException(
+                "PagBank checkout expiration must be greater than zero."
             );
         }
 
@@ -152,6 +160,9 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
                             "CREDIT_CARD"
                         )
                     ],
+                    DateTimeOffset.UtcNow
+                        .AddMinutes(_options.CheckoutExpirationMinutes)
+                        .ToString("O", CultureInfo.InvariantCulture),
                     _options.RedirectUrl,
                     _options.RedirectUrl,
                     [_options.NotificationUrl],
@@ -550,6 +561,9 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
 
         [property: JsonPropertyName("payment_methods")]
         PagBankPaymentMethod[] PaymentMethods,
+
+        [property: JsonPropertyName("expiration_date")]
+        string ExpirationDate,
 
         [property: JsonPropertyName("redirect_url")]
         string RedirectUrl,

@@ -267,6 +267,19 @@ public class Order
             OrderStatus.Received;
     }
 
+    public void CancelPendingPayment()
+    {
+        if (Status != OrderStatus.PendingPayment)
+        {
+            throw new InvalidOperationException(
+                "Only orders pending payment can be cancelled for payment expiration."
+            );
+        }
+
+        Status =
+            OrderStatus.Cancelled;
+    }
+
     public void AdvanceStatus(
         OrderStatus next)
     {

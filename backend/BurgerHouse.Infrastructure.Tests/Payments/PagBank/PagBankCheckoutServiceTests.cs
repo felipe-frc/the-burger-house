@@ -55,9 +55,15 @@ public class PagBankCheckoutServiceTests
 
         var payment = NewPayment();
 
+        var beforeCheckout =
+            DateTimeOffset.UtcNow;
+
         var result =
             await Service(http)
                 .GetOrCreateAsync(payment, identity);
+
+        var afterCheckout =
+            DateTimeOffset.UtcNow;
 
         Assert.Equal(
             HttpMethod.Post,
@@ -143,6 +149,25 @@ public class PagBankCheckoutServiceTests
             ["PIX", "CREDIT_CARD"],
             paymentMethods
         );
+
+        var expiration =
+            DateTimeOffset.Parse(
+                body.RootElement
+                    .GetProperty("expiration_date")
+                    .GetString()
+                ?? throw new InvalidOperationException(
+                    "PagBank checkout expiration was null."
+                ),
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind
+            );
+
+        Assert.InRange(
+            expiration,
+            beforeCheckout.AddMinutes(30),
+            afterCheckout.AddMinutes(30)
+        );
+
         // Debit requires prior account approval and must not be offered yet.
         Assert.DoesNotContain("DEBIT_CARD", paymentMethods);
 

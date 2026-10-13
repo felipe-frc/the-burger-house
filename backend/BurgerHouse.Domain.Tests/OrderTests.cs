@@ -154,6 +154,40 @@ public class OrderTests
         );
     }
 
+    [Fact]
+    public void CancelPendingPayment_ShouldCancelPendingOrder()
+    {
+        var order = NewOrder();
+
+        order.CancelPendingPayment();
+
+        Assert.Equal(
+            OrderStatus.Cancelled,
+            order.Status
+        );
+    }
+
+    [Fact]
+    public void CancelPendingPayment_ShouldThrow_WhenOrderIsAlreadyReceived()
+    {
+        var order = NewOrder();
+
+        order.AddItem(
+            new OrderItem(1, 1, 25m)
+        );
+
+        order.MarkAsReceived();
+
+        Assert.Throws<InvalidOperationException>(
+            () => order.CancelPendingPayment()
+        );
+
+        Assert.Equal(
+            OrderStatus.Received,
+            order.Status
+        );
+    }
+
     private static Order NewOrder(
         decimal deliveryFee = 8m)
     {

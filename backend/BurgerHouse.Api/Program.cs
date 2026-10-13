@@ -103,6 +103,11 @@ var pagBankOptions = builder.Services
             ) &&
             uri.Scheme == Uri.UriSchemeHttps,
         "PagBank base URL must be configured as HTTPS."
+    )
+    .Validate(
+        options =>
+            options.CheckoutExpirationMinutes > 0,
+        "PagBank checkout expiration must be greater than zero."
     );
 
 if (!builder.Environment.IsDevelopment())
@@ -171,6 +176,9 @@ if (builder.Environment.IsDevelopment())
     builder.Services.AddScoped<PendingPaymentReconciliationBatch>();
     builder.Services.AddHostedService<BurgerHouse.Api.DevelopmentPaymentReconciliationWorker>();
 }
+
+builder.Services.AddScoped<PendingPaymentExpirationBatch>();
+builder.Services.AddHostedService<BurgerHouse.Api.PendingPaymentExpirationWorker>();
 
 builder.Services.AddScoped<
     SynchronizeCheckoutPaymentHandler>();

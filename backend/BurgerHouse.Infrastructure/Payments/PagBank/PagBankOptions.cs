@@ -13,4 +13,6 @@ public sealed class PagBankOptions
     public string RedirectUrl { get; init; } = string.Empty;
 
     public string NotificationUrl { get; init; } = string.Empty;
+
+    public int CheckoutExpirationMinutes { get; init; } = 30;
 }

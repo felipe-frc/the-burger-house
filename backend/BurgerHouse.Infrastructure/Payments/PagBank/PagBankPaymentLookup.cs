@@ -95,6 +95,48 @@ public sealed class PagBankPaymentLookup
         );
     }
 
+    public async Task<string?> GetCheckoutStatusAsync(
+        string checkoutId,
+        int paymentId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!IsResourceId(checkoutId, "CHEC_"))
+        {
+            throw new InvalidOperationException(
+                "PagBank checkout id is invalid."
+            );
+        }
+
+        var checkout =
+            await GetResourceAsync<CheckoutResponse>(
+                $"checkouts/{Uri.EscapeDataString(checkoutId)}",
+                cancellationToken
+            );
+
+        if (checkout is null)
+        {
+            return null;
+        }
+
+        if (!string.Equals(
+                checkout.Id,
+                checkoutId,
+                StringComparison.Ordinal
+            ) ||
+            !string.Equals(
+                checkout.ReferenceId,
+                PagBankCheckoutService.CreateReference(paymentId),
+                StringComparison.Ordinal
+            ) ||
+            string.IsNullOrWhiteSpace(checkout.Status))
+        {
+            throw new InvalidOperationException(
+                "PagBank returned an incompatible checkout."
+            );
+        }
+
+        return checkout.Status.Trim();
+    }
     public async Task<PagBankChargeDiscovery> DiscoverChargeAsync(
         string checkoutId, int paymentId, decimal amount, CancellationToken cancellationToken = default)
     {
@@ -153,6 +195,7 @@ public sealed class PagBankPaymentLookup
     {
         [JsonPropertyName("id")] public string? Id { get; init; }
         [JsonPropertyName("reference_id")] public string? ReferenceId { get; init; }
+        [JsonPropertyName("status")] public string? Status { get; init; }
         [JsonPropertyName("orders")] public OrderResponse?[]? Orders { get; init; }
     }
 
