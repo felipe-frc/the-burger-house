@@ -185,6 +185,126 @@ public class PagBankPaymentReconciliationServiceTests
     }
 
     [Fact]
+    public async Task PaymentAuditIsPersistedAndDuplicateReconciliationDoesNotDuplicateIt()
+    {
+        using var fixture =
+            new Fixture(false)
+            {
+                DiscoverOrder = true,
+                ProviderMethod = "PIX"
+            };
+
+        await fixture.Reconcile();
+
+        await using (var db = fixture.Open())
+        {
+            var audit =
+                Assert.Single(
+                    await db.AdminAuditLogs
+                        .AsNoTracking()
+                        .ToListAsync()
+                );
+
+            Assert.Null(
+                audit.AdminUserId
+            );
+
+            Assert.Equal(
+                "Provider",
+                audit.ActorType
+            );
+
+            Assert.Equal(
+                "PaymentSynchronized",
+                audit.Action
+            );
+
+            Assert.Equal(
+                "Payment",
+                audit.EntityType
+            );
+
+            Assert.Equal(
+                fixture.PaymentId.ToString(),
+                audit.EntityId
+            );
+
+            Assert.DoesNotContain(
+                "CHAR_1",
+                audit.Changes
+            );
+
+            using var document =
+                JsonDocument.Parse(
+                    audit.Changes
+                );
+
+            var changes =
+                document.RootElement;
+
+            Assert.Equal(
+                "Pending",
+                changes
+                    .GetProperty("status")
+                    .GetProperty("from")
+                    .GetString()
+            );
+
+            Assert.Equal(
+                "Approved",
+                changes
+                    .GetProperty("status")
+                    .GetProperty("to")
+                    .GetString()
+            );
+
+            Assert.Equal(
+                "PendingPayment",
+                changes
+                    .GetProperty("orderStatus")
+                    .GetProperty("from")
+                    .GetString()
+            );
+
+            Assert.Equal(
+                "Received",
+                changes
+                    .GetProperty("orderStatus")
+                    .GetProperty("to")
+                    .GetString()
+            );
+
+            Assert.True(
+                changes.TryGetProperty(
+                    "externalPaymentLinked",
+                    out var externalPaymentLinked
+                )
+            );
+
+            Assert.False(
+                externalPaymentLinked
+                    .GetProperty("from")
+                    .GetBoolean()
+            );
+
+            Assert.True(
+                externalPaymentLinked
+                    .GetProperty("to")
+                    .GetBoolean()
+            );
+        }
+
+        await fixture.Reconcile();
+
+        await using var secondDb =
+            fixture.Open();
+
+        Assert.Equal(
+            1,
+            await secondDb.AdminAuditLogs.CountAsync()
+        );
+    }
+    [Fact]
     public async Task CheckoutDiscoveryApprovesPixAndPreservesFinancialHistory()
     {
         using var fixture = new Fixture(false) { DiscoverOrder = true, ProviderMethod = "PIX" };
@@ -560,7 +680,8 @@ public class PagBankPaymentReconciliationServiceTests
                 new PagBankPaymentLookup(http, _options),
                 new SynchronizeCheckoutPaymentHandler(
                     new PaymentRepository(db),
-                    new OrderRepository(db)
+                    new OrderRepository(db),
+                    new EfAuditLogWriter(db)
                 ),
                 db,
                 NullLogger<PagBankPaymentReconciliationService>.Instance

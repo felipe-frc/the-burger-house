@@ -168,6 +168,10 @@ builder.Services.AddScoped<
     EfUnitOfWork>();
 
 builder.Services.AddScoped<
+    IAuditLogWriter,
+    EfAuditLogWriter>();
+
+builder.Services.AddScoped<
     CreateOrderHandler>();
 
 builder.Services.AddScoped<

@@ -1568,6 +1568,9 @@ public class PagBankWebhooksControllerTests
                     paymentRepository,
                     new OrderRepository(
                         db
+                    ),
+                    new EfAuditLogWriter(
+                        db
                     )
                 );
 
@@ -1923,6 +1926,9 @@ public class PagBankWebhooksControllerTests
                             db
                         ),
                         new OrderRepository(
+                            db
+                        ),
+                        new EfAuditLogWriter(
                             db
                         )
                     ),

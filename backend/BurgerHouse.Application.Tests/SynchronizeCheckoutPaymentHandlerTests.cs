@@ -12,7 +12,7 @@ public class SynchronizeCheckoutPaymentHandlerTests
     public async Task RepeatedAndRegressiveSnapshotsPreserveDeltasAndApproval()
     {
         var store = new Store();
-        var handler = new SynchronizeCheckoutPaymentHandler(store, store);
+        var handler = new SynchronizeCheckoutPaymentHandler(store, store, store);
         Task<bool> Sync(PaymentGatewayStatus status, decimal total) =>
             handler.HandleAsync(17, "CHAR_1", 100, "BRL", PaymentMethod.Pix, status, refundedAmount: total);
         Assert.True(await Sync(PaymentGatewayStatus.Approved, 0));
@@ -31,6 +31,15 @@ public class SynchronizeCheckoutPaymentHandlerTests
         Assert.Equal(approved, store.Payment.ApprovedAt);
         Assert.Equal(PaymentStatus.Refunded, store.Payment.Status);
         Assert.Equal(4, store.Saves);
+        Assert.Equal(4, store.AuditLogs.Count);
+        Assert.All(store.AuditLogs, audit =>
+        {
+            Assert.Equal("Provider", audit.ActorType);
+            Assert.Equal("PaymentSynchronized", audit.Action);
+            Assert.Equal("Payment", audit.EntityType);
+            Assert.Null(audit.AdminUserId);
+            Assert.DoesNotContain("CHAR_1", audit.Changes);
+        });
     }
 
     [Theory]
@@ -42,7 +51,7 @@ public class SynchronizeCheckoutPaymentHandlerTests
     {
         var store = new Store();
         if (legacy) typeof(Payment).GetProperty(nameof(Payment.RefundTrackingStartedAt))!.SetValue(store.Payment, null);
-        var handler = new SynchronizeCheckoutPaymentHandler(store, store);
+        var handler = new SynchronizeCheckoutPaymentHandler(store, store, store);
         await handler.HandleAsync(17, "CHAR_1", 100, "BRL", PaymentMethod.Pix,
             total == 100 ? PaymentGatewayStatus.Refunded : PaymentGatewayStatus.PartiallyRefunded,
             refundedAmount: total);
@@ -50,13 +59,15 @@ public class SynchronizeCheckoutPaymentHandlerTests
         Assert.Equal(legacy ? 0 : 1, store.Payment.Refunds.Count);
         Assert.Equal(!legacy, store.Payment.ApprovedAt.HasValue);
         Assert.Equal(legacy ? ApprovalDateSource.Unknown : ApprovalDateSource.Observed, store.Payment.ApprovalDateSource);
+        Assert.Single(store.AuditLogs);
     }
 
-    private sealed class Store : IPaymentRepository, IOrderRepository
+    private sealed class Store : IPaymentRepository, IOrderRepository, IAuditLogWriter
     {
         public Payment Payment { get; } = new(1, 100, Guid.NewGuid().ToString(), PaymentMethod.Unknown);
         private readonly Order order = new(0, "pickup", "Cliente", "11999990000", "cliente@teste.com", "52998224725");
         public int Saves { get; private set; }
+        public List<AdminAuditLog> AuditLogs { get; } = [];
         public Store()
         {
             typeof(Payment).GetProperty(nameof(Payment.Id))!.SetValue(Payment, 17);
@@ -69,6 +80,14 @@ public class SynchronizeCheckoutPaymentHandlerTests
         Task<Payment?> IPaymentRepository.GetByIdAsync(int id, CancellationToken ct) => Task.FromResult<Payment?>(Payment);
         Task<Order?> IOrderRepository.GetByIdAsync(int id, CancellationToken ct) => Task.FromResult<Order?>(order);
         public Task<Payment?> GetActiveByOrderIdAsync(int id, CancellationToken cancellationToken = default) => Task.FromResult<Payment?>(Payment);
+        public Task AddAsync(
+            AdminAuditLog auditLog,
+            CancellationToken cancellationToken = default)
+        {
+            AuditLogs.Add(auditLog);
+            return Task.CompletedTask;
+        }
+
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) { Saves++; return Task.CompletedTask; }
     }
 }

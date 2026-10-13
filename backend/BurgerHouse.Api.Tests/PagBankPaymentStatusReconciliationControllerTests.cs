@@ -79,7 +79,7 @@ public class PagBankPaymentStatusReconciliationControllerTests
             var orderRepository = new OrderRepository(db);
             var reconciliation = new PagBankPaymentReconciliationService(
                 new PagBankPaymentLookup(http, pagBankOptions),
-                new SynchronizeCheckoutPaymentHandler(paymentRepository, orderRepository),
+                new SynchronizeCheckoutPaymentHandler(paymentRepository, orderRepository, new EfAuditLogWriter(db)),
                 db,
                 NullLogger<PagBankPaymentReconciliationService>.Instance
             );

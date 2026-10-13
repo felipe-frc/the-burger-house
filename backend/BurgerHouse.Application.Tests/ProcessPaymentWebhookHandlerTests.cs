@@ -88,6 +88,40 @@ public class ProcessPaymentWebhookHandlerTests
             1,
             unitOfWork.ClearTrackingCalls
         );
+
+        var audit =
+            Assert.Single(
+                store.AuditLogs
+            );
+
+        Assert.Null(
+            audit.AdminUserId
+        );
+
+        Assert.Equal(
+            "Provider",
+            audit.ActorType
+        );
+
+        Assert.Equal(
+            "PaymentSynchronized",
+            audit.Action
+        );
+
+        Assert.Equal(
+            "Payment",
+            audit.EntityType
+        );
+
+        Assert.Equal(
+            store.Payment.Id.ToString(),
+            audit.EntityId
+        );
+
+        Assert.DoesNotContain(
+            "CHAR_1",
+            audit.Changes
+        );
     }
 
     [Fact]
@@ -169,6 +203,10 @@ public class ProcessPaymentWebhookHandlerTests
                 Assert.True(
                     transaction.Committed
                 )
+        );
+
+        Assert.Single(
+            store.AuditLogs
         );
     }
 
@@ -487,6 +525,7 @@ public class ProcessPaymentWebhookHandlerTests
         var synchronizer =
             new SynchronizeCheckoutPaymentHandler(
                 store,
+                store,
                 store
             );
 
@@ -616,13 +655,17 @@ public class ProcessPaymentWebhookHandlerTests
 
     private sealed class Store
         : IPaymentRepository,
-          IOrderRepository
+          IOrderRepository,
+          IAuditLogWriter
     {
         public Order Order { get; }
 
         public Payment Payment { get; }
 
         public int Saves { get; private set; }
+
+        public List<AdminAuditLog> AuditLogs { get; } =
+            [];
 
         public Store()
         {
@@ -716,6 +759,17 @@ public class ProcessPaymentWebhookHandlerTests
                     ? Payment
                     : null
             );
+        }
+
+        public Task AddAsync(
+            AdminAuditLog auditLog,
+            CancellationToken cancellationToken = default)
+        {
+            AuditLogs.Add(
+                auditLog
+            );
+
+            return Task.CompletedTask;
         }
 
         public Task SaveChangesAsync(
