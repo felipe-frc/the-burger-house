@@ -228,11 +228,15 @@ builder.Services.AddScoped<IPaymentProviderLookup>(
             PagBankPaymentLookup>()
 );
 
-builder.Services.AddHttpClient<PagBankWebhookSignatureValidator>(
+builder.Services.AddHttpClient(
+    PagBankWebhookSignatureValidator.HttpClientName,
     client =>
         client.Timeout =
             TimeSpan.FromSeconds(15)
 );
+
+builder.Services.AddSingleton<
+    PagBankWebhookSignatureValidator>();
 
 builder.Services.AddControllersWithViews();
 

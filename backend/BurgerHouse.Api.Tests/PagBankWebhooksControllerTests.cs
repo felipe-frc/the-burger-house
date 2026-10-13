@@ -1584,7 +1584,9 @@ public class PagBankWebhooksControllerTests
             var controller =
                 new PagBankWebhooksController(
                     new PagBankWebhookSignatureValidator(
-                        signatureHttp,
+                        new SingleClientFactory(
+                            signatureHttp
+                        ),
                         options
                     ),
                     webhookHandler,
@@ -1999,6 +2001,36 @@ public class PagBankWebhooksControllerTests
             string? Currency = null,
             string? Method = null
         );
+
+        private sealed class SingleClientFactory(
+
+            HttpClient client)
+
+            : IHttpClientFactory
+
+        {
+
+            public HttpClient CreateClient(
+
+                string name)
+
+            {
+
+                Assert.Equal(
+
+                    PagBankWebhookSignatureValidator.HttpClientName,
+
+                    name
+
+                );
+
+
+                return client;
+
+            }
+
+        }
+
 
         private sealed class Stub(
             Func<
