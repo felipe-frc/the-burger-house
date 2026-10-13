@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Globalization;
+using System.Security.Claims;
 using BurgerHouse.Application.Admin;
 using BurgerHouse.Application.Orders.CreateOrder;
 using BurgerHouse.Domain.Enums;
@@ -39,7 +40,20 @@ public sealed class AdminController(IAdminService service, TimeProvider clock) :
     [HttpPatch("products/{id:int:min(1)}")]
     public async Task<IActionResult> Product(int id, ProductRequest request, CancellationToken ct)
     {
-        await service.UpdateProductAsync(id, request.Price!.Value, request.CostPrice, request.IsActive!.Value, ct);
+        var adminUserId = int.Parse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)!
+        );
+
+        await service.UpdateProductAsync(
+            id,
+            request.Price!.Value,
+            request.CostPrice,
+            request.IsActive!.Value,
+            adminUserId,
+            clock.GetUtcNow().UtcDateTime,
+            ct
+        );
+
         return NoContent();
     }
     [HttpGet("store")]

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BurgerHouse.Application.Admin;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
@@ -161,15 +162,95 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
     }
     public async Task<IReadOnlyList<ProductRow>> ProductsAsync(CancellationToken ct) =>
         await db.Products.AsNoTracking().OrderBy(p => p.Id).Select(p => new ProductRow(p.Id, p.Name, p.Price, p.CostPrice, p.IsActive)).ToListAsync(ct);
-    public async Task UpdateProductAsync(int id, decimal price, decimal? cost, bool active, CancellationToken ct)
+    public async Task UpdateProductAsync(
+        int id,
+        decimal price,
+        decimal? cost,
+        bool active,
+        int adminUserId,
+        DateTime utcNow,
+        CancellationToken ct)
     {
-        if (price <= 0 || price > 99999999.99m || decimal.Round(price, 2) != price) throw new ArgumentException("Invalid price.");
-        var product = await db.Products.SingleOrDefaultAsync(p => p.Id == id, ct) ?? throw new KeyNotFoundException();
+        if (price <= 0 ||
+            price > 99999999.99m ||
+            decimal.Round(price, 2) != price)
+            throw new ArgumentException("Invalid price.");
+
+        if (adminUserId <= 0)
+            throw new ArgumentException(
+                "Invalid admin user.",
+                nameof(adminUserId)
+            );
+
+        if (utcNow.Kind != DateTimeKind.Utc)
+            throw new ArgumentException(
+                "Audit timestamp must be UTC.",
+                nameof(utcNow)
+            );
+
+        var product =
+            await db.Products.SingleOrDefaultAsync(
+                p => p.Id == id,
+                ct
+            )
+            ?? throw new KeyNotFoundException();
+
+        var changes =
+            new Dictionary<string, object?>();
+
+        if (product.Price != price)
+        {
+            changes["price"] = new
+            {
+                from = product.Price,
+                to = price
+            };
+        }
+
+        if (product.CostPrice != cost)
+        {
+            changes["costPrice"] = new
+            {
+                from = product.CostPrice,
+                to = cost
+            };
+        }
+
+        if (product.IsActive != active)
+        {
+            changes["isActive"] = new
+            {
+                from = product.IsActive,
+                to = active
+            };
+        }
+
+        if (changes.Count == 0)
+            return;
+
         product.UpdateCost(cost);
         product.UpdatePrice(price);
-        if (active) product.Activate(); else product.Deactivate();
+
+        if (active)
+            product.Activate();
+        else
+            product.Deactivate();
+
+        db.AdminAuditLogs.Add(
+            new AdminAuditLog(
+                adminUserId,
+                "Admin",
+                "ProductUpdated",
+                "Product",
+                id.ToString(),
+                JsonSerializer.Serialize(changes),
+                utcNow
+            )
+        );
+
         await db.SaveChangesAsync(ct);
     }
+
     private static void ValidatePage(int page)
     {
         if (page < 1 || page > 100000) throw new ArgumentException("Invalid page.");

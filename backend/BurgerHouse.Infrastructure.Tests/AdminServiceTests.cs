@@ -17,12 +17,22 @@ public sealed class AdminServiceTests : IAsyncLifetime
     private readonly SqliteConnection connection = new("Data Source=:memory:");
     private BurgerHouseDbContext db = null!;
     private AdminService service = null!;
+    private AdminUser owner = null!;
     private static DateRange Today => DateRange.FromDates(DateRange.LocalToday(DateTime.UtcNow), DateRange.LocalToday(DateTime.UtcNow));
     public async Task InitializeAsync()
     {
         await connection.OpenAsync();
         db = new(new DbContextOptionsBuilder<BurgerHouseDbContext>().UseSqlite(connection).Options, TestPersonalData.Protector);
         await db.Database.MigrateAsync();
+
+        owner = new AdminUser(
+            "owner@example.invalid",
+            "test-password-hash"
+        );
+
+        db.Add(owner);
+        await db.SaveChangesAsync();
+
         service = new(db);
     }
     public async Task DisposeAsync() { await db.DisposeAsync(); await connection.DisposeAsync(); }
@@ -93,7 +103,7 @@ public sealed class AdminServiceTests : IAsyncLifetime
     public async Task HistoricalUnknownCostDoesNotInventProfitAndSnapshotSurvivesProductEdits()
     {
         await Seed(cost: null); await Seed(cost: 10);
-        await service.UpdateProductAsync(1, 90, 80, true, default);
+        await service.UpdateProductAsync(1, 90, 80, true, owner.Id, DateTime.UtcNow, default);
         var summary = await service.SummaryAsync(Today, default);
         Assert.Equal(2, summary.PaidOrders); Assert.Equal(1, summary.OrdersWithCost); Assert.Equal(40m, summary.GrossProfit);
         Assert.Contains(await db.OrderItems.ToListAsync(), i => i.UnitCost == 10m && i.UnitPrice == 30m);
@@ -107,12 +117,12 @@ public sealed class AdminServiceTests : IAsyncLifetime
     [Fact]
     public async Task NewOrderHandlerCopiesCurrentCostAndNeverChangesExistingItems()
     {
-        await service.UpdateProductAsync(1, 30, 12.5m, true, default);
+        await service.UpdateProductAsync(1, 30, 12.5m, true, owner.Id, DateTime.UtcNow, default);
         var handler = new CreateOrderHandler(new ProductRepository(db), new OrderRepository(db));
         await handler.HandleAsync(new CreateOrderRequest { OrderType = "pickup", CustomerName = "Cliente",
             CustomerEmail = "cliente@teste.com", CustomerTaxId = "52998224725",
             CustomerPhone = "11999990000", Items = [new() { ProductCode = "burger-praiano", Quantity = 1 }] });
-        await service.UpdateProductAsync(1, 50, 20, true, default);
+        await service.UpdateProductAsync(1, 50, 20, true, owner.Id, DateTime.UtcNow, default);
         db.ChangeTracker.Clear();
         var item = await db.OrderItems.SingleAsync();
         Assert.Equal(12.5m, item.UnitCost); Assert.Equal(30m, item.UnitPrice);
@@ -159,16 +169,160 @@ public sealed class AdminServiceTests : IAsyncLifetime
     [InlineData(1, -1)]
     [InlineData(1, 0.111)]
     public async Task ProductEditRejectsInvalidMoney(decimal price, decimal cost) =>
-        await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateProductAsync(1, price, cost, true, default));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateProductAsync(1, price, cost, true, owner.Id, DateTime.UtcNow, default));
     [Fact]
     public async Task ProductsExposeOnlyApprovedFieldsAndAllowUnknownCost()
     {
-        await service.UpdateProductAsync(1, 33, 0, false, default);
+        await service.UpdateProductAsync(1, 33, 0, false, owner.Id, DateTime.UtcNow, default);
         var product = (await service.ProductsAsync(default)).First();
         Assert.False(product.IsActive); Assert.Equal(33, product.Margin);
-        await service.UpdateProductAsync(1, 33, null, true, default);
+        await service.UpdateProductAsync(1, 33, null, true, owner.Id, DateTime.UtcNow, default);
         Assert.Null((await service.ProductsAsync(default)).First().Margin);
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.UpdateProductAsync(999, 1, null, true, default));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.UpdateProductAsync(999, 1, null, true, owner.Id, DateTime.UtcNow, default));
+    }
+    [Fact]
+    public async Task ProductEditsCreateAuditLogWithChangedFields()
+    {
+        var utcNow =
+            new DateTime(
+                2026,
+                10,
+                13,
+                12,
+                0,
+                0,
+                DateTimeKind.Utc
+            );
+
+        await service.UpdateProductAsync(
+            1,
+            49.90m,
+            20m,
+            false,
+            owner.Id,
+            utcNow,
+            default
+        );
+
+        var log =
+            await db.AdminAuditLogs.SingleAsync();
+
+        Assert.Equal(
+            owner.Id,
+            log.AdminUserId
+        );
+
+        Assert.Equal(
+            "Admin",
+            log.ActorType
+        );
+
+        Assert.Equal(
+            "ProductUpdated",
+            log.Action
+        );
+
+        Assert.Equal(
+            "Product",
+            log.EntityType
+        );
+
+        Assert.Equal(
+            "1",
+            log.EntityId
+        );
+
+        Assert.Equal(
+            utcNow,
+            log.CreatedAtUtc
+        );
+
+        using var document =
+            System.Text.Json.JsonDocument.Parse(
+                log.Changes
+            );
+
+        var changes =
+            document.RootElement;
+
+        var price =
+            changes.GetProperty(
+                "price"
+            );
+
+        Assert.Equal(
+            43.90m,
+            price.GetProperty(
+                "from"
+            ).GetDecimal()
+        );
+
+        Assert.Equal(
+            49.90m,
+            price.GetProperty(
+                "to"
+            ).GetDecimal()
+        );
+
+        var cost =
+            changes.GetProperty(
+                "costPrice"
+            );
+
+        Assert.Equal(
+            System.Text.Json.JsonValueKind.Null,
+            cost.GetProperty(
+                "from"
+            ).ValueKind
+        );
+
+        Assert.Equal(
+            20m,
+            cost.GetProperty(
+                "to"
+            ).GetDecimal()
+        );
+
+        var active =
+            changes.GetProperty(
+                "isActive"
+            );
+
+        Assert.True(
+            active.GetProperty(
+                "from"
+            ).GetBoolean()
+        );
+
+        Assert.False(
+            active.GetProperty(
+                "to"
+            ).GetBoolean()
+        );
+    }
+
+    [Fact]
+    public async Task ProductEditWithoutChangesDoesNotCreateAuditLog()
+    {
+        var product =
+            await db.Products.SingleAsync(
+                product =>
+                    product.Id == 1
+            );
+
+        await service.UpdateProductAsync(
+            product.Id,
+            product.Price,
+            product.CostPrice,
+            product.IsActive,
+            owner.Id,
+            DateTime.UtcNow,
+            default
+        );
+
+        Assert.Empty(
+            await db.AdminAuditLogs.ToListAsync()
+        );
     }
     [Fact]
     public async Task DateBoundariesExcludeFollowingDayAndSeriesFillsZeros()
