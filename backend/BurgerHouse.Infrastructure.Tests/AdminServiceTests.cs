@@ -103,7 +103,7 @@ public sealed class AdminServiceTests : IAsyncLifetime
     public async Task HistoricalUnknownCostDoesNotInventProfitAndSnapshotSurvivesProductEdits()
     {
         await Seed(cost: null); await Seed(cost: 10);
-        await service.UpdateProductAsync(1, 90, 80, true, owner.Id, DateTime.UtcNow, default);
+        await service.UpdateProductAsync(1, db.Products.Single(p => p.Id == 1).Name, db.Products.Single(p => p.Id == 1).Description, 90, 80, true, owner.Id, DateTime.UtcNow, default);
         var summary = await service.SummaryAsync(Today, default);
         Assert.Equal(2, summary.PaidOrders); Assert.Equal(1, summary.OrdersWithCost); Assert.Equal(40m, summary.GrossProfit);
         Assert.Contains(await db.OrderItems.ToListAsync(), i => i.UnitCost == 10m && i.UnitPrice == 30m);
@@ -117,12 +117,12 @@ public sealed class AdminServiceTests : IAsyncLifetime
     [Fact]
     public async Task NewOrderHandlerCopiesCurrentCostAndNeverChangesExistingItems()
     {
-        await service.UpdateProductAsync(1, 30, 12.5m, true, owner.Id, DateTime.UtcNow, default);
+        await service.UpdateProductAsync(1, db.Products.Single(p => p.Id == 1).Name, db.Products.Single(p => p.Id == 1).Description, 30, 12.5m, true, owner.Id, DateTime.UtcNow, default);
         var handler = new CreateOrderHandler(new ProductRepository(db), new OrderRepository(db));
         await handler.HandleAsync(new CreateOrderRequest { OrderType = "pickup", CustomerName = "Cliente",
             CustomerEmail = "cliente@teste.com", CustomerTaxId = "52998224725",
             CustomerPhone = "11999990000", Items = [new() { ProductCode = "burger-praiano", Quantity = 1 }] });
-        await service.UpdateProductAsync(1, 50, 20, true, owner.Id, DateTime.UtcNow, default);
+        await service.UpdateProductAsync(1, db.Products.Single(p => p.Id == 1).Name, db.Products.Single(p => p.Id == 1).Description, 50, 20, true, owner.Id, DateTime.UtcNow, default);
         db.ChangeTracker.Clear();
         var item = await db.OrderItems.SingleAsync();
         Assert.Equal(12.5m, item.UnitCost); Assert.Equal(30m, item.UnitPrice);
@@ -277,16 +277,16 @@ public sealed class AdminServiceTests : IAsyncLifetime
     [InlineData(1, -1)]
     [InlineData(1, 0.111)]
     public async Task ProductEditRejectsInvalidMoney(decimal price, decimal cost) =>
-        await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateProductAsync(1, price, cost, true, owner.Id, DateTime.UtcNow, default));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateProductAsync(1, db.Products.Single(p => p.Id == 1).Name, db.Products.Single(p => p.Id == 1).Description, price, cost, true, owner.Id, DateTime.UtcNow, default));
     [Fact]
     public async Task ProductsExposeOnlyApprovedFieldsAndAllowUnknownCost()
     {
-        await service.UpdateProductAsync(1, 33, 0, false, owner.Id, DateTime.UtcNow, default);
+        await service.UpdateProductAsync(1, db.Products.Single(p => p.Id == 1).Name, db.Products.Single(p => p.Id == 1).Description, 33, 0, false, owner.Id, DateTime.UtcNow, default);
         var product = (await service.ProductsAsync(default)).First();
         Assert.False(product.IsActive); Assert.Equal(33, product.Margin);
-        await service.UpdateProductAsync(1, 33, null, true, owner.Id, DateTime.UtcNow, default);
+        await service.UpdateProductAsync(1, db.Products.Single(p => p.Id == 1).Name, db.Products.Single(p => p.Id == 1).Description, 33, null, true, owner.Id, DateTime.UtcNow, default);
         Assert.Null((await service.ProductsAsync(default)).First().Margin);
-        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.UpdateProductAsync(999, 1, null, true, owner.Id, DateTime.UtcNow, default));
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => service.UpdateProductAsync(999, "Produto de teste", "Descricao de teste", 1, null, true, owner.Id, DateTime.UtcNow, default));
     }
     [Fact]
     public async Task ProductEditsCreateAuditLogWithChangedFields()
@@ -304,6 +304,8 @@ public sealed class AdminServiceTests : IAsyncLifetime
 
         await service.UpdateProductAsync(
             1,
+            db.Products.Single(p => p.Id == 1).Name,
+            db.Products.Single(p => p.Id == 1).Description,
             49.90m,
             20m,
             false,
@@ -409,6 +411,236 @@ public sealed class AdminServiceTests : IAsyncLifetime
         );
     }
 
+    [Theory]
+    [InlineData("", "Descricao valida")]
+    [InlineData("   ", "Descricao valida")]
+    [InlineData("Nome valido", "")]
+    [InlineData("Nome valido", "   ")]
+    public async Task ProductEditRejectsInvalidNameAndDescription(
+        string name,
+        string description)
+    {
+        var before = await db.Products
+            .AsNoTracking()
+            .SingleAsync(p => p.Id == 1);
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.UpdateProductAsync(
+                before.Id,
+                name,
+                description,
+                before.Price,
+                before.CostPrice,
+                before.IsActive,
+                owner.Id,
+                DateTime.UtcNow,
+                default
+            )
+        );
+
+        db.ChangeTracker.Clear();
+
+        var after = await db.Products
+            .AsNoTracking()
+            .SingleAsync(p => p.Id == 1);
+
+        Assert.Equal(before.Name, after.Name);
+        Assert.Equal(before.Description, after.Description);
+
+        Assert.Empty(await db.AdminAuditLogs.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ProductEditRejectsNameAndDescriptionAboveLimits()
+    {
+        var before = await db.Products
+            .AsNoTracking()
+            .SingleAsync(p => p.Id == 1);
+
+        foreach (var values in new[]
+        {
+            (Name: new string('N', 151), Description: "Descricao valida"),
+            (Name: "Nome valido", Description: new string('D', 501))
+        })
+        {
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => service.UpdateProductAsync(
+                    before.Id,
+                    values.Name,
+                    values.Description,
+                    before.Price,
+                    before.CostPrice,
+                    before.IsActive,
+                    owner.Id,
+                    DateTime.UtcNow,
+                    default
+                )
+            );
+        }
+
+        db.ChangeTracker.Clear();
+
+        var after = await db.Products
+            .AsNoTracking()
+            .SingleAsync(p => p.Id == 1);
+
+        Assert.Equal(before.Name, after.Name);
+        Assert.Equal(before.Description, after.Description);
+
+        Assert.Empty(await db.AdminAuditLogs.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ProductEditAcceptsMaximumLengthsAndTrimsWhitespace()
+    {
+        var before = await db.Products
+            .AsNoTracking()
+            .SingleAsync(p => p.Id == 1);
+
+        var name = new string('N', 150);
+        var description = new string('D', 500);
+
+        await service.UpdateProductAsync(
+            before.Id,
+            "  " + name + "  ",
+            "  " + description + "  ",
+            before.Price,
+            before.CostPrice,
+            before.IsActive,
+            owner.Id,
+            DateTime.UtcNow,
+            default
+        );
+
+        db.ChangeTracker.Clear();
+
+        var after = await db.Products
+            .AsNoTracking()
+            .SingleAsync(p => p.Id == 1);
+
+        Assert.Equal(name, after.Name);
+        Assert.Equal(description, after.Description);
+
+        var log = await db.AdminAuditLogs
+            .AsNoTracking()
+            .SingleAsync();
+
+        using var document =
+            System.Text.Json.JsonDocument.Parse(log.Changes);
+
+        Assert.Equal(
+            name,
+            document.RootElement.GetProperty("name")
+                .GetProperty("to").GetString()
+        );
+
+        Assert.Equal(
+            description,
+            document.RootElement.GetProperty("description")
+                .GetProperty("to").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task ProductEditWithOnlySurroundingWhitespaceDoesNotCreateAudit()
+    {
+        var product = await db.Products
+            .AsNoTracking()
+            .SingleAsync(p => p.Id == 1);
+
+        await service.UpdateProductAsync(
+            product.Id,
+            "  " + product.Name + "  ",
+            "  " + product.Description + "  ",
+            product.Price,
+            product.CostPrice,
+            product.IsActive,
+            owner.Id,
+            DateTime.UtcNow,
+            default
+        );
+
+        Assert.Empty(await db.AdminAuditLogs.ToListAsync());
+    }
+
+    [Fact]
+    public async Task ProductNameAndDescriptionChangesPersistAndCreateAuditLog()
+    {
+        var before = await db.Products
+            .AsNoTracking()
+            .SingleAsync(p => p.Id == 1);
+
+        const string newName = "O Praiano Especial";
+        const string newDescription = "Burger especial com queijo coalho e bacon.";
+
+        await service.UpdateProductAsync(
+            before.Id,
+            newName,
+            newDescription,
+            before.Price,
+            before.CostPrice,
+            before.IsActive,
+            owner.Id,
+            DateTime.UtcNow,
+            default
+        );
+
+        db.ChangeTracker.Clear();
+
+        var after = await db.Products
+            .AsNoTracking()
+            .SingleAsync(p => p.Id == before.Id);
+
+        Assert.Equal(newName, after.Name);
+        Assert.Equal(newDescription, after.Description);
+
+        Assert.Equal(before.Price, after.Price);
+        Assert.Equal(before.CostPrice, after.CostPrice);
+        Assert.Equal(before.IsActive, after.IsActive);
+
+        var log = await db.AdminAuditLogs
+            .AsNoTracking()
+            .SingleAsync();
+
+        Assert.Equal("ProductUpdated", log.Action);
+        Assert.Equal("Product", log.EntityType);
+        Assert.Equal(before.Id.ToString(), log.EntityId);
+        Assert.Equal(owner.Id, log.AdminUserId);
+
+        using var document =
+            System.Text.Json.JsonDocument.Parse(log.Changes);
+
+        var changes = document.RootElement;
+
+        var nameChange = changes.GetProperty("name");
+
+        Assert.Equal(
+            before.Name,
+            nameChange.GetProperty("from").GetString()
+        );
+
+        Assert.Equal(
+            newName,
+            nameChange.GetProperty("to").GetString()
+        );
+
+        var descriptionChange = changes.GetProperty("description");
+
+        Assert.Equal(
+            before.Description,
+            descriptionChange.GetProperty("from").GetString()
+        );
+
+        Assert.Equal(
+            newDescription,
+            descriptionChange.GetProperty("to").GetString()
+        );
+
+        Assert.False(changes.TryGetProperty("price", out _));
+        Assert.False(changes.TryGetProperty("costPrice", out _));
+        Assert.False(changes.TryGetProperty("isActive", out _));
+    }
+
     [Fact]
     public async Task ProductEditWithoutChangesDoesNotCreateAuditLog()
     {
@@ -420,6 +652,8 @@ public sealed class AdminServiceTests : IAsyncLifetime
 
         await service.UpdateProductAsync(
             product.Id,
+            product.Name,
+            product.Description,
             product.Price,
             product.CostPrice,
             product.IsActive,
@@ -468,6 +702,8 @@ public sealed class AdminServiceTests : IAsyncLifetime
             () =>
                 service.UpdateProductAsync(
                     before.Id,
+                    before.Name,
+                    before.Description,
                     before.Price + 1m,
                     before.CostPrice,
                     !before.IsActive,

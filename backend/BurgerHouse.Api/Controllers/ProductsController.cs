@@ -20,6 +20,8 @@ public sealed class ProductsController(
             .Select(product =>
                 new PublicProductResponse(
                     product.Code,
+                    product.Name,
+                    product.Description,
                     product.Price,
                     product.IsActive
                 )
@@ -32,6 +34,8 @@ public sealed class ProductsController(
 
 public sealed record PublicProductResponse(
     string Code,
+    string Name,
+    string Description,
     decimal Price,
     bool IsActive
 );

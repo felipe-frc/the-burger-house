@@ -250,6 +250,18 @@ export const MENU_PRODUCTS = MENU_CATEGORIES.flatMap((category) => category.item
 
 export const MENU_PRODUCT_BY_ID = new Map(MENU_PRODUCTS.map((item) => [item.id, item]));
 
+const MENU_ORIGINAL_TEXT = new Map(
+  MENU_PRODUCTS.map((product) => [
+    product.id,
+    {
+      name: product.name,
+      description: product.description,
+      englishName: product.translations?.["en-US"]?.name,
+      englishDescription: product.translations?.["en-US"]?.description,
+    },
+  ]),
+);
+
 export function applyPublicCatalog(rows) {
   if (!Array.isArray(rows)) return;
 
@@ -259,6 +271,10 @@ export function applyPublicCatalog(rows) {
         (row) =>
           row &&
           typeof row.code === "string" &&
+          typeof row.name === "string" &&
+          row.name.trim().length > 0 &&
+          typeof row.description === "string" &&
+          row.description.trim().length > 0 &&
           typeof row.price === "number" &&
           typeof row.isActive === "boolean",
       )
@@ -273,7 +289,23 @@ export function applyPublicCatalog(rows) {
       return;
     }
 
+    const original = MENU_ORIGINAL_TEXT.get(product.id);
+
+    product.name = remote.name;
+    product.description = remote.description;
     product.price = remote.price;
     product.isActive = remote.isActive;
+
+    if (product.translations?.["en-US"] && original) {
+      product.translations["en-US"].name =
+        remote.name === original.name
+          ? original.englishName
+          : remote.name;
+
+      product.translations["en-US"].description =
+        remote.description === original.description
+          ? original.englishDescription
+          : remote.description;
+    }
   });
 }

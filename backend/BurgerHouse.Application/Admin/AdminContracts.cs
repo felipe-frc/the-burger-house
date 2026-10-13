@@ -21,7 +21,7 @@ public record PaymentDetail(string Status, string Method, decimal Amount, DateTi
 public record OrderDetail(OrderRow Order, string CustomerPhone, string? ZipCode, string? Street,
     string? HouseNumber, string? Neighborhood, string? City, string? Complement, string? Observation,
     decimal DeliveryFee, IReadOnlyList<ItemDetail> Items, IReadOnlyList<PaymentDetail> Payments);
-public record ProductRow(int Id, string Name, decimal Price, decimal? CostPrice, bool IsActive)
+public record ProductRow(int Id, string Name, string Description, decimal Price, decimal? CostPrice, bool IsActive)
 {
     public decimal? Margin => CostPrice.HasValue ? Price - CostPrice : null;
 }
@@ -58,7 +58,7 @@ public interface IAdminService
     Task<OrderDetail?> OrderAsync(int id, CancellationToken ct);
     Task AdvanceAsync(int id, OrderStatus expected, OrderStatus next, int adminUserId, DateTime utcNow, CancellationToken ct);
     Task<IReadOnlyList<ProductRow>> ProductsAsync(CancellationToken ct);
-    Task UpdateProductAsync(int id, decimal price, decimal? cost, bool active, int adminUserId, DateTime utcNow, CancellationToken ct);
+    Task UpdateProductAsync(int id, string name, string description, decimal price, decimal? cost, bool active, int adminUserId, DateTime utcNow, CancellationToken ct);
     Task<FinanceSummary> SummaryAsync(DateRange range, CancellationToken ct);
     Task<IReadOnlyList<RevenuePoint>> RevenueAsync(DateRange range, CancellationToken ct);
     Task<IReadOnlyList<MethodSummary>> MethodsAsync(DateRange range, CancellationToken ct);

@@ -291,9 +291,11 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
     }
 
     public async Task<IReadOnlyList<ProductRow>> ProductsAsync(CancellationToken ct) =>
-        await db.Products.AsNoTracking().OrderBy(p => p.Id).Select(p => new ProductRow(p.Id, p.Name, p.Price, p.CostPrice, p.IsActive)).ToListAsync(ct);
+        await db.Products.AsNoTracking().OrderBy(p => p.Id).Select(p => new ProductRow(p.Id, p.Name, p.Description, p.Price, p.CostPrice, p.IsActive)).ToListAsync(ct);
     public async Task UpdateProductAsync(
         int id,
+        string name,
+        string description,
         decimal price,
         decimal? cost,
         bool active,
@@ -301,6 +303,13 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
         DateTime utcNow,
         CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(name) ||
+            name.Trim().Length > 150)
+            throw new ArgumentException("Invalid product name.");
+
+        if (string.IsNullOrWhiteSpace(description) ||
+            description.Trim().Length > 500)
+            throw new ArgumentException("Invalid product description.");
         if (price <= 0 ||
             price > 99999999.99m ||
             decimal.Round(price, 2) != price)
@@ -327,6 +336,40 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
 
         var changes =
             new Dictionary<string, object?>();
+        var normalizedName =
+            name.Trim();
+
+        var normalizedDescription =
+            description.Trim();
+
+        if (!string.Equals(
+                product.Name,
+                normalizedName,
+                StringComparison.Ordinal
+            ))
+        {
+            changes["name"] =
+                new
+                {
+                    from = product.Name,
+                    to = normalizedName
+                };
+        }
+
+        if (!string.Equals(
+                product.Description,
+                normalizedDescription,
+                StringComparison.Ordinal
+            ))
+        {
+            changes["description"] =
+                new
+                {
+                    from = product.Description,
+                    to = normalizedDescription
+                };
+        }
+
 
         if (product.Price != price)
         {
@@ -359,6 +402,10 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
             return;
 
         product.UpdateCost(cost);
+        product.UpdateDetails(
+            normalizedName,
+            normalizedDescription
+        );
         product.UpdatePrice(price);
 
         if (active)

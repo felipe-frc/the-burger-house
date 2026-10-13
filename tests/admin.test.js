@@ -474,13 +474,21 @@ it("edits only allowed product fields and shows read-only store source", async (
   const request = setup();
   await app.start();
   await app.go("/admin/products");
+  const productName = document.querySelector('[name="name"]').value;
+  const productDescription = document.querySelector('[name="description"]').value;
   document.querySelector('[name="price"]').value = "32";
   document.querySelector('[name="costPrice"]').value = "";
   submit("[data-product]");
   await flush();
   expect(request).toHaveBeenCalledWith("products/1", {
     method: "PATCH",
-    body: { price: 32, costPrice: null, isActive: true },
+    body: {
+      name: productName.trim(),
+      description: productDescription.trim(),
+      price: 32,
+      costPrice: null,
+      isActive: true,
+    },
   });
   expect(document.body.textContent).toContain("cardápio público");
   await app.go("/admin/store");

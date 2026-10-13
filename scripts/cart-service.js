@@ -33,6 +33,9 @@ export function reconcileCartWithCatalog(cart, catalog) {
     return [
       {
         ...item,
+        name: typeof current.name === "string" && current.name.trim()
+          ? current.name
+          : item.name,
         price: current.price,
       },
     ];

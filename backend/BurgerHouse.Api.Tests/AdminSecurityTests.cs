@@ -192,7 +192,7 @@ public sealed class AdminSecurityTests : IAsyncLifetime
                 "test-placeholder", "Authorization", "Bearer", "qr_code", "tax_id", "cardNumber", "cvv" }.Concat(keys))
                 Assert.DoesNotContain(forbidden, text, StringComparison.OrdinalIgnoreCase);
             if (!path.StartsWith("orders/"))
-                foreach (var field in new[] { "customerPhone", "zipCode", "street", "houseNumber", "neighborhood", "complement", "11999990000", "Rua Privada" })
+                foreach (var field in new[] { "customerPhone", "zipCode", "street", "houseNumber", "neighborhood", "\"complement\":", "11999990000", "Rua Privada" })
                     Assert.DoesNotContain(field, text, StringComparison.OrdinalIgnoreCase);
             else
             {
@@ -221,10 +221,10 @@ public sealed class AdminSecurityTests : IAsyncLifetime
         client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PatchAsJsonAsync("/api/admin/products/1", new { price = 30, costPrice = 10, isActive = true })).StatusCode);
         await Token("me");
-        Assert.Equal(HttpStatusCode.NoContent, (await client.PatchAsJsonAsync("/api/admin/products/1", new { price = 30, costPrice = 10, isActive = true, name = "must not change" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.PatchAsJsonAsync("/api/admin/products/1", new { price = 30, costPrice = 10, isActive = true, name = "Produto atualizado", description = "Descricao atualizada para teste" })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PatchAsJsonAsync("/api/admin/products/1", new { costPrice = 5 })).StatusCode);
         var products = await client.GetFromJsonAsync<JsonElement>("/api/admin/products");
-        Assert.NotEqual("must not change", products[0].GetProperty("name").GetString());
+        Assert.Equal("Produto atualizado", products[0].GetProperty("name").GetString());
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/admin/finance/summary?period=custom&start=invalid")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/admin/orders/999")).StatusCode);
     }

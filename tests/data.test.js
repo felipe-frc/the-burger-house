@@ -47,6 +47,13 @@ describe("menu data", () => {
     const crown = MENU_PRODUCT_BY_ID.get("burger-joia-da-coroa");
     const praiano = MENU_PRODUCT_BY_ID.get("burger-praiano");
 
+    const previousCrownName = crown.name;
+    const previousCrownDescription = crown.description;
+    const previousCrownEnglishName = crown.translations["en-US"].name;
+    const previousCrownEnglishDescription = crown.translations["en-US"].description;
+    const previousPraianoName = praiano.name;
+    const previousPraianoDescription = praiano.description;
+    const previousPraianoEnglishDescription = praiano.translations["en-US"].description;
     const previousCrownPrice = crown.price;
     const previousCrownActive = crown.isActive;
     const previousPraianoActive = praiano.isActive;
@@ -55,20 +62,37 @@ describe("menu data", () => {
       applyPublicCatalog([
         {
           code: "burger-joia-da-coroa",
+          name: "Joia da Coroa Especial",
+          description: "Descrição atualizada pelo Admin.",
           price: 59.9,
           isActive: true,
         },
         {
           code: "burger-praiano",
+          name: "O Praiano",
+          description: "Descrição atualizada para teste.",
           price: 43.9,
           isActive: false,
         },
       ]);
 
+      expect(crown.name).toBe("Joia da Coroa Especial");
+      expect(crown.description).toBe("Descrição atualizada pelo Admin.");
+      expect(crown.translations["en-US"].name).toBe("Joia da Coroa Especial");
+      expect(crown.translations["en-US"].description).toBe("Descrição atualizada pelo Admin.");
+      expect(praiano.translations["en-US"].name).toBe("The Beach Burger");
+      expect(praiano.translations["en-US"].description).toBe("Descrição atualizada para teste.");
       expect(crown.price).toBe(59.9);
       expect(crown.isActive).toBe(true);
       expect(praiano.isActive).toBe(false);
     } finally {
+      crown.name = previousCrownName;
+      crown.description = previousCrownDescription;
+      crown.translations["en-US"].name = previousCrownEnglishName;
+      crown.translations["en-US"].description = previousCrownEnglishDescription;
+      praiano.name = previousPraianoName;
+      praiano.description = previousPraianoDescription;
+      praiano.translations["en-US"].description = previousPraianoEnglishDescription;
       crown.price = previousCrownPrice;
       crown.isActive = previousCrownActive;
       praiano.isActive = previousPraianoActive;

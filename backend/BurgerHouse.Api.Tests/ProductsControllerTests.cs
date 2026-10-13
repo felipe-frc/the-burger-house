@@ -67,6 +67,18 @@ public sealed class ProductsControllerTests
         Assert.True(
             crown.IsActive
         );
+
+        var praiano = Assert.Single(
+            products,
+            product => product.Code == "burger-praiano"
+        );
+
+        Assert.Equal("O Praiano", praiano.Name);
+
+        Assert.Equal(
+            "Queijo coalho grelhado com fio de mel, banana-da-terra frita, bacon crocante e maionese defumada.",
+            praiano.Description
+        );
     }
 
     [Fact]

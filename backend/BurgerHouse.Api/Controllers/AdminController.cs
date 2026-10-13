@@ -61,6 +61,8 @@ public sealed class AdminController(IAdminService service, TimeProvider clock) :
 
         await service.UpdateProductAsync(
             id,
+            request.Name,
+            request.Description,
             request.Price!.Value,
             request.CostPrice,
             request.IsActive!.Value,
@@ -112,4 +114,10 @@ public sealed class AdminController(IAdminService service, TimeProvider clock) :
 }
 public record PeriodRequest(string Period = "7d", string? Start = null, string? End = null);
 public record StatusRequest([Required] string ExpectedStatus, [Required] string Status);
-public record ProductRequest([Required] decimal? Price, decimal? CostPrice, [Required] bool? IsActive);
+public record ProductRequest(
+    [Required, StringLength(150, MinimumLength = 1)] string Name,
+    [Required, StringLength(500, MinimumLength = 1)] string Description,
+    [Required] decimal? Price,
+    decimal? CostPrice,
+    [Required] bool? IsActive
+);

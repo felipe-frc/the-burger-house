@@ -406,6 +406,8 @@ export function createAdminApp(root, request = createAdminClient()) {
         await request(`products/${form.dataset.product}`, {
           method: "PATCH",
           body: {
+            name: String(fields.get("name") ?? "").trim(),
+            description: String(fields.get("description") ?? "").trim(),
             price: Number(fields.get("price")),
             costPrice: fields.get("costPrice") === "" ? null : Number(fields.get("costPrice")),
             isActive: fields.has("isActive"),
@@ -413,7 +415,7 @@ export function createAdminApp(root, request = createAdminClient()) {
         });
         await go(route, true);
         message(
-          "Produto atualizado. Revise o cardápio estático se alterou preço ou disponibilidade.",
+          "Produto atualizado. As alterações serão refletidas no cardápio público na próxima atualização dos dados.",
         );
       }
     } catch (error) {

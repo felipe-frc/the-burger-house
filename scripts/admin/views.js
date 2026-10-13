@@ -143,9 +143,9 @@ export function orderDetails(data) {
 }
 export function products(rows) {
   return (
-    title("Produtos", "Gerencie preço, custo e disponibilidade.") +
-    `<p class="notice">${icon("info")}<span>O cardápio público mantém preços, nomes, imagens e disponibilidade em arquivos estáticos. Atualize-o na mesma publicação ao alterar preço ou disponibilidade aqui; o backend sempre determina o preço cobrado. Custo vazio significa desconhecido.</span></p>` +
-    `<div class="product-grid">${rows.map((p) => `<form class="panel" data-product="${p.id}"><div class="product-heading"><span class="section-icon">${icon("products")}</span><h2>${esc(p.name)}</h2></div><label>Preço de venda<input name="price" type="number" step=".01" min=".01" max="99999999.99" required value="${p.price}"></label><label>Custo por unidade<input name="costPrice" type="number" step=".01" min="0" max="99999999.99" value="${p.costPrice ?? ""}"></label><div class="product-margin"><p>Margem bruta</p><strong>${esc(money(p.margin))}${p.margin == null ? "" : ` <small>(${((p.margin / p.price) * 100).toFixed(1)}%)</small>`}</strong></div><label class="switch-label"><span>Status · Ativo</span><input name="isActive" type="checkbox" ${p.isActive ? "checked" : ""}></label><button>Salvar produto${icon("check")}</button></form>`).join("")}</div>`
+    title("Produtos", "Gerencie nome, descrição, preço, custo e disponibilidade.") +
+    `<p class="notice">${icon("info")}<span>Nome, descrição, preço e disponibilidade são sincronizados com o cardápio público. As imagens continuam configuradas no frontend. Custo vazio significa desconhecido.</span></p>` +
+    `<div class="product-grid">${rows.map((p) => `<form class="panel" data-product="${p.id}"><div class="product-heading"><span class="section-icon">${icon("products")}</span><h2>${esc(p.name)}</h2></div><label>Nome do produto<input name="name" type="text" maxlength="150" required value="${esc(p.name)}"></label><label>Descrição do produto<textarea name="description" maxlength="500" rows="3" required>${esc(p.description ?? "")}</textarea></label><label>Preço de venda<input name="price" type="number" step=".01" min=".01" max="99999999.99" required value="${p.price}"></label><label>Custo por unidade<input name="costPrice" type="number" step=".01" min="0" max="99999999.99" value="${p.costPrice ?? ""}"></label><div class="product-margin"><p>Margem bruta</p><strong>${esc(money(p.margin))}${p.margin == null ? "" : ` <small>(${((p.margin / p.price) * 100).toFixed(1)}%)</small>`}</strong></div><label class="switch-label"><span>Status · Ativo</span><input name="isActive" type="checkbox" ${p.isActive ? "checked" : ""}></label><button>Salvar produto${icon("check")}</button></form>`).join("")}</div>`
   );
 }
 export function paymentMethods(methods) {
@@ -178,6 +178,8 @@ function auditChanges(changes) {
     const parsed = JSON.parse(changes);
 
     const labels = {
+      name: "nome",
+      description: "descrição",
       price: "preço",
       costPrice: "custo",
       isActive: "ativo",

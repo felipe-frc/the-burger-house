@@ -5,6 +5,7 @@ public class Product
     public int Id { get; private set; }
     public string Code { get; private set; }
     public string Name { get; private set; }
+    public string Description { get; private set; } = string.Empty;
     public decimal Price { get; private set; }
     public decimal? CostPrice { get; private set; }
     public bool IsActive { get; private set; }
@@ -29,6 +30,37 @@ public class Product
         IsActive = true;
     }
 
+    public void UpdateDetails(
+        string name,
+        string description)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException(
+                "Product name cannot be empty.",
+                nameof(name)
+            );
+
+        if (name.Trim().Length > 150)
+            throw new ArgumentException(
+                "Product name cannot exceed 150 characters.",
+                nameof(name)
+            );
+
+        if (string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException(
+                "Product description cannot be empty.",
+                nameof(description)
+            );
+
+        if (description.Trim().Length > 500)
+            throw new ArgumentException(
+                "Product description cannot exceed 500 characters.",
+                nameof(description)
+            );
+
+        Name = name.Trim();
+        Description = description.Trim();
+    }
     public void UpdatePrice(decimal price)
     {
         if (price <= 0)

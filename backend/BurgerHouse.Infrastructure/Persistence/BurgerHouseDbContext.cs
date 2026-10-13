@@ -135,6 +135,10 @@ public class BurgerHouseDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(150);
 
+            entity.Property(product => product.Description)
+                .IsRequired()
+                .HasMaxLength(500);
+
             entity.Property(product => product.Price)
                 .HasPrecision(10, 2);
 
@@ -147,6 +151,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 1,
                     Code = "burger-praiano",
                     Name = "O Praiano",
+                    Description = "Queijo coalho grelhado com fio de mel, banana-da-terra frita, bacon crocante e maionese defumada.",
                     Price = 43.90m,
                     IsActive = true
                 },
@@ -155,6 +160,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 2,
                     Code = "burger-onion-rings",
                     Name = "O Famoso Onion Ring",
+                    Description = "Aioli de alho assado, queijo suíço derretido, bacon e anéis de cebola gigantes crocantes.",
                     Price = 43.90m,
                     IsActive = true
                 },
@@ -163,6 +169,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 3,
                     Code = "burger-crispy-chicken-cheddar",
                     Name = "Crispy Chicken Cheddar",
+                    Description = "Filé de frango crocante com cheddar derretido, bacon, alface, tomate e maionese defumada.",
                     Price = 35.90m,
                     IsActive = true
                 },
@@ -171,6 +178,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 4,
                     Code = "burger-outback-king",
                     Name = "O Outback King",
+                    Description = "Creme de cheddar artesanal, cebola caramelizada, cubos de bacon crocante e molho barbecue especial.",
                     Price = 43.90m,
                     IsActive = true
                 },
@@ -179,6 +187,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 5,
                     Code = "burger-chicken-grill-supreme",
                     Name = "Chicken Grill Supreme",
+                    Description = "Filé de frango grelhado com cheddar, bacon, alface, tomate, cebola crispy e maionese defumada.",
                     Price = 35.90m,
                     IsActive = true
                 },
@@ -187,6 +196,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 6,
                     Code = "burger-joia-da-coroa",
                     Name = "A Joia da Coroa",
+                    Description = "Burger de picanha premium com queijo Canastra Real, cogumelos salteados e aioli de trufas brancas.",
                     Price = 58.90m,
                     IsActive = true
                 },
@@ -195,6 +205,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 7,
                     Code = "side-fritas-cheddar",
                     Name = "Fritas Cheddar & Bacon",
+                    Description = "Batatas fritas crocantes mergulhadas em creme de cheddar artesanal com cubos de bacon crocante.",
                     Price = 24.90m,
                     IsActive = true
                 },
@@ -203,6 +214,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 8,
                     Code = "side-batata-rustica",
                     Name = "Batatas Rústicas da Casa",
+                    Description = "Cortes grossos com casca, fritos até ficarem crocantes, temperados com sal grosso e alecrim.",
                     Price = 18.90m,
                     IsActive = true
                 },
@@ -211,6 +223,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 9,
                     Code = "side-aneis-cebola",
                     Name = "Anéis de Cebola Crocantes",
+                    Description = "Anéis de cebola empanados em mistura secreta e fritos à perfeição com molho barbecue especial.",
                     Price = 22.90m,
                     IsActive = true
                 },
@@ -219,6 +232,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 10,
                     Code = "drink-coca-lata",
                     Name = "Coca-Cola Lata",
+                    Description = "Refrigerante gelado e refrescante para complementar sua refeição.",
                     Price = 5.90m,
                     IsActive = true
                 },
@@ -227,6 +241,7 @@ public class BurgerHouseDbContext : DbContext
                     Id = 11,
                     Code = "drink-guarana-antarctica",
                     Name = "Guaraná Antarctica",
+                    Description = "Refrigerante com sabor único e refrescante para sua satisfação.",
                     Price = 5.90m,
                     IsActive = true
                 }

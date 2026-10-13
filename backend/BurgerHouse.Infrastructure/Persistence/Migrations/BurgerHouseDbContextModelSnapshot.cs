@@ -338,6 +338,11 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .HasPrecision(10, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
@@ -362,6 +367,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 1,
                             Code = "burger-praiano",
+                            Description = "Queijo coalho grelhado com fio de mel, banana-da-terra frita, bacon crocante e maionese defumada.",
                             IsActive = true,
                             Name = "O Praiano",
                             Price = 43.90m
@@ -370,6 +376,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 2,
                             Code = "burger-onion-rings",
+                            Description = "Aioli de alho assado, queijo suíço derretido, bacon e anéis de cebola gigantes crocantes.",
                             IsActive = true,
                             Name = "O Famoso Onion Ring",
                             Price = 43.90m
@@ -378,6 +385,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 3,
                             Code = "burger-crispy-chicken-cheddar",
+                            Description = "Filé de frango crocante com cheddar derretido, bacon, alface, tomate e maionese defumada.",
                             IsActive = true,
                             Name = "Crispy Chicken Cheddar",
                             Price = 35.90m
@@ -386,6 +394,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 4,
                             Code = "burger-outback-king",
+                            Description = "Creme de cheddar artesanal, cebola caramelizada, cubos de bacon crocante e molho barbecue especial.",
                             IsActive = true,
                             Name = "O Outback King",
                             Price = 43.90m
@@ -394,6 +403,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 5,
                             Code = "burger-chicken-grill-supreme",
+                            Description = "Filé de frango grelhado com cheddar, bacon, alface, tomate, cebola crispy e maionese defumada.",
                             IsActive = true,
                             Name = "Chicken Grill Supreme",
                             Price = 35.90m
@@ -402,6 +412,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 6,
                             Code = "burger-joia-da-coroa",
+                            Description = "Burger de picanha premium com queijo Canastra Real, cogumelos salteados e aioli de trufas brancas.",
                             IsActive = true,
                             Name = "A Joia da Coroa",
                             Price = 58.90m
@@ -410,6 +421,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 7,
                             Code = "side-fritas-cheddar",
+                            Description = "Batatas fritas crocantes mergulhadas em creme de cheddar artesanal com cubos de bacon crocante.",
                             IsActive = true,
                             Name = "Fritas Cheddar & Bacon",
                             Price = 24.90m
@@ -418,6 +430,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 8,
                             Code = "side-batata-rustica",
+                            Description = "Cortes grossos com casca, fritos até ficarem crocantes, temperados com sal grosso e alecrim.",
                             IsActive = true,
                             Name = "Batatas Rústicas da Casa",
                             Price = 18.90m
@@ -426,6 +439,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 9,
                             Code = "side-aneis-cebola",
+                            Description = "Anéis de cebola empanados em mistura secreta e fritos à perfeição com molho barbecue especial.",
                             IsActive = true,
                             Name = "Anéis de Cebola Crocantes",
                             Price = 22.90m
@@ -434,6 +448,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 10,
                             Code = "drink-coca-lata",
+                            Description = "Refrigerante gelado e refrescante para complementar sua refeição.",
                             IsActive = true,
                             Name = "Coca-Cola Lata",
                             Price = 5.90m
@@ -442,6 +457,7 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         {
                             Id = 11,
                             Code = "drink-guarana-antarctica",
+                            Description = "Refrigerante com sabor único e refrescante para sua satisfação.",
                             IsActive = true,
                             Name = "Guaraná Antarctica",
                             Price = 5.90m
