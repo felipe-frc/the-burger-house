@@ -324,7 +324,66 @@ export function createAdminApp(root, request = createAdminClient()) {
     const button = event.target.closest("button");
     if (!button || button.disabled) return;
     try {
-      if (button.hasAttribute("data-translate-product")) {
+      if (button.hasAttribute("data-toggle-product")) {
+        event.preventDefault();
+
+        const form = button.closest("form");
+        if (!form) return;
+
+        const checkbox = form.elements.namedItem("isActive");
+
+        if (!(checkbox instanceof HTMLInputElement)) return;
+
+        const currentlyActive = checkbox.checked;
+
+        const question = currentlyActive
+          ? "Desativar este produto? Ele deixará de estar disponível para novos pedidos. O histórico será preservado. Outras alterações feitas neste formulário também serão salvas."
+          : "Reativar este produto? Ele voltará a estar disponível para novos pedidos. Outras alterações feitas neste formulário também serão salvas.";
+
+        if (!globalThis.confirm(question)) return;
+
+        button.disabled = true;
+
+        try {
+          const fields = new FormData(form);
+
+          const englishName = String(fields.get("englishName") ?? "").trim();
+          const englishDescription = String(fields.get("englishDescription") ?? "").trim();
+
+          if (Boolean(englishName) !== Boolean(englishDescription)) {
+            message("Preencha os dois campos em inglês ou deixe ambos vazios.");
+            return;
+          }
+
+          await request(`products/${form.dataset.product}`, {
+            method: "PATCH",
+            body: {
+              name: String(fields.get("name") ?? "").trim(),
+              description: String(fields.get("description") ?? "").trim(),
+              englishName,
+              englishDescription,
+              price: Number(fields.get("price")),
+              costPrice: fields.get("costPrice") === ""
+                ? null
+                : Number(fields.get("costPrice")),
+              isActive: !currentlyActive,
+            },
+          });
+
+          await go(route, true);
+
+          message(
+            currentlyActive
+              ? "Produto desativado. O histórico de pedidos foi preservado."
+              : "Produto reativado com sucesso.",
+          );
+        } catch (error) {
+          handleError(error);
+        } finally {
+          button.disabled = false;
+        }
+
+      } else if (button.hasAttribute("data-translate-product")) {
         event.preventDefault();
 
         const form = button.closest("form");
@@ -436,7 +495,7 @@ export function createAdminApp(root, request = createAdminClient()) {
     event.preventDefault();
     const form = event.target,
       fields = new FormData(form),
-      button = form.querySelector("button");
+      button = form.querySelector('button[type="submit"]') ?? form.querySelector("button");
     if (form.id === "create-product-form" || form.dataset.product) {
       const englishName = String(fields.get("englishName") ?? "").trim();
       const englishDescription = String(fields.get("englishDescription") ?? "").trim();
