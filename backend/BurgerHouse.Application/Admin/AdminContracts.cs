@@ -21,7 +21,7 @@ public record PaymentDetail(string Status, string Method, decimal Amount, DateTi
 public record OrderDetail(OrderRow Order, string CustomerPhone, string? ZipCode, string? Street,
     string? HouseNumber, string? Neighborhood, string? City, string? Complement, string? Observation,
     decimal DeliveryFee, IReadOnlyList<ItemDetail> Items, IReadOnlyList<PaymentDetail> Payments);
-public record ProductRow(int Id, string Name, string Description, decimal Price, decimal? CostPrice, bool IsActive, string EnglishName = "", string EnglishDescription = "", string Category = "menu", int DisplayOrder = 1000)
+public record ProductRow(int Id, string Name, string Description, decimal Price, decimal? CostPrice, bool IsActive, string EnglishName = "", string EnglishDescription = "", string Category = "menu", int DisplayOrder = 1000, string? ImageUrl = null)
 {
     public decimal? Margin => CostPrice.HasValue ? Price - CostPrice : null;
 }

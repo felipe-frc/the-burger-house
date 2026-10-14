@@ -213,6 +213,137 @@ public sealed class AdminSecurityTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/admin/auth/me")).StatusCode);
     }
     [Fact]
+    public async Task ProductImageUploadRequiresOwnerAndCsrf()
+    {
+        using var bitmap = new SkiaSharp.SKBitmap(16, 16);
+        bitmap.Erase(SkiaSharp.SKColors.Orange);
+
+        using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
+        using var encoded = image.Encode(
+            SkiaSharp.SKEncodedImageFormat.Png, 90);
+
+        var bytes = encoded.ToArray();
+
+        static MultipartFormDataContent UploadBody(byte[] content)
+        {
+            var form = new MultipartFormDataContent();
+            var part = new ByteArrayContent(content);
+
+            part.Headers.ContentType =
+                new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+
+            form.Add(part, "file", "photo.png");
+
+            return form;
+        }
+
+        const string endpoint = "/api/admin/products/1/image";
+
+        using (var body = UploadBody(bytes))
+        {
+            using var response = await client.PostAsync(endpoint, body);
+
+            Assert.Equal(
+                HttpStatusCode.Unauthorized,
+                response.StatusCode);
+        }
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await Login()).StatusCode);
+
+        client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+
+        using (var body = UploadBody(bytes))
+        {
+            using var response = await client.PostAsync(endpoint, body);
+
+            Assert.Equal(
+                HttpStatusCode.BadRequest,
+                response.StatusCode);
+        }
+
+        await Token("me");
+
+        string? imageUrl = null;
+
+        try
+        {
+            using (var body = UploadBody(bytes))
+            {
+                using var response = await client.PostAsync(endpoint, body);
+
+                Assert.Equal(
+                    HttpStatusCode.OK,
+                    response.StatusCode);
+
+                var json =
+                    await response.Content.ReadFromJsonAsync<JsonElement>();
+
+                imageUrl = json.GetProperty("imageUrl").GetString();
+            }
+
+            Assert.NotNull(imageUrl);
+
+            Assert.Matches(
+                @"\A/api/product-images/[a-f0-9]{32}\.webp\z",
+                imageUrl);
+
+            using (var response = await client.GetAsync(imageUrl))
+            {
+                Assert.Equal(
+                    HttpStatusCode.OK,
+                    response.StatusCode);
+
+                Assert.Equal(
+                    "image/webp",
+                    response.Content.Headers.ContentType?.MediaType);
+            }
+
+            client.DefaultRequestHeaders.Remove("X-CSRF-TOKEN");
+
+            using (var response = await client.DeleteAsync(endpoint))
+            {
+                Assert.Equal(
+                    HttpStatusCode.BadRequest,
+                    response.StatusCode);
+            }
+
+            await Token("me");
+
+            using (var response = await client.DeleteAsync(endpoint))
+            {
+                Assert.Equal(
+                    HttpStatusCode.NoContent,
+                    response.StatusCode);
+            }
+
+            using var missing = await client.GetAsync(imageUrl);
+
+            Assert.Equal(
+                HttpStatusCode.NotFound,
+                missing.StatusCode);
+        }
+        finally
+        {
+            if (imageUrl is not null)
+            {
+                try
+                {
+                    await Token("me");
+
+                    using var cleanup =
+                        await client.DeleteAsync(endpoint);
+                }
+                catch
+                {
+                    // Preserve the original test failure.
+                }
+            }
+        }
+    }
+
+    [Fact]
     public async Task CsrfProtectsLoginAndAuthenticatedMutations()
     {
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/admin/auth/login",

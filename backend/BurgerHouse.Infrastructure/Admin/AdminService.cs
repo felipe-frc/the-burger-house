@@ -291,7 +291,7 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
     }
 
     public async Task<IReadOnlyList<ProductRow>> ProductsAsync(CancellationToken ct) =>
-        await db.Products.AsNoTracking().OrderBy(p => p.Category).ThenBy(p => p.DisplayOrder).ThenBy(p => p.Code).Select(p => new ProductRow(p.Id, p.Name, p.Description, p.Price, p.CostPrice, p.IsActive, p.EnglishName, p.EnglishDescription, p.Category, p.DisplayOrder)).ToListAsync(ct);
+        await db.Products.AsNoTracking().OrderBy(p => p.Category).ThenBy(p => p.DisplayOrder).ThenBy(p => p.Code).Select(p => new ProductRow(p.Id, p.Name, p.Description, p.Price, p.CostPrice, p.IsActive, p.EnglishName, p.EnglishDescription, p.Category, p.DisplayOrder, p.ImageUrl)).ToListAsync(ct);
     public async Task<int> CreateProductAsync(
         string name,
         string description,

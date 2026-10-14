@@ -1,3 +1,4 @@
+import { setupProductImages } from "./product-images.js";
 import { createAdminClient, AdminError } from "./client.js";
 import { createOrderNotifier, createPoller, statusLabels } from "./model.js";
 import * as views from "./views.js";
@@ -16,6 +17,7 @@ function productClassification(fields) {
 }
 
 export function createAdminApp(root, request = createAdminClient()) {
+  setupProductImages(root, request);
   let disposed = false;
   let authenticated = false,
     route = "",
