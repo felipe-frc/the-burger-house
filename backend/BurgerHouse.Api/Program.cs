@@ -1,3 +1,4 @@
+using BurgerHouse.Api.Images;
 using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Application.Abstractions.Persistence;
 using BurgerHouse.Application.Orders.CreateOrder;
@@ -265,6 +266,12 @@ builder.Services.AddOwnerAdministration(
     builder.Environment.IsDevelopment()
 );
 
+builder.Services.AddSingleton(
+    new ProductImageStorage(
+        ProductImageStorage.GetDefaultDirectory()
+    )
+);
+builder.Services.AddScoped<ProductImageAssignmentService>();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();

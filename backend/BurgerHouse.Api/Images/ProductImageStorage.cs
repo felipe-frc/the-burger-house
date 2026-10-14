@@ -102,6 +102,14 @@ public sealed class ProductImageStorage
             throw new InvalidDataException(
                 "Image could not be decoded.");
 
+        if (codec.EncodedFormat is not (
+            SKEncodedImageFormat.Jpeg or
+            SKEncodedImageFormat.Png or
+            SKEncodedImageFormat.Webp))
+        {
+            throw new InvalidDataException(
+                "Unsupported image format.");
+        }
         var info = codec.Info;
 
         if (info.Width <= 0 ||
@@ -176,5 +184,55 @@ public sealed class ProductImageStorage
 
             throw;
         }
+    }
+
+    public Stream? OpenRead(string filename)
+    {
+        if (!System.Text.RegularExpressions.Regex.IsMatch(
+            filename,
+            @"\A[a-f0-9]{32}\.webp\z"))
+            return null;
+
+        var path = Path.Combine(_directory, filename);
+
+        try
+        {
+            return new FileStream(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read);
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    public void Delete(string? imageUrl)
+    {
+        const string prefix = "/api/product-images/";
+
+        if (imageUrl is null ||
+            !imageUrl.StartsWith(
+                prefix,
+                StringComparison.Ordinal))
+            return;
+
+        var filename = imageUrl.Substring(prefix.Length);
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(
+            filename,
+            @"\A[a-f0-9]{32}\.webp\z"))
+            return;
+
+        var path = Path.Combine(_directory, filename);
+
+        if (File.Exists(path))
+            File.Delete(path);
     }
 }
