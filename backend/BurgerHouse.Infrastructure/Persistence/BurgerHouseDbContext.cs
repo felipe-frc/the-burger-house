@@ -128,6 +128,8 @@ public class BurgerHouseDbContext : DbContext
             entity.ToTable("Products");
 
             entity.HasKey(product => product.Id);
+            entity.Property(product => product.Category).IsRequired().HasMaxLength(10).HasDefaultValue("menu");
+            entity.Property(product => product.DisplayOrder).HasDefaultValue(1000).HasSentinel(-1);
 
             entity.Property(product => product.Code)
                 .IsRequired()
@@ -154,6 +156,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 1,
+                    Category = "menu",
+                    DisplayOrder = 1,
                     Code = "burger-praiano",
                     Name = "O Praiano",
                     Description = "Queijo coalho grelhado com fio de mel, banana-da-terra frita, bacon crocante e maionese defumada.",
@@ -163,6 +167,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 2,
+                    Category = "menu",
+                    DisplayOrder = 2,
                     Code = "burger-onion-rings",
                     Name = "O Famoso Onion Ring",
                     Description = "Aioli de alho assado, queijo suíço derretido, bacon e anéis de cebola gigantes crocantes.",
@@ -172,6 +178,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 3,
+                    Category = "menu",
+                    DisplayOrder = 3,
                     Code = "burger-crispy-chicken-cheddar",
                     Name = "Crispy Chicken Cheddar",
                     Description = "Filé de frango crocante com cheddar derretido, bacon, alface, tomate e maionese defumada.",
@@ -181,6 +189,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 4,
+                    Category = "menu",
+                    DisplayOrder = 4,
                     Code = "burger-outback-king",
                     Name = "O Outback King",
                     Description = "Creme de cheddar artesanal, cebola caramelizada, cubos de bacon crocante e molho barbecue especial.",
@@ -190,6 +200,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 5,
+                    Category = "menu",
+                    DisplayOrder = 5,
                     Code = "burger-chicken-grill-supreme",
                     Name = "Chicken Grill Supreme",
                     Description = "Filé de frango grelhado com cheddar, bacon, alface, tomate, cebola crispy e maionese defumada.",
@@ -199,6 +211,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 6,
+                    Category = "menu",
+                    DisplayOrder = 6,
                     Code = "burger-joia-da-coroa",
                     Name = "A Joia da Coroa",
                     Description = "Burger de picanha premium com queijo Canastra Real, cogumelos salteados e aioli de trufas brancas.",
@@ -208,6 +222,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 7,
+                    Category = "sides",
+                    DisplayOrder = 1,
                     Code = "side-fritas-cheddar",
                     Name = "Fritas Cheddar & Bacon",
                     Description = "Batatas fritas crocantes mergulhadas em creme de cheddar artesanal com cubos de bacon crocante.",
@@ -217,6 +233,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 8,
+                    Category = "sides",
+                    DisplayOrder = 2,
                     Code = "side-batata-rustica",
                     Name = "Batatas Rústicas da Casa",
                     Description = "Cortes grossos com casca, fritos até ficarem crocantes, temperados com sal grosso e alecrim.",
@@ -226,6 +244,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 9,
+                    Category = "sides",
+                    DisplayOrder = 3,
                     Code = "side-aneis-cebola",
                     Name = "Anéis de Cebola Crocantes",
                     Description = "Anéis de cebola empanados em mistura secreta e fritos à perfeição com molho barbecue especial.",
@@ -235,6 +255,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 10,
+                    Category = "drinks",
+                    DisplayOrder = 1,
                     Code = "drink-coca-lata",
                     Name = "Coca-Cola Lata",
                     Description = "Refrigerante gelado e refrescante para complementar sua refeição.",
@@ -244,6 +266,8 @@ public class BurgerHouseDbContext : DbContext
                 new
                 {
                     Id = 11,
+                    Category = "drinks",
+                    DisplayOrder = 2,
                     Code = "drink-guarana-antarctica",
                     Name = "Guaraná Antarctica",
                     Description = "Refrigerante com sabor único e refrescante para sua satisfação.",

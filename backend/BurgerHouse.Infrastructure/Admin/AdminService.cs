@@ -291,7 +291,7 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
     }
 
     public async Task<IReadOnlyList<ProductRow>> ProductsAsync(CancellationToken ct) =>
-        await db.Products.AsNoTracking().OrderBy(p => p.Id).Select(p => new ProductRow(p.Id, p.Name, p.Description, p.Price, p.CostPrice, p.IsActive, p.EnglishName, p.EnglishDescription)).ToListAsync(ct);
+        await db.Products.AsNoTracking().OrderBy(p => p.Category).ThenBy(p => p.DisplayOrder).ThenBy(p => p.Code).Select(p => new ProductRow(p.Id, p.Name, p.Description, p.Price, p.CostPrice, p.IsActive, p.EnglishName, p.EnglishDescription, p.Category, p.DisplayOrder)).ToListAsync(ct);
     public async Task<int> CreateProductAsync(
         string name,
         string description,
@@ -300,7 +300,7 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
         bool active,
         int adminUserId,
         DateTime utcNow,
-        CancellationToken ct, string? englishName = null, string? englishDescription = null)
+        CancellationToken ct, string? englishName = null, string? englishDescription = null, string category = "menu", int displayOrder = 1000)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 150)
             throw new ArgumentException("Invalid product name.", nameof(name));
@@ -322,9 +322,9 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
 
         foreach (var character in normalized)
         {
-            var category = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character);
+            var unicodeCategory = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character);
 
-            if (category == System.Globalization.UnicodeCategory.NonSpacingMark)
+            if (unicodeCategory == System.Globalization.UnicodeCategory.NonSpacingMark)
                 continue;
 
             var lower = char.ToLowerInvariant(character);
@@ -355,6 +355,7 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
         );
 
         product.UpdateEnglishDetails(englishName, englishDescription);
+        product.UpdateClassification(category, displayOrder);
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
 
@@ -370,7 +371,9 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
             englishDescription = product.EnglishDescription,
             price = product.Price,
             costPrice = product.CostPrice,
-            isActive = product.IsActive
+            isActive = product.IsActive,
+            category = product.Category,
+            displayOrder = product.DisplayOrder
         };
 
         db.AdminAuditLogs.Add(
@@ -399,7 +402,7 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
         bool active,
         int adminUserId,
         DateTime utcNow,
-        CancellationToken ct, string? englishName = null, string? englishDescription = null)
+        CancellationToken ct, string? englishName = null, string? englishDescription = null, string? category = null, int? displayOrder = null)
     {
         if (string.IsNullOrWhiteSpace(name) ||
             name.Trim().Length > 150)
@@ -523,6 +526,14 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
             };
         }
 
+        var nextCategory = category ?? product.Category;
+        var nextDisplayOrder = displayOrder ?? product.DisplayOrder;
+        if (product.Category != nextCategory)
+            changes["category"] = new { from = product.Category, to = nextCategory };
+        if (product.DisplayOrder != nextDisplayOrder)
+            changes["displayOrder"] = new { from = product.DisplayOrder, to = nextDisplayOrder };
+
+        product.UpdateClassification(nextCategory, nextDisplayOrder);
         if (changes.Count == 0)
             return;
 

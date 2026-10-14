@@ -329,6 +329,13 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue("menu");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -342,6 +349,11 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("DisplayOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(1000);
 
                     b.Property<string>("EnglishDescription")
                         .IsRequired()
@@ -380,8 +392,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 1,
+                            Category = "menu",
                             Code = "burger-praiano",
                             Description = "Queijo coalho grelhado com fio de mel, banana-da-terra frita, bacon crocante e maionese defumada.",
+                            DisplayOrder = 1,
                             IsActive = true,
                             Name = "O Praiano",
                             Price = 43.90m
@@ -389,8 +403,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 2,
+                            Category = "menu",
                             Code = "burger-onion-rings",
                             Description = "Aioli de alho assado, queijo suíço derretido, bacon e anéis de cebola gigantes crocantes.",
+                            DisplayOrder = 2,
                             IsActive = true,
                             Name = "O Famoso Onion Ring",
                             Price = 43.90m
@@ -398,8 +414,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 3,
+                            Category = "menu",
                             Code = "burger-crispy-chicken-cheddar",
                             Description = "Filé de frango crocante com cheddar derretido, bacon, alface, tomate e maionese defumada.",
+                            DisplayOrder = 3,
                             IsActive = true,
                             Name = "Crispy Chicken Cheddar",
                             Price = 35.90m
@@ -407,8 +425,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 4,
+                            Category = "menu",
                             Code = "burger-outback-king",
                             Description = "Creme de cheddar artesanal, cebola caramelizada, cubos de bacon crocante e molho barbecue especial.",
+                            DisplayOrder = 4,
                             IsActive = true,
                             Name = "O Outback King",
                             Price = 43.90m
@@ -416,8 +436,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 5,
+                            Category = "menu",
                             Code = "burger-chicken-grill-supreme",
                             Description = "Filé de frango grelhado com cheddar, bacon, alface, tomate, cebola crispy e maionese defumada.",
+                            DisplayOrder = 5,
                             IsActive = true,
                             Name = "Chicken Grill Supreme",
                             Price = 35.90m
@@ -425,8 +447,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 6,
+                            Category = "menu",
                             Code = "burger-joia-da-coroa",
                             Description = "Burger de picanha premium com queijo Canastra Real, cogumelos salteados e aioli de trufas brancas.",
+                            DisplayOrder = 6,
                             IsActive = true,
                             Name = "A Joia da Coroa",
                             Price = 58.90m
@@ -434,8 +458,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 7,
+                            Category = "sides",
                             Code = "side-fritas-cheddar",
                             Description = "Batatas fritas crocantes mergulhadas em creme de cheddar artesanal com cubos de bacon crocante.",
+                            DisplayOrder = 1,
                             IsActive = true,
                             Name = "Fritas Cheddar & Bacon",
                             Price = 24.90m
@@ -443,8 +469,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 8,
+                            Category = "sides",
                             Code = "side-batata-rustica",
                             Description = "Cortes grossos com casca, fritos até ficarem crocantes, temperados com sal grosso e alecrim.",
+                            DisplayOrder = 2,
                             IsActive = true,
                             Name = "Batatas Rústicas da Casa",
                             Price = 18.90m
@@ -452,8 +480,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 9,
+                            Category = "sides",
                             Code = "side-aneis-cebola",
                             Description = "Anéis de cebola empanados em mistura secreta e fritos à perfeição com molho barbecue especial.",
+                            DisplayOrder = 3,
                             IsActive = true,
                             Name = "Anéis de Cebola Crocantes",
                             Price = 22.90m
@@ -461,8 +491,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 10,
+                            Category = "drinks",
                             Code = "drink-coca-lata",
                             Description = "Refrigerante gelado e refrescante para complementar sua refeição.",
+                            DisplayOrder = 1,
                             IsActive = true,
                             Name = "Coca-Cola Lata",
                             Price = 5.90m
@@ -470,8 +502,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         new
                         {
                             Id = 11,
+                            Category = "drinks",
                             Code = "drink-guarana-antarctica",
                             Description = "Refrigerante com sabor único e refrescante para sua satisfação.",
+                            DisplayOrder = 2,
                             IsActive = true,
                             Name = "Guaraná Antarctica",
                             Price = 5.90m

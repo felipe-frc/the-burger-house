@@ -125,7 +125,7 @@ test("products allow controlled edits and store remains read-only", async ({ pag
   const calls = await mockAdmin(page);
   await login(page);
   await navigate(page, "Produtos");
-  await page.getByLabel("Custo por unidade").fill("12.50");
+  await page.locator('[data-product="1"]').getByLabel("Custo por unidade").fill("12.50");
   await page.getByRole("button", { name: "Salvar produto", exact: true }).click();
   await expect
     .poll(() =>

@@ -379,7 +379,7 @@ export function renderMenu() {
  * @param {object} category
  * @param {string} category.id
  * @param {string} category.icon
- * @param {Array<object>} category.items
+ * @param {Array<import("./data.js").MenuProduct>} category.items
  * @returns {string}
  */
 function renderMenuCategory(category) {
@@ -594,7 +594,7 @@ export function setupCategoryNavigation() {
 
     const existingCategories = new Set(
       Array.from(navContainer.querySelectorAll("[data-category-link]"))
-        .map((link) => link.dataset.categoryLink),
+        .map((link) => link.getAttribute("data-category-link")),
     );
 
     MENU_CATEGORIES

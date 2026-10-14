@@ -1,6 +1,15 @@
 import { expect, test } from "@playwright/test";
+import { MENU_CATEGORIES } from "../../scripts/data.js";
 
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/products", (route) => route.fulfill({ json:
+    MENU_CATEGORIES.flatMap((category) => category.items.map((product, index) => ({
+      code: product.id, name: product.name, description: product.description, price: product.price,
+      isActive: true, category: category.id, displayOrder: index + 1,
+      englishName: product.id === "burger-praiano" ? "The Beach Burger" : product.name,
+      englishDescription: "Catalog description in English",
+    }))),
+  }));
   await page.addInitScript(() => {
     const fixedDate = new Date("2026-01-01T20:00:00");
 
@@ -114,6 +123,7 @@ test("approved payment offers a clean new order without retaining personal data 
   await expect(page.locator('[data-i18n="hero.hours"]')).toHaveText(
     "Segunda a domingo • 18h às 23h",
   );
+  await expect(page.locator(".add-to-cart-btn").first()).toBeVisible();
   await page.locator("#language-select").selectOption("en-US");
   await expect(page.locator('[data-i18n="hero.hours"]')).toHaveText(
     "Monday to Sunday • 6 PM to 11 PM",
@@ -358,6 +368,7 @@ test("deve manter o fluxo bloqueado quando o carrinho ficar vazio antes da revis
 test("deve trocar o idioma da interface e refletir os textos do pedido", async ({ page }) => {
   await page.goto("/");
 
+  await expect(page.locator(".add-to-cart-btn").first()).toBeVisible();
   await page.locator("#language-select").selectOption("en-US");
 
   await expect(page.locator("html")).toHaveAttribute("lang", "en");

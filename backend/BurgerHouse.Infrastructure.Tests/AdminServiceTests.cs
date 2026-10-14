@@ -282,10 +282,10 @@ public sealed class AdminServiceTests : IAsyncLifetime
     public async Task ProductsExposeOnlyApprovedFieldsAndAllowUnknownCost()
     {
         await service.UpdateProductAsync(1, db.Products.Single(p => p.Id == 1).Name, db.Products.Single(p => p.Id == 1).Description, 33, 0, false, owner.Id, DateTime.UtcNow, default);
-        var product = (await service.ProductsAsync(default)).First();
+        var product = (await service.ProductsAsync(default)).Single(p => p.Id == 1);
         Assert.False(product.IsActive); Assert.Equal(33, product.Margin);
         await service.UpdateProductAsync(1, db.Products.Single(p => p.Id == 1).Name, db.Products.Single(p => p.Id == 1).Description, 33, null, true, owner.Id, DateTime.UtcNow, default);
-        Assert.Null((await service.ProductsAsync(default)).First().Margin);
+        Assert.Null((await service.ProductsAsync(default)).Single(p => p.Id == 1).Margin);
         await Assert.ThrowsAsync<KeyNotFoundException>(() => service.UpdateProductAsync(999, "Produto de teste", "Descricao de teste", 1, null, true, owner.Id, DateTime.UtcNow, default));
     }
     [Fact]

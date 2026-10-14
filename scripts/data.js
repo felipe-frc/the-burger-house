@@ -1,3 +1,9 @@
+/**
+ * @typedef {{id: string, name: string, description: string, price: number, image: string,
+ * imageAlt: string, tag?: string, isActive?: boolean, category?: string, displayOrder?: number,
+ * translations: {"en-US": {imageAlt: string, tag?: string, name?: string, description?: string}}}} MenuProduct
+ */
+/** @type {Array<{id: string, title: string, icon: string, subtitle: string, translations: {"en-US": {title: string, subtitle: string}}, items: MenuProduct[]}>} */
 export const MENU_CATEGORIES = [
   {
     id: "menu",
@@ -220,132 +226,56 @@ export const MENU_PRODUCTS = MENU_CATEGORIES.flatMap((category) => category.item
 
 export const MENU_PRODUCT_BY_ID = new Map(MENU_PRODUCTS.map((item) => [item.id, item]));
 
-const NEW_PRODUCTS_CATEGORY = {
-  id: "novidades",
-  title: "Novidades",
-  subtitle: "Conheça os novos sabores do nosso cardápio.",
-  icon: "fas fa-star",
-  translations: {
-    "en-US": {
-      title: "What's New",
-      subtitle: "Discover the newest flavors on our menu.",
-    },
-  },
-  items: [],
-};
-
-const ORIGINAL_PRODUCT_IDS = new Set(MENU_PRODUCTS.map((product) => product.id));
+// Keep original objects/images and stable references used by the cart.
+const ORIGINAL_PRODUCTS = new Map(MENU_PRODUCT_BY_ID);
+const ORIGINAL_CLASSIFICATION = new Map(
+  MENU_CATEGORIES.flatMap((category) =>
+    category.items.map((product, index) => [product.id, { category: category.id, displayOrder: index + 1 }]),
+  ),
+);
 
 export function applyPublicCatalog(rows) {
   if (!Array.isArray(rows)) return;
-
-  const catalogByCode = new Map(
-    rows
-      .filter(
-        (row) =>
-          row &&
-          typeof row.code === "string" &&
-          typeof row.name === "string" &&
-          row.name.trim().length > 0 &&
-          typeof row.description === "string" &&
-          row.description.trim().length > 0 &&
-          typeof row.price === "number" &&
-          typeof row.isActive === "boolean",
-      )
-      .map((row) => [row.code, row]),
-  );
-
-  MENU_PRODUCTS.forEach((product) => {
-    const remote = catalogByCode.get(product.id);
-
-    if (!remote) {
-      product.isActive = false;
-      return;
-    }
-
-    product.name = remote.name;
-    product.description = remote.description;
-    product.price = remote.price;
-    product.isActive = remote.isActive;
-
-    if (product.translations?.["en-US"]) {
-      const englishName =
-        typeof remote.englishName === "string"
-          ? remote.englishName.trim()
-          : "";
-
-      const englishDescription =
-        typeof remote.englishDescription === "string"
-          ? remote.englishDescription.trim()
-          : "";
-
-      // Os textos vem exclusivamente do catalogo da API.
-      // Sem traducao, exibe o original em portugues.
-      product.translations["en-US"].name =
-        englishName || remote.name;
-
-      product.translations["en-US"].description =
-        englishDescription || remote.description;
-    }
-  });
-
-  const newProducts = [...catalogByCode.values()]
-    .filter((row) => !ORIGINAL_PRODUCT_IDS.has(row.code))
-    .map((row) => ({
-      id: row.code,
-      name: row.name,
-      description: row.description,
-      price: row.price,
-      isActive: row.isActive,
-      image: "./assets/logo-burger.webp",
-      imageAlt: row.name,
-      translations: {
-        "en-US": {
-          name:
-            typeof row.englishName === "string" && row.englishName.trim()
-              ? row.englishName.trim()
-              : row.name,
-          description:
-            typeof row.englishDescription === "string" &&
-            row.englishDescription.trim()
-              ? row.englishDescription.trim()
-              : row.description,
-          imageAlt:
-            typeof row.englishName === "string" && row.englishName.trim()
-              ? row.englishName.trim()
-              : row.name,
-        },
-      },
-    }));
-
-  const previousCodes = NEW_PRODUCTS_CATEGORY.items.map((product) => product.id);
-
-  previousCodes.forEach((code) => {
-    MENU_PRODUCT_BY_ID.delete(code);
-  });
-
-  NEW_PRODUCTS_CATEGORY.items = newProducts;
-
-  for (let index = MENU_PRODUCTS.length - 1; index >= 0; index--) {
-    if (!ORIGINAL_PRODUCT_IDS.has(MENU_PRODUCTS[index].id)) {
-      MENU_PRODUCTS.splice(index, 1);
-    }
+  const categories = new Map(MENU_CATEGORIES.map((category) => [category.id, category]));
+  const catalog = new Map();
+  for (const row of rows) {
+    if (!row || typeof row.code !== "string" || !row.code.trim() ||
+        typeof row.name !== "string" || !row.name.trim() ||
+        typeof row.description !== "string" || !row.description.trim() ||
+        !Number.isFinite(row.price) || row.price <= 0 || typeof row.isActive !== "boolean") continue;
+    const fallback = ORIGINAL_CLASSIFICATION.get(row.code) ?? { category: "menu", displayOrder: 1000 };
+    const category = row.category ?? fallback.category;
+    const displayOrder = row.displayOrder ?? fallback.displayOrder;
+    if (!categories.has(category) || !Number.isInteger(displayOrder) || displayOrder < 0 || displayOrder > 999999) continue;
+    catalog.set(row.code, { ...row, category, displayOrder });
   }
 
-  if (newProducts.some((product) => product.isActive)) {
-    if (!MENU_CATEGORIES.includes(NEW_PRODUCTS_CATEGORY)) {
-      MENU_CATEGORIES.push(NEW_PRODUCTS_CATEGORY);
-    }
-  } else {
-    const categoryIndex = MENU_CATEGORIES.indexOf(NEW_PRODUCTS_CATEGORY);
-
-    if (categoryIndex !== -1) {
-      MENU_CATEGORIES.splice(categoryIndex, 1);
-    }
+  for (const product of MENU_PRODUCTS) product.isActive = false;
+  for (const category of MENU_CATEGORIES) category.items.length = 0;
+  const nextProducts = [];
+  for (const row of catalog.values()) {
+    /** @type {MenuProduct} */
+    const product = MENU_PRODUCT_BY_ID.get(row.code) ?? ORIGINAL_PRODUCTS.get(row.code) ?? {
+      id: row.code, name: row.name, description: row.description, price: row.price,
+      image: "./assets/logo-burger.webp", imageAlt: row.name,
+      translations: { "en-US": { imageAlt: row.name } },
+    };
+    Object.assign(product, {
+      name: row.name, description: row.description, price: row.price,
+      isActive: row.isActive, category: row.category, displayOrder: row.displayOrder,
+    });
+    const english = product.translations["en-US"];
+    english.name = typeof row.englishName === "string" && row.englishName.trim() ? row.englishName.trim() : row.name;
+    english.description = typeof row.englishDescription === "string" && row.englishDescription.trim() ? row.englishDescription.trim() : row.description;
+    categories.get(row.category).items.push(product);
+    nextProducts.push(product);
   }
-
-  newProducts.forEach((product) => {
-    MENU_PRODUCTS.push(product);
-    MENU_PRODUCT_BY_ID.set(product.id, product);
-  });
+  for (const category of MENU_CATEGORIES) {
+    category.items.sort((a, b) => a.displayOrder - b.displayOrder || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  }
+  MENU_PRODUCTS.splice(0, MENU_PRODUCTS.length, ...MENU_CATEGORIES.flatMap((category) => category.items));
+  MENU_PRODUCT_BY_ID.clear();
+  // Missing original products remain unavailable, but can still be resolved by existing cart entries.
+  for (const [id, product] of ORIGINAL_PRODUCTS) MENU_PRODUCT_BY_ID.set(id, product);
+  for (const product of nextProducts) MENU_PRODUCT_BY_ID.set(product.id, product);
 }

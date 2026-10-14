@@ -74,6 +74,10 @@ public sealed class ProductsControllerTests
         );
 
         Assert.Equal("O Praiano", praiano.Name);
+        Assert.Equal("menu", praiano.Category);
+        Assert.Equal(1, praiano.DisplayOrder);
+        Assert.Equal("drinks", Assert.Single(products, p => p.Code == "drink-coca-lata").Category);
+        Assert.Equal(products.OrderBy(p => p.Category, StringComparer.Ordinal).ThenBy(p => p.DisplayOrder).ThenBy(p => p.Code, StringComparer.Ordinal), products);
 
         Assert.Equal(
             "Queijo coalho grelhado com fio de mel, banana-da-terra frita, bacon crocante e maionese defumada.",

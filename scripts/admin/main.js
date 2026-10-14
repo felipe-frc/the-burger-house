@@ -4,6 +4,17 @@ import * as views from "./views.js";
 import { isStoreOpenNow } from "../utils.js";
 import { STORE_OPEN_HOUR, STORE_CLOSE_HOUR } from "../config.js";
 
+function productClassification(fields) {
+  const category = String(fields.get("category"));
+  const rawPosition = String(fields.get("displayOrder") ?? "").trim();
+  const displayOrder = Number(rawPosition);
+  if (!["menu", "sides", "drinks"].includes(category) || !rawPosition ||
+      !Number.isInteger(displayOrder) || displayOrder < 0 || displayOrder > 999999) {
+    throw new AdminError("Selecione uma categoria e uma ordem inteira entre 0 e 999999.", 400);
+  }
+  return { category, displayOrder };
+}
+
 export function createAdminApp(root, request = createAdminClient()) {
   let disposed = false;
   let authenticated = false,
@@ -295,7 +306,7 @@ export function createAdminApp(root, request = createAdminClient()) {
     const englishName = form.elements.namedItem("englishName");
     const englishDescription = form.elements.namedItem("englishDescription");
 
-    if (!englishName || !englishDescription) return;
+    if (!(englishName instanceof HTMLInputElement) || !(englishDescription instanceof HTMLTextAreaElement)) return;
 
     // Uma mudanca no texto original invalida a traducao existente.
     if (englishName.value.trim() || englishDescription.value.trim()) {
@@ -334,6 +345,7 @@ export function createAdminApp(root, request = createAdminClient()) {
 
         if (!(checkbox instanceof HTMLInputElement)) return;
 
+        if (!form.reportValidity()) return;
         const currentlyActive = checkbox.checked;
 
         const question = currentlyActive
@@ -362,6 +374,7 @@ export function createAdminApp(root, request = createAdminClient()) {
               description: String(fields.get("description") ?? "").trim(),
               englishName,
               englishDescription,
+              ...productClassification(fields),
               price: Number(fields.get("price")),
               costPrice: fields.get("costPrice") === ""
                 ? null
@@ -571,6 +584,7 @@ export function createAdminApp(root, request = createAdminClient()) {
             description: String(fields.get("description") ?? "").trim(),
             englishName: String(fields.get("englishName") ?? "").trim(),
             englishDescription: String(fields.get("englishDescription") ?? "").trim(),
+            ...productClassification(fields),
             price: Number(fields.get("price")),
             costPrice: fields.get("costPrice") === "" ? null : Number(fields.get("costPrice")),
             isActive: fields.has("isActive"),
@@ -587,6 +601,7 @@ export function createAdminApp(root, request = createAdminClient()) {
             description: String(fields.get("description") ?? "").trim(),
             englishName: String(fields.get("englishName") ?? "").trim(),
             englishDescription: String(fields.get("englishDescription") ?? "").trim(),
+            ...productClassification(fields),
             price: Number(fields.get("price")),
             costPrice: fields.get("costPrice") === "" ? null : Number(fields.get("costPrice")),
             isActive: fields.has("isActive"),

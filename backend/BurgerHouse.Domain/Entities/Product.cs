@@ -11,6 +11,18 @@ public class Product
     public decimal Price { get; private set; }
     public decimal? CostPrice { get; private set; }
     public bool IsActive { get; private set; }
+    public string Category { get; private set; } = "menu";
+    public int DisplayOrder { get; private set; } = 1000;
+
+    public void UpdateClassification(string category, int displayOrder)
+    {
+        if (category is not ("menu" or "sides" or "drinks"))
+            throw new ArgumentException("Invalid product category.", nameof(category));
+        if (displayOrder is < 0 or > 999999)
+            throw new ArgumentOutOfRangeException(nameof(displayOrder), "Invalid product display order.");
+        Category = category;
+        DisplayOrder = displayOrder;
+    }
 
     public Product(string code, string name, decimal price)
     {

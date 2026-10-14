@@ -224,7 +224,7 @@ public sealed class AdminSecurityTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NoContent, (await client.PatchAsJsonAsync("/api/admin/products/1", new { price = 30, costPrice = 10, isActive = true, name = "Produto atualizado", description = "Descricao atualizada para teste" })).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PatchAsJsonAsync("/api/admin/products/1", new { costPrice = 5 })).StatusCode);
         var products = await client.GetFromJsonAsync<JsonElement>("/api/admin/products");
-        Assert.Equal("Produto atualizado", products[0].GetProperty("name").GetString());
+        Assert.Equal("Produto atualizado", products.EnumerateArray().Single(p => p.GetProperty("id").GetInt32() == 1).GetProperty("name").GetString());
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/admin/finance/summary?period=custom&start=invalid")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/admin/orders/999")).StatusCode);
     }
@@ -240,6 +240,44 @@ public sealed class AdminSecurityTests : IAsyncLifetime
         }
         Assert.Equal(HttpStatusCode.TooManyRequests, (await client.PostAsJsonAsync("/api/admin/auth/login",
             new { email = "missing@example.invalid", password = "incorrect-test-only" })).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("invalid", 0)]
+    [InlineData("menu", -1)]
+    [InlineData("drinks", 1000000)]
+    public async Task ProductClassificationRejectsInvalidRequests(string category, int displayOrder)
+    {
+        await Login();
+        await Token("me");
+        var response = await client.PostAsJsonAsync("/api/admin/products", new {
+            name = "Teste", description = "Descrição", price = 12, isActive = true, category, displayOrder
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ProductClassificationFlowsFromAdminToPublicCatalog()
+    {
+        await Login();
+        await Token("me");
+        var created = await client.PostAsJsonAsync("/api/admin/products", new {
+            name = "Suco classificação", description = "Descrição", englishName = "Juice", englishDescription = "Fresh juice",
+            price = 12, isActive = true, category = "drinks", displayOrder = 0
+        });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        var edited = await client.PatchAsJsonAsync($"/api/admin/products/{id}", new {
+            name = "Suco classificação", description = "Descrição", englishName = "Juice", englishDescription = "Fresh juice",
+            price = 12, isActive = false, category = "sides", displayOrder = 2
+        });
+        Assert.Equal(HttpStatusCode.NoContent, edited.StatusCode);
+        var catalog = await client.GetFromJsonAsync<JsonElement>("/api/products");
+        var product = catalog.EnumerateArray().Single(p => p.GetProperty("name").GetString() == "Suco classificação");
+        Assert.Equal("sides", product.GetProperty("category").GetString());
+        Assert.Equal(2, product.GetProperty("displayOrder").GetInt32());
+        Assert.Equal("Juice", product.GetProperty("englishName").GetString());
+        Assert.False(product.GetProperty("isActive").GetBoolean());
     }
     [Fact]
     public async Task ExhaustingOnePeerDoesNotBlockAnotherPeer()

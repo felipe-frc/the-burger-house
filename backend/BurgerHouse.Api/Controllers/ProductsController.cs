@@ -16,7 +16,9 @@ public sealed class ProductsController(
     {
         return await dbContext.Products
             .AsNoTracking()
-            .OrderBy(product => product.Id)
+            .OrderBy(product => product.Category)
+            .ThenBy(product => product.DisplayOrder)
+            .ThenBy(product => product.Code)
             .Select(product =>
                 new PublicProductResponse(
                     product.Code,
@@ -25,7 +27,9 @@ public sealed class ProductsController(
                     product.Price,
                     product.IsActive,
                     product.EnglishName,
-                    product.EnglishDescription
+                    product.EnglishDescription,
+                    product.Category,
+                    product.DisplayOrder
                 )
             )
             .ToListAsync(
@@ -41,5 +45,7 @@ public sealed record PublicProductResponse(
     decimal Price,
     bool IsActive,
     string EnglishName = "",
-    string EnglishDescription = ""
+    string EnglishDescription = "",
+    string Category = "menu",
+    int DisplayOrder = 1000
 );

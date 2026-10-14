@@ -122,7 +122,9 @@ public sealed class AdminController(IAdminService service, TimeProvider clock) :
             clock.GetUtcNow().UtcDateTime,
             ct,
             request.EnglishName,
-            request.EnglishDescription
+            request.EnglishDescription,
+            request.Category ?? "menu",
+            request.DisplayOrder ?? 1000
         );
 
         return StatusCode(201, new { id });
@@ -145,7 +147,9 @@ public sealed class AdminController(IAdminService service, TimeProvider clock) :
             clock.GetUtcNow().UtcDateTime,
             ct,
             request.EnglishName,
-            request.EnglishDescription
+            request.EnglishDescription,
+            request.Category,
+            request.DisplayOrder
         );
 
         return NoContent();
@@ -202,5 +206,7 @@ public record ProductRequest(
     decimal? CostPrice,
     [Required] bool? IsActive,
     [StringLength(150)] string? EnglishName = null,
-    [StringLength(500)] string? EnglishDescription = null
+    [StringLength(500)] string? EnglishDescription = null,
+    string? Category = null,
+    int? DisplayOrder = null
 );

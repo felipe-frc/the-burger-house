@@ -4,6 +4,38 @@ namespace BurgerHouse.Domain.Tests;
 
 public class ProductTests
 {
+    [Theory]
+    [InlineData("menu", 0)]
+    [InlineData("sides", 12)]
+    [InlineData("drinks", 999999)]
+    public void ClassificationPreservesOtherFields(string category, int position)
+    {
+        var product = Product.Create("test", "Produto", "Descrição", 20, 5, false);
+        product.UpdateEnglishDetails("Product", "Description");
+        Assert.Equal("menu", product.Category);
+        Assert.Equal(1000, product.DisplayOrder);
+        product.UpdateClassification(category, position);
+        Assert.Equal(category, product.Category);
+        Assert.Equal(position, product.DisplayOrder);
+        Assert.Equal(20, product.Price);
+        Assert.Equal(5, product.CostPrice);
+        Assert.Equal("Product", product.EnglishName);
+        Assert.False(product.IsActive);
+    }
+
+    [Theory]
+    [InlineData("unknown", 0)]
+    [InlineData("", 0)]
+    [InlineData(null, 0)]
+    [InlineData("menu", -1)]
+    [InlineData("menu", 1000000)]
+    public void InvalidClassificationDoesNotMutateProduct(string? category, int position)
+    {
+        var product = new Product("test", "Produto", 20);
+        Assert.ThrowsAny<ArgumentException>(() => product.UpdateClassification(category!, position));
+        Assert.Equal("menu", product.Category);
+        Assert.Equal(1000, product.DisplayOrder);
+    }
     [Fact]
     public void Constructor_ShouldCreateActiveProduct()
     {

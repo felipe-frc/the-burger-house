@@ -479,6 +479,8 @@ it("edits only allowed product fields and shows read-only store source", async (
   const productDescription = editForm.querySelector('[name="description"]').value;
   editForm.querySelector('[name="price"]').value = "32";
   editForm.querySelector('[name="costPrice"]').value = "";
+  editForm.querySelector('[name="category"]').value = "drinks";
+  editForm.querySelector('[name="displayOrder"]').value = "2";
   submit('[data-product="1"]');
   await flush();
   expect(request).toHaveBeenCalledWith("products/1", {
@@ -489,6 +491,8 @@ it("edits only allowed product fields and shows read-only store source", async (
       englishName: "",
       englishDescription: "",
       price: 32,
+      category: "drinks",
+      displayOrder: 2,
       costPrice: null,
       isActive: true,
     },
@@ -498,6 +502,34 @@ it("edits only allowed product fields and shows read-only store source", async (
   expect(document.body.textContent).toContain("18h às 23h");
   expect(document.body.textContent).toContain("5,00");
 });
+it("creates a product with category and position without losing translations", async () => {
+  const request = setup();
+  await app.start();
+  await app.go("/admin/products");
+  const form = document.querySelector("#create-product-form");
+  for (const [name, value] of Object.entries({ name: "Suco", description: "Suco natural", englishName: "Juice", englishDescription: "Fresh juice", category: "drinks", displayOrder: "0", price: "12" })) {
+    form.querySelector(`[name="${name}"]`).value = value;
+  }
+  expect(form.querySelector("[data-translate-product]")).not.toBeNull();
+  submit("#create-product-form");
+  await flush();
+  expect(request).toHaveBeenCalledWith("products", { method: "POST", body: {
+    name: "Suco", description: "Suco natural", englishName: "Juice", englishDescription: "Fresh juice",
+    category: "drinks", displayOrder: 0, price: 12, costPrice: null, isActive: true,
+  } });
+});
+
+it.each(["", "-1", "1.5", "1000000"])("rejects invalid display position %s before sending", async (position) => {
+  const request = setup();
+  await app.start();
+  await app.go("/admin/products");
+  document.querySelector('[data-product="1"] [name="displayOrder"]').value = position;
+  submit('[data-product="1"]');
+  await flush();
+  expect(request.mock.calls.some(([, options]) => options?.method === "PATCH")).toBe(false);
+  expect(document.getElementById("admin-message").textContent).toContain("ordem inteira");
+});
+
 it("mobile menu toggles accessibly and dashboard period changes", async () => {
   const request = setup();
   await app.start();
