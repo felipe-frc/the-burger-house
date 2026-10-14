@@ -152,6 +152,22 @@ if (!builder.Environment.IsDevelopment())
 pagBankOptions.ValidateOnStart();
 
 builder.Services.AddScoped<
+    BurgerHouse.Infrastructure.Translations.ProductTranslationCoordinator>();
+
+builder.Services.AddScoped<
+    BurgerHouse.Infrastructure.Translations.PendingProductTranslationBatch>();
+
+builder.Services.AddHostedService<
+    BurgerHouse.Api.AzureProductTranslationWorker>();
+
+builder.Services.AddHttpClient<
+    BurgerHouse.Application.Translations.IProductTranslationService,
+    BurgerHouse.Infrastructure.Translations.AzureProductTranslationService>(
+    client =>
+        client.Timeout = TimeSpan.FromSeconds(30)
+);
+
+builder.Services.AddScoped<
     IProductRepository,
     ProductRepository>();
 

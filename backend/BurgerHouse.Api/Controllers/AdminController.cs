@@ -52,6 +52,81 @@ public sealed class AdminController(IAdminService service, TimeProvider clock) :
     }
     [HttpGet("products")]
     public Task<IReadOnlyList<ProductRow>> Products(CancellationToken ct) => service.ProductsAsync(ct);
+    [HttpPost("products/translate")]
+    public async Task<IActionResult> TranslateProduct(
+        ProductTranslationRequest request,
+        [FromServices] BurgerHouse.Application.Translations.IProductTranslationService translator,
+        CancellationToken ct)
+    {
+        var name = request.Name.Trim();
+        var description = request.Description.Trim();
+
+        if (name.Length == 0 || description.Length == 0)
+            return BadRequest(new
+            {
+                error = "Informe nome e descricao em portugues."
+            });
+
+        try
+        {
+            var translation = await translator.TranslateAsync(
+                name,
+                description,
+                ct
+            );
+
+            return Ok(new
+            {
+                englishName = translation.EnglishName,
+                englishDescription = translation.EnglishDescription
+            });
+        }
+        catch (HttpRequestException)
+        {
+            return StatusCode(503, new
+            {
+                error = "O tradutor esta temporariamente indisponivel."
+            });
+        }
+        catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return StatusCode(503, new
+            {
+                error = "Tempo limite excedido. Tente novamente."
+            });
+        }
+        catch (InvalidOperationException)
+        {
+            return StatusCode(503, new
+            {
+                error = "Nao foi possivel concluir a traducao."
+            });
+        }
+    }
+    [HttpPost("products")]
+    public async Task<IActionResult> CreateProduct(
+        ProductRequest request,
+        CancellationToken ct)
+    {
+        var adminUserId = int.Parse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)!
+        );
+
+        var id = await service.CreateProductAsync(
+            request.Name,
+            request.Description,
+            request.Price!.Value,
+            request.CostPrice,
+            request.IsActive!.Value,
+            adminUserId,
+            clock.GetUtcNow().UtcDateTime,
+            ct,
+            request.EnglishName,
+            request.EnglishDescription
+        );
+
+        return StatusCode(201, new { id });
+    }
     [HttpPatch("products/{id:int:min(1)}")]
     public async Task<IActionResult> Product(int id, ProductRequest request, CancellationToken ct)
     {
@@ -68,7 +143,9 @@ public sealed class AdminController(IAdminService service, TimeProvider clock) :
             request.IsActive!.Value,
             adminUserId,
             clock.GetUtcNow().UtcDateTime,
-            ct
+            ct,
+            request.EnglishName,
+            request.EnglishDescription
         );
 
         return NoContent();
@@ -112,6 +189,10 @@ public sealed class AdminController(IAdminService service, TimeProvider clock) :
         return DateRange.FromDates(first, today);
     }
 }
+public record ProductTranslationRequest(
+    [Required, StringLength(150, MinimumLength = 1)] string Name,
+    [Required, StringLength(500, MinimumLength = 1)] string Description
+);
 public record PeriodRequest(string Period = "7d", string? Start = null, string? End = null);
 public record StatusRequest([Required] string ExpectedStatus, [Required] string Status);
 public record ProductRequest(
@@ -119,5 +200,7 @@ public record ProductRequest(
     [Required, StringLength(500, MinimumLength = 1)] string Description,
     [Required] decimal? Price,
     decimal? CostPrice,
-    [Required] bool? IsActive
+    [Required] bool? IsActive,
+    [StringLength(150)] string? EnglishName = null,
+    [StringLength(500)] string? EnglishDescription = null
 );
