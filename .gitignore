@@ -75,3 +75,11 @@ artifacts/
 *.db-wal
 *.sqlite
 *.sqlite3
+
+# Local implementation snapshots and diagnostic exports
+*.bak
+/translation-cleanup-backup/
+/diagnostico-*.txt
+/relatorio-git-*.txt
+/backup-*.zip
+/diagnostico-*.zip
