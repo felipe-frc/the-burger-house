@@ -472,10 +472,6 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
         }
 
 
-        var portugueseTextChanged =
-            !string.Equals(product.Name, normalizedName, StringComparison.Ordinal) ||
-            !string.Equals(product.Description, normalizedDescription, StringComparison.Ordinal);
-
         // Preserva traducoes revisadas no formulario.
         // Campos vazios continuam pendentes para o Azure Translator.
         var normalizedEnglishName = englishName?.Trim() ?? string.Empty;
