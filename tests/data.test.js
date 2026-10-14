@@ -30,80 +30,165 @@ describe("menu data", () => {
     });
   });
 
-  it("has English translations for categories and products", () => {
+  it("keeps category translations and product image metadata", () => {
     MENU_CATEGORIES.forEach((category) => {
       expect(category.translations?.["en-US"]?.title).toBeTruthy();
       expect(category.translations?.["en-US"]?.subtitle).toBeTruthy();
 
       category.items.forEach((product) => {
-        expect(product.translations?.["en-US"]?.name).toBeTruthy();
-        expect(product.translations?.["en-US"]?.description).toBeTruthy();
         expect(product.translations?.["en-US"]?.imageAlt).toBeTruthy();
       });
     });
   });
 
-  it("applies backend price and availability to static menu metadata", () => {
+  it("does not require static English product names or descriptions", () => {
+    const praiano = MENU_PRODUCT_BY_ID.get("burger-praiano");
+
+    expect(praiano).toBeDefined();
+
+    // Os textos em ingles devem chegar pela API.
+    // Nao devem existir traducoes antigas obrigatorias.
+    expect(praiano.translations["en-US"].name).toBeUndefined();
+    expect(praiano.translations["en-US"].description).toBeUndefined();
+  });
+
+  it("uses backend translations, prices and availability", () => {
     const crown = MENU_PRODUCT_BY_ID.get("burger-joia-da-coroa");
     const praiano = MENU_PRODUCT_BY_ID.get("burger-praiano");
 
-    const previousCrownName = crown.name;
-    const previousCrownDescription = crown.description;
-    const previousCrownEnglishName = crown.translations["en-US"].name;
-    const previousCrownEnglishDescription = crown.translations["en-US"].description;
-    const previousPraianoName = praiano.name;
-    const previousPraianoDescription = praiano.description;
-    const previousPraianoEnglishDescription = praiano.translations["en-US"].description;
-    const previousCrownPrice = crown.price;
-    const previousCrownActive = crown.isActive;
-    const previousPraianoActive = praiano.isActive;
+    const original = [
+      {
+        product: crown,
+        name: crown.name,
+        description: crown.description,
+        englishName: crown.translations["en-US"].name,
+        englishDescription: crown.translations["en-US"].description,
+        price: crown.price,
+        isActive: crown.isActive,
+      },
+      {
+        product: praiano,
+        name: praiano.name,
+        description: praiano.description,
+        englishName: praiano.translations["en-US"].name,
+        englishDescription: praiano.translations["en-US"].description,
+        price: praiano.price,
+        isActive: praiano.isActive,
+      },
+    ];
 
     try {
       applyPublicCatalog([
         {
           code: "burger-joia-da-coroa",
           name: "Joia da Coroa Especial",
-          description: "Descrição atualizada pelo Admin.",
+          description: "Descricao atualizada pelo Admin.",
+          englishName: "Special Crown Jewel",
+          englishDescription: "Updated description from Azure.",
           price: 59.9,
           isActive: true,
         },
         {
           code: "burger-praiano",
           name: "O Praiano",
-          description: "Descrição atualizada para teste.",
+          description: "Descricao atualizada para teste.",
+          englishName: "The Beachgoer",
+          englishDescription: "Updated description for testing.",
           price: 43.9,
           isActive: false,
         },
       ]);
 
       expect(crown.name).toBe("Joia da Coroa Especial");
-      expect(crown.description).toBe("Descrição atualizada pelo Admin.");
-      expect(crown.translations["en-US"].name).toBe("Joia da Coroa Especial");
-      expect(crown.translations["en-US"].description).toBe("Descrição atualizada pelo Admin.");
-      expect(praiano.translations["en-US"].name).toBe("The Beach Burger");
-      expect(praiano.translations["en-US"].description).toBe("Descrição atualizada para teste.");
+      expect(crown.description).toBe("Descricao atualizada pelo Admin.");
+      expect(crown.translations["en-US"].name).toBe(
+        "Special Crown Jewel"
+      );
+      expect(crown.translations["en-US"].description).toBe(
+        "Updated description from Azure."
+      );
+
+      expect(praiano.translations["en-US"].name).toBe(
+        "The Beachgoer"
+      );
+      expect(praiano.translations["en-US"].description).toBe(
+        "Updated description for testing."
+      );
+
       expect(crown.price).toBe(59.9);
       expect(crown.isActive).toBe(true);
       expect(praiano.isActive).toBe(false);
     } finally {
-      crown.name = previousCrownName;
-      crown.description = previousCrownDescription;
-      crown.translations["en-US"].name = previousCrownEnglishName;
-      crown.translations["en-US"].description = previousCrownEnglishDescription;
-      praiano.name = previousPraianoName;
-      praiano.description = previousPraianoDescription;
-      praiano.translations["en-US"].description = previousPraianoEnglishDescription;
-      crown.price = previousCrownPrice;
-      crown.isActive = previousCrownActive;
-      praiano.isActive = previousPraianoActive;
+      original.forEach((snapshot) => {
+        const product = snapshot.product;
 
-      MENU_PRODUCTS.forEach((product) => {
-        if (product.isActive === false && product !== praiano) {
+        product.name = snapshot.name;
+        product.description = snapshot.description;
+        product.translations["en-US"].name =
+          snapshot.englishName;
+        product.translations["en-US"].description =
+          snapshot.englishDescription;
+        product.price = snapshot.price;
+
+        if (snapshot.isActive === undefined) {
           delete product.isActive;
+        } else {
+          product.isActive = snapshot.isActive;
         }
       });
     }
   });
+
+  it("falls back to Portuguese when translation is missing", () => {
+    const praiano = MENU_PRODUCT_BY_ID.get("burger-praiano");
+
+    const previous = {
+      name: praiano.name,
+      description: praiano.description,
+      englishName: praiano.translations["en-US"].name,
+      englishDescription:
+        praiano.translations["en-US"].description,
+      isActive: praiano.isActive,
+    };
+
+    try {
+      applyPublicCatalog([
+        {
+          code: "burger-praiano",
+          name: "O Praiano",
+          description: "Descricao em portugues.",
+          englishName: "",
+          englishDescription: "",
+          price: 43.9,
+          isActive: true,
+        },
+      ]);
+
+      expect(praiano.translations["en-US"].name).toBe(
+        "O Praiano"
+      );
+
+      expect(praiano.translations["en-US"].description).toBe(
+        "Descricao em portugues."
+      );
+    } finally {
+      praiano.name = previous.name;
+      praiano.description = previous.description;
+
+      praiano.translations["en-US"].name =
+        previous.englishName;
+
+      praiano.translations["en-US"].description =
+        previous.englishDescription;
+
+      if (previous.isActive === undefined) {
+        delete praiano.isActive;
+      } else {
+        praiano.isActive = previous.isActive;
+      }
+    }
+  });
+
   it("maps every product by id", () => {
     MENU_PRODUCTS.forEach((product) => {
       expect(MENU_PRODUCT_BY_ID.get(product.id)).toEqual(product);
