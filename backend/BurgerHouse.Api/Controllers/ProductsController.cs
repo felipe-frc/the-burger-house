@@ -29,8 +29,8 @@ public sealed class ProductsController(
                     product.EnglishName,
                     product.EnglishDescription,
                     product.Category,
-                    product.DisplayOrder
-                )
+                    product.DisplayOrder,
+                    product.ImageUrl)
             )
             .ToListAsync(
                 cancellationToken
@@ -47,5 +47,5 @@ public sealed record PublicProductResponse(
     string EnglishName = "",
     string EnglishDescription = "",
     string Category = "menu",
-    int DisplayOrder = 1000
-);
+    int DisplayOrder = 1000,
+    string? ImageUrl = null);

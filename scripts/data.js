@@ -268,6 +268,7 @@ export function applyPublicCatalog(rows) {
     english.name = typeof row.englishName === "string" && row.englishName.trim() ? row.englishName.trim() : row.name;
     english.description = typeof row.englishDescription === "string" && row.englishDescription.trim() ? row.englishDescription.trim() : row.description;
     categories.get(row.category).items.push(product);
+    product.imageUrl = typeof row.imageUrl === "string" ? row.imageUrl : null;
     nextProducts.push(product);
   }
   for (const category of MENU_CATEGORIES) {

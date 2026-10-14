@@ -1,3 +1,43 @@
+/**
+ * Resolves uploaded product images.
+ * Falls back to the original catalog image.
+ */
+function resolveProductImage(product) {
+    const fallback = product.image || "";
+
+    if (!product.imageUrl) {
+        return fallback;
+    }
+
+    const path = String(product.imageUrl);
+
+    if (!/^\/api\/product-images\/[a-f0-9]{32}\.webp$/.test(path)) {
+        return fallback;
+    }
+
+    const configuredBase = import.meta.env.VITE_API_BASE_URL;
+
+    const base = configuredBase ||
+        (import.meta.env.DEV
+            ? "http://localhost:5041"
+            : "");
+
+    if (!base) {
+        return fallback;
+    }
+
+    try {
+        const apiUrl = new URL(base, window.location.origin);
+
+        if (!["https:", "http:"].includes(apiUrl.protocol)) {
+            return fallback;
+        }
+
+        return new URL(path, apiUrl.origin).href;
+    } catch {
+        return fallback;
+    }
+}
 import { TOAST_DURATION_MS } from "./config.js";
 import { MENU_CATEGORIES } from "./data.js";
 import { getLocalizedEntity, translate } from "./i18n.js";
@@ -426,7 +466,7 @@ function renderProductCard(product) {
     <article class="product-item-card reveal">
       <div class="product-item-img-wrapper">
         <img
-          src="${escapeHTML(product.image)}"
+          src="${escapeHTML(resolveProductImage(product))}"
           alt="${escapeHTML(imageAlt)}"
           width="110"
           height="110"
