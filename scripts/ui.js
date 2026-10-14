@@ -583,6 +583,44 @@ export function setupCartVisibility() {
 }
 
 export function setupCategoryNavigation() {
+  const navContainer = document.querySelector(
+    "#category-nav .category-nav-container",
+  );
+
+  if (navContainer) {
+    navContainer
+      .querySelectorAll('[data-dynamic-category="true"]')
+      .forEach((link) => link.remove());
+
+    const existingCategories = new Set(
+      Array.from(navContainer.querySelectorAll("[data-category-link]"))
+        .map((link) => link.dataset.categoryLink),
+    );
+
+    MENU_CATEGORIES
+      .filter((category) => !existingCategories.has(category.id))
+      .forEach((category) => {
+        const link = document.createElement("a");
+        link.href = `#${category.id}`;
+        link.className = "category-nav-link";
+        link.dataset.categoryLink = category.id;
+        link.dataset.dynamicCategory = "true";
+
+        const symbol = document.createElement("i");
+        symbol.className = category.icon;
+        symbol.setAttribute("aria-hidden", "true");
+
+        const label = document.createElement("span");
+        label.textContent =
+          document.documentElement.lang === "en"
+            ? category.translations?.["en-US"]?.title ?? category.title
+            : category.title;
+
+        link.append(symbol, label);
+        navContainer.append(link);
+      });
+  }
+
   if (typeof cleanupCategoryNavigation === "function") {
     cleanupCategoryNavigation();
 
@@ -598,8 +636,8 @@ export function setupCategoryNavigation() {
   );
 
   const sections = /** @type {HTMLElement[]} */ (
-    ["menu", "sides", "drinks"]
-      .map((id) => document.getElementById(id))
+    MENU_CATEGORIES
+      .map((category) => document.getElementById(category.id))
       .filter((section) => section instanceof HTMLElement)
   );
 

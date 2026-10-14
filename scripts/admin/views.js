@@ -145,7 +145,44 @@ export function products(rows) {
   return (
     title("Produtos", "Gerencie nome, descrição, preço, custo e disponibilidade.") +
     `<p class="notice">${icon("info")}<span>Nome, descrição, preço e disponibilidade são sincronizados com o cardápio público. As imagens continuam configuradas no frontend. Custo vazio significa desconhecido.</span></p>` +
-    `<div class="product-grid">${rows.map((p) => `<form class="panel" data-product="${p.id}"><div class="product-heading"><span class="section-icon">${icon("products")}</span><h2>${esc(p.name)}</h2></div><label>Nome do produto<input name="name" type="text" maxlength="150" required value="${esc(p.name)}"></label><label>Descrição do produto<textarea name="description" maxlength="500" rows="3" required>${esc(p.description ?? "")}</textarea></label><label>Preço de venda<input name="price" type="number" step=".01" min=".01" max="99999999.99" required value="${p.price}"></label><label>Custo por unidade<input name="costPrice" type="number" step=".01" min="0" max="99999999.99" value="${p.costPrice ?? ""}"></label><div class="product-margin"><p>Margem bruta</p><strong>${esc(money(p.margin))}${p.margin == null ? "" : ` <small>(${((p.margin / p.price) * 100).toFixed(1)}%)</small>`}</strong></div><label class="switch-label"><span>Status · Ativo</span><input name="isActive" type="checkbox" ${p.isActive ? "checked" : ""}></label><button>Salvar produto${icon("check")}</button></form>`).join("")}</div>`
+    `<section class="panel">
+      <div class="section-header">
+        ${sectionTitle("Cadastrar novo produto", "products")}
+      </div>
+      <p class="muted">Cadastre um produto sem precisar informar um código interno. O sistema gera esse identificador automaticamente.</p>
+      <form id="create-product-form">
+        <label>Nome do produto
+          <input name="name" type="text" maxlength="150" required>
+        </label>
+        <label>Descrição do produto
+          <textarea name="description" maxlength="500" rows="3" required></textarea>
+        </label>
+        <div class="product-translation-action">
+  <button type="button" data-translate-product aria-label="Traduzir nome e descrição para inglês">
+    ${icon("translate")} PT ↔ EN · Traduzir automaticamente
+  </button>
+  <p class="muted" data-translation-status role="status" aria-live="polite">Preencha o nome e a descrição em português para gerar a tradução.</p>
+</div>
+        <label>Nome em inglês
+          <input name="englishName" type="text" maxlength="150" placeholder="Ex.: Special Burger">
+        </label>
+        <label>Descrição em inglês
+          <textarea name="englishDescription" maxlength="500" rows="3" placeholder="Descreva o produto em inglês"></textarea>
+        </label>
+        <label>Preço de venda
+          <input name="price" type="number" step=".01" min=".01" max="99999999.99" required>
+        </label>
+        <label>Custo por unidade
+          <input name="costPrice" type="number" step=".01" min="0" max="99999999.99">
+        </label>
+        <label class="switch-label">
+          <span>Status · Ativo</span>
+          <input name="isActive" type="checkbox" checked>
+        </label>
+        <button type="submit">Cadastrar produto${icon("check")}</button>
+      </form>
+    </section>` +
+    `<div class="product-grid">${rows.map((p) => `<form class="panel" data-product="${p.id}"><div class="product-heading"><span class="section-icon">${icon("products")}</span><h2>${esc(p.name)}</h2></div><label>Nome do produto<input name="name" type="text" maxlength="150" required value="${esc(p.name)}"></label><label>Descrição do produto<textarea name="description" maxlength="500" rows="3" required>${esc(p.description ?? "")}</textarea></label><div class="product-translation-action">  <button type="button" data-translate-product aria-label="Traduzir nome e descrição para inglês">    ${icon("translate")} PT ↔ EN · Traduzir automaticamente  </button>  <p class="muted" data-translation-status role="status" aria-live="polite">Preencha o nome e a descrição em português para gerar a tradução.</p></div><label>Nome em inglês<input name="englishName" type="text" maxlength="150" value="${esc(p.englishName ?? "")}"></label><label>Descrição em inglês<textarea name="englishDescription" maxlength="500" rows="3">${esc(p.englishDescription ?? "")}</textarea></label><label>Preço de venda<input name="price" type="number" step=".01" min=".01" max="99999999.99" required value="${p.price}"></label><label>Custo por unidade<input name="costPrice" type="number" step=".01" min="0" max="99999999.99" value="${p.costPrice ?? ""}"></label><div class="product-margin"><p>Margem bruta</p><strong>${esc(money(p.margin))}${p.margin == null ? "" : ` <small>(${((p.margin / p.price) * 100).toFixed(1)}%)</small>`}</strong></div><label class="switch-label"><span>Status · Ativo</span><input name="isActive" type="checkbox" ${p.isActive ? "checked" : ""}></label><button>Salvar produto${icon("check")}</button></form>`).join("")}</div>`
   );
 }
 export function paymentMethods(methods) {
@@ -156,6 +193,7 @@ export function transactionTable(page) {
 }
 
 const auditActionLabels = {
+  ProductCreated: "Produto cadastrado",
   ProductUpdated: "Produto atualizado",
   OrderStatusChanged: "Status do pedido atualizado",
   PaymentSynchronized: "Pagamento sincronizado",
@@ -178,6 +216,7 @@ function auditChanges(changes) {
     const parsed = JSON.parse(changes);
 
     const labels = {
+      code: "código interno",
       name: "nome",
       description: "descrição",
       price: "preço",

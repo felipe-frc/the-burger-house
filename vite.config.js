@@ -15,7 +15,7 @@ export default defineConfig({
       configurePreviewServer: adminFallback,
     },
   ],
-  server: { proxy: { "/api/admin": { target: "http://localhost:5041", changeOrigin: true } } },
+  server: { proxy: { "/api/admin": { target: "http://localhost:5000", changeOrigin: true } } },
   build: {
     rollupOptions: {
       input: {

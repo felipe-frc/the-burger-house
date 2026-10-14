@@ -23,9 +23,6 @@ export const MENU_CATEGORIES = [
         tag: "Mais Pedido",
         translations: {
           "en-US": {
-            name: "The Beach Burger",
-            description:
-              "Grilled coalho cheese with a drizzle of honey, fried plantain, crispy bacon and smoked mayo.",
             imageAlt:
               "The Beach Burger with grilled coalho cheese, fried plantain, crispy bacon and smoked mayo.",
             tag: "Best Seller",
@@ -44,9 +41,6 @@ export const MENU_CATEGORIES = [
         tag: "Destaque",
         translations: {
           "en-US": {
-            name: "The Famous Onion Ring",
-            description:
-              "Roasted garlic aioli, melted Swiss cheese, bacon and giant crispy onion rings.",
             imageAlt:
               "The Famous Onion Ring burger with Swiss cheese, bacon and crispy onion rings.",
             tag: "Featured",
@@ -64,9 +58,6 @@ export const MENU_CATEGORIES = [
           "Hambúrguer Crispy Chicken Cheddar com frango crocante, cheddar, bacon, alface, tomate e maionese defumada.",
         translations: {
           "en-US": {
-            name: "Crispy Chicken Cheddar",
-            description:
-              "Crispy chicken fillet with melted cheddar, bacon, lettuce, tomato and smoked mayo.",
             imageAlt:
               "Crispy Chicken Cheddar burger with crispy chicken, cheddar, bacon, lettuce, tomato and smoked mayo.",
           },
@@ -84,9 +75,6 @@ export const MENU_CATEGORIES = [
         tag: "Premium",
         translations: {
           "en-US": {
-            name: "The Outback King",
-            description:
-              "Craft cheddar cream, caramelized onion, crispy bacon cubes and special barbecue sauce.",
             imageAlt:
               "The Outback King burger with cheddar cream, caramelized onion, crispy bacon and barbecue sauce.",
             tag: "Premium",
@@ -104,9 +92,6 @@ export const MENU_CATEGORIES = [
           "Hambúrguer Chicken Grill Supreme com frango grelhado, cheddar, bacon, alface, tomate e cebola crispy.",
         translations: {
           "en-US": {
-            name: "Chicken Grill Supreme",
-            description:
-              "Grilled chicken fillet with cheddar, bacon, lettuce, tomato, crispy onion and smoked mayo.",
             imageAlt:
               "Chicken Grill Supreme burger with grilled chicken, cheddar, bacon, lettuce, tomato and crispy onion.",
           },
@@ -124,9 +109,6 @@ export const MENU_CATEGORIES = [
         tag: "Exclusivo",
         translations: {
           "en-US": {
-            name: "The Crown Jewel",
-            description:
-              "Premium picanha burger with Canastra cheese, sautéed mushrooms and white truffle aioli.",
             imageAlt:
               "The Crown Jewel burger with picanha, Canastra cheese, sautéed mushrooms and truffle aioli.",
             tag: "Exclusive",
@@ -158,8 +140,6 @@ export const MENU_CATEGORIES = [
           "Porção de batatas fritas crocantes com creme de cheddar artesanal e cubos de bacon.",
         translations: {
           "en-US": {
-            name: "Cheddar & Bacon Fries",
-            description: "Crispy fries covered with craft cheddar cream and crispy bacon cubes.",
             imageAlt: "Portion of crispy fries with craft cheddar cream and bacon cubes.",
           },
         },
@@ -174,9 +154,6 @@ export const MENU_CATEGORIES = [
         imageAlt: "Porção de batatas rústicas com casca, sal grosso e alecrim.",
         translations: {
           "en-US": {
-            name: "House Rustic Potatoes",
-            description:
-              "Thick skin-on cuts fried until crispy, seasoned with coarse salt and rosemary.",
             imageAlt: "Portion of rustic skin-on potatoes with coarse salt and rosemary.",
           },
         },
@@ -191,9 +168,6 @@ export const MENU_CATEGORIES = [
         imageAlt: "Porção de anéis de cebola empanados e crocantes acompanhados de molho barbecue.",
         translations: {
           "en-US": {
-            name: "Crispy Onion Rings",
-            description:
-              "Onion rings breaded in a secret mix and fried to perfection with special barbecue sauce.",
             imageAlt: "Portion of crispy breaded onion rings served with barbecue sauce.",
           },
         },
@@ -221,8 +195,6 @@ export const MENU_CATEGORIES = [
         imageAlt: "Lata de Coca-Cola gelada para acompanhar o pedido.",
         translations: {
           "en-US": {
-            name: "Coca-Cola Can",
-            description: "Cold and refreshing soda to complete your meal.",
             imageAlt: "Cold Coca-Cola can to pair with the order.",
           },
         },
@@ -236,8 +208,6 @@ export const MENU_CATEGORIES = [
         imageAlt: "Lata de Guaraná Antarctica gelada para acompanhar o pedido.",
         translations: {
           "en-US": {
-            name: "Guaraná Antarctica",
-            description: "A refreshing soda with a unique flavor for your satisfaction.",
             imageAlt: "Cold Guaraná Antarctica can to pair with the order.",
           },
         },
@@ -250,17 +220,21 @@ export const MENU_PRODUCTS = MENU_CATEGORIES.flatMap((category) => category.item
 
 export const MENU_PRODUCT_BY_ID = new Map(MENU_PRODUCTS.map((item) => [item.id, item]));
 
-const MENU_ORIGINAL_TEXT = new Map(
-  MENU_PRODUCTS.map((product) => [
-    product.id,
-    {
-      name: product.name,
-      description: product.description,
-      englishName: product.translations?.["en-US"]?.name,
-      englishDescription: product.translations?.["en-US"]?.description,
+const NEW_PRODUCTS_CATEGORY = {
+  id: "novidades",
+  title: "Novidades",
+  subtitle: "Conheça os novos sabores do nosso cardápio.",
+  icon: "fas fa-star",
+  translations: {
+    "en-US": {
+      title: "What's New",
+      subtitle: "Discover the newest flavors on our menu.",
     },
-  ]),
-);
+  },
+  items: [],
+};
+
+const ORIGINAL_PRODUCT_IDS = new Set(MENU_PRODUCTS.map((product) => product.id));
 
 export function applyPublicCatalog(rows) {
   if (!Array.isArray(rows)) return;
@@ -289,23 +263,89 @@ export function applyPublicCatalog(rows) {
       return;
     }
 
-    const original = MENU_ORIGINAL_TEXT.get(product.id);
-
     product.name = remote.name;
     product.description = remote.description;
     product.price = remote.price;
     product.isActive = remote.isActive;
 
-    if (product.translations?.["en-US"] && original) {
+    if (product.translations?.["en-US"]) {
+      const englishName =
+        typeof remote.englishName === "string"
+          ? remote.englishName.trim()
+          : "";
+
+      const englishDescription =
+        typeof remote.englishDescription === "string"
+          ? remote.englishDescription.trim()
+          : "";
+
+      // Os textos vem exclusivamente do catalogo da API.
+      // Sem traducao, exibe o original em portugues.
       product.translations["en-US"].name =
-        remote.name === original.name
-          ? original.englishName
-          : remote.name;
+        englishName || remote.name;
 
       product.translations["en-US"].description =
-        remote.description === original.description
-          ? original.englishDescription
-          : remote.description;
+        englishDescription || remote.description;
     }
+  });
+
+  const newProducts = [...catalogByCode.values()]
+    .filter((row) => !ORIGINAL_PRODUCT_IDS.has(row.code))
+    .map((row) => ({
+      id: row.code,
+      name: row.name,
+      description: row.description,
+      price: row.price,
+      isActive: row.isActive,
+      image: "./assets/logo-burger.webp",
+      imageAlt: row.name,
+      translations: {
+        "en-US": {
+          name:
+            typeof row.englishName === "string" && row.englishName.trim()
+              ? row.englishName.trim()
+              : row.name,
+          description:
+            typeof row.englishDescription === "string" &&
+            row.englishDescription.trim()
+              ? row.englishDescription.trim()
+              : row.description,
+          imageAlt:
+            typeof row.englishName === "string" && row.englishName.trim()
+              ? row.englishName.trim()
+              : row.name,
+        },
+      },
+    }));
+
+  const previousCodes = NEW_PRODUCTS_CATEGORY.items.map((product) => product.id);
+
+  previousCodes.forEach((code) => {
+    MENU_PRODUCT_BY_ID.delete(code);
+  });
+
+  NEW_PRODUCTS_CATEGORY.items = newProducts;
+
+  for (let index = MENU_PRODUCTS.length - 1; index >= 0; index--) {
+    if (!ORIGINAL_PRODUCT_IDS.has(MENU_PRODUCTS[index].id)) {
+      MENU_PRODUCTS.splice(index, 1);
+    }
+  }
+
+  if (newProducts.some((product) => product.isActive)) {
+    if (!MENU_CATEGORIES.includes(NEW_PRODUCTS_CATEGORY)) {
+      MENU_CATEGORIES.push(NEW_PRODUCTS_CATEGORY);
+    }
+  } else {
+    const categoryIndex = MENU_CATEGORIES.indexOf(NEW_PRODUCTS_CATEGORY);
+
+    if (categoryIndex !== -1) {
+      MENU_CATEGORIES.splice(categoryIndex, 1);
+    }
+  }
+
+  newProducts.forEach((product) => {
+    MENU_PRODUCTS.push(product);
+    MENU_PRODUCT_BY_ID.set(product.id, product);
   });
 }

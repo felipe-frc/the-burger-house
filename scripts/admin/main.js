@@ -278,6 +278,41 @@ export function createAdminApp(root, request = createAdminClient()) {
       auditLogs,
     );
   }
+  function productTranslationInput(event) {
+    const field = event.target;
+
+    if (!(field instanceof HTMLInputElement ||
+          field instanceof HTMLTextAreaElement)) return;
+
+    if (field.name !== "name" && field.name !== "description") return;
+
+    const form = field.closest("form");
+
+    if (!form || !(form.id === "create-product-form" || form.dataset.product)) {
+      return;
+    }
+
+    const englishName = form.elements.namedItem("englishName");
+    const englishDescription = form.elements.namedItem("englishDescription");
+
+    if (!englishName || !englishDescription) return;
+
+    // Uma mudanca no texto original invalida a traducao existente.
+    if (englishName.value.trim() || englishDescription.value.trim()) {
+      englishName.value = "";
+      englishDescription.value = "";
+
+      const status = form.querySelector("[data-translation-status]");
+
+      if (status) {
+        status.textContent =
+          "Tradução desatualizada. Clique para traduzir novamente. " +
+          "Se salvar sem traduzir, o Azure processará a tradução pendente.";
+      }
+
+      form.dataset.translationOutdated = "true";
+    }
+  }
   async function click(event) {
     if (!(event.target instanceof Element)) return;
     const link = event.target.closest("a[data-nav]");
@@ -289,7 +324,64 @@ export function createAdminApp(root, request = createAdminClient()) {
     const button = event.target.closest("button");
     if (!button || button.disabled) return;
     try {
-      if (button.id === "menu-toggle") {
+      if (button.hasAttribute("data-translate-product")) {
+        event.preventDefault();
+
+        const form = button.closest("form");
+
+        if (!form) return;
+
+        const nameInput = form.elements.namedItem("name");
+        const descriptionInput = form.elements.namedItem("description");
+        const englishNameInput = form.elements.namedItem("englishName");
+        const englishDescriptionInput = form.elements.namedItem("englishDescription");
+        const status = form.querySelector("[data-translation-status]");
+
+        const name = String(nameInput?.value ?? "").trim();
+        const description = String(descriptionInput?.value ?? "").trim();
+
+        if (!name || !description) {
+          if (status) status.textContent = "Preencha primeiro o nome e a descrição em português.";
+          return;
+        }
+
+        button.disabled = true;
+        const originalLabel = button.innerHTML;
+        button.textContent = "Traduzindo...";
+        if (status) status.textContent = "Consultando o Azure Translator...";
+
+        try {
+          const result = await request("products/translate", {
+            method: "POST",
+            body: { name, description },
+          });
+
+          if (String(nameInput.value).trim() !== name ||
+              String(descriptionInput.value).trim() !== description) {
+            if (status) status.textContent = "O português mudou durante a tradução. Traduza novamente.";
+            return;
+          }
+
+          if (!result?.englishName || !result?.englishDescription) {
+            throw new Error("Resposta de tradução incompleta.");
+          }
+
+          englishNameInput.value = result.englishName;
+          englishDescriptionInput.value = result.englishDescription;
+          delete form.dataset.translationOutdated;
+
+          if (status) status.textContent = "Tradução concluída. Revise o inglês antes de salvar.";
+        } catch (error) {
+          if (status) {
+            status.textContent = "Não foi possível traduzir agora. Tente novamente.";
+          }
+          handleError(error);
+        } finally {
+          button.innerHTML = originalLabel;
+          button.disabled = false;
+        }
+
+      } else if (button.id === "menu-toggle") {
         const open = button.getAttribute("aria-expanded") !== "true";
         button.setAttribute("aria-expanded", String(open));
         root.querySelector("#admin-nav").classList.toggle("open", open);
@@ -345,6 +437,16 @@ export function createAdminApp(root, request = createAdminClient()) {
     const form = event.target,
       fields = new FormData(form),
       button = form.querySelector("button");
+    if (form.id === "create-product-form" || form.dataset.product) {
+      const englishName = String(fields.get("englishName") ?? "").trim();
+      const englishDescription = String(fields.get("englishDescription") ?? "").trim();
+
+      if (Boolean(englishName) !== Boolean(englishDescription)) {
+        message("Preencha o nome e a descrição em inglês juntos, ou deixe ambos vazios.");
+        return;
+      }
+    }
+
     button.disabled = true;
     try {
       if (form.id === "login-form") {
@@ -402,12 +504,30 @@ export function createAdminApp(root, request = createAdminClient()) {
           root.querySelector("#revenue-chart").innerHTML = views.chart(
             await request(`finance/revenue?${periodQuery}`),
           );
+      } else if (form.id === "create-product-form") {
+        await request("products", {
+          method: "POST",
+          body: {
+            name: String(fields.get("name") ?? "").trim(),
+            description: String(fields.get("description") ?? "").trim(),
+            englishName: String(fields.get("englishName") ?? "").trim(),
+            englishDescription: String(fields.get("englishDescription") ?? "").trim(),
+            price: Number(fields.get("price")),
+            costPrice: fields.get("costPrice") === "" ? null : Number(fields.get("costPrice")),
+            isActive: fields.has("isActive"),
+          },
+        });
+
+        await go(route, true);
+        message("Produto cadastrado com sucesso.");
       } else if (form.dataset.product) {
         await request(`products/${form.dataset.product}`, {
           method: "PATCH",
           body: {
             name: String(fields.get("name") ?? "").trim(),
             description: String(fields.get("description") ?? "").trim(),
+            englishName: String(fields.get("englishName") ?? "").trim(),
+            englishDescription: String(fields.get("englishDescription") ?? "").trim(),
             price: Number(fields.get("price")),
             costPrice: fields.get("costPrice") === "" ? null : Number(fields.get("costPrice")),
             isActive: fields.has("isActive"),
@@ -463,6 +583,7 @@ export function createAdminApp(root, request = createAdminClient()) {
     const panel = root.querySelector("#notifications-panel");
     if (panel && !panel.hidden) setDrawer(true, false);
   };
+  root.addEventListener("input", productTranslationInput);
   root.addEventListener("click", click);
   root.addEventListener("keydown", keydown);
   root.addEventListener("submit", submit);
