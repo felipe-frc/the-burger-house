@@ -14,6 +14,29 @@ public class Product
     public string Category { get; private set; } = "menu";
     public int DisplayOrder { get; private set; } = 1000;
 
+    public string? ImageUrl { get; private set; }
+
+    public void UpdateImageUrl(string? imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl))
+        {
+            ImageUrl = null;
+            return;
+        }
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(
+            imageUrl,
+            @"\A/api/product-images/[a-f0-9]{32}\.(jpg|png|webp)\z",
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant))
+        {
+            throw new ArgumentException(
+                "Invalid product image path.",
+                nameof(imageUrl));
+        }
+
+        ImageUrl = imageUrl;
+    }
+
     public void UpdateClassification(string category, int displayOrder)
     {
         if (category is not ("menu" or "sides" or "drinks"))

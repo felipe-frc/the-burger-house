@@ -131,6 +131,10 @@ public class BurgerHouseDbContext : DbContext
             entity.Property(product => product.Category).IsRequired().HasMaxLength(10).HasDefaultValue("menu");
             entity.Property(product => product.DisplayOrder).HasDefaultValue(1000).HasSentinel(-1);
 
+            entity.Property(product => product.ImageUrl)
+                .HasMaxLength(200)
+                .IsRequired(false);
+
             entity.Property(product => product.Code)
                 .IsRequired()
                 .HasMaxLength(100);
