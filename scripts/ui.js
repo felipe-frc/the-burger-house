@@ -1,42 +1,32 @@
+import { API_BASE_URL } from "./config.js";
 /**
  * Resolves uploaded product images.
  * Falls back to the original catalog image.
  */
 function resolveProductImage(product) {
-    const fallback = product.image || "";
+  const fallback = product.image || "";
 
-    if (!product.imageUrl) {
-        return fallback;
+  if (typeof product.imageUrl !== "string") {
+    return fallback;
+  }
+
+  const path = product.imageUrl;
+
+  if (!/^\/api\/product-images\/[a-f0-9]{32}\.webp$/.test(path)) {
+    return fallback;
+  }
+
+  try {
+    const api = new URL(API_BASE_URL, window.location.origin);
+
+    if (api.protocol !== "https:" && api.protocol !== "http:") {
+      return fallback;
     }
 
-    const path = String(product.imageUrl);
-
-    if (!/^\/api\/product-images\/[a-f0-9]{32}\.webp$/.test(path)) {
-        return fallback;
-    }
-
-    const configuredBase = import.meta.env.VITE_API_BASE_URL;
-
-    const base = configuredBase ||
-        (import.meta.env.DEV
-            ? "http://localhost:5041"
-            : "");
-
-    if (!base) {
-        return fallback;
-    }
-
-    try {
-        const apiUrl = new URL(base, window.location.origin);
-
-        if (!["https:", "http:"].includes(apiUrl.protocol)) {
-            return fallback;
-        }
-
-        return new URL(path, apiUrl.origin).href;
-    } catch {
-        return fallback;
-    }
+    return new URL(path, api.origin).href;
+  } catch {
+    return fallback;
+  }
 }
 import { TOAST_DURATION_MS } from "./config.js";
 import { MENU_CATEGORIES } from "./data.js";

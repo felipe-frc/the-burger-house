@@ -3,19 +3,8 @@ const TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const IMAGE_PATH = /^\/api\/product-images\/[a-f0-9]{32}\.webp$/;
 
 function apiOrigin() {
-  const configured =
-    import.meta.env.VITE_API_BASE_URL ||
-    (import.meta.env.DEV
-      ? "http://localhost:5041"
-      : window.location.origin);
-
-  const url = new URL(configured, window.location.origin);
-
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new Error("Endereco da API invalido.");
-  }
-
-  return url.origin;
+  // Keep image operations on the same origin as the admin client.
+  return window.location.origin;
 }
 
 function imageAddress(path) {
@@ -41,7 +30,7 @@ async function imageRequest(request, productId, method, body) {
 
   const response = await fetch(url, {
     method,
-    credentials: "include",
+    credentials: "same-origin",
     headers: {
       "X-CSRF-TOKEN": csrf
     },
