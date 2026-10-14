@@ -44,7 +44,6 @@ public class BurgerHouseDbContext : DbContext
         ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-
         modelBuilder.Entity<PaymentRefund>(entity =>
         {
             entity.ToTable("PaymentRefunds", table =>
@@ -113,6 +112,12 @@ public class BurgerHouseDbContext : DbContext
             entity.HasOne<AdminUser>().WithMany().HasForeignKey(s => s.AdminUserId).OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<Product>().Property(p => p.CostPrice).HasPrecision(10, 2);
+        modelBuilder.Entity<Product>().Property(p => p.EnglishName)
+            .HasMaxLength(150)
+            .HasDefaultValue(string.Empty);
+        modelBuilder.Entity<Product>().Property(p => p.EnglishDescription)
+            .HasMaxLength(500)
+            .HasDefaultValue(string.Empty);
         modelBuilder.Entity<OrderItem>().Property(i => i.UnitCost).HasPrecision(10, 2);
         modelBuilder.Entity<Order>().Property(o => o.Status).IsConcurrencyToken();
         modelBuilder.Entity<Order>().HasIndex(o => new { o.Status, o.CreatedAt });

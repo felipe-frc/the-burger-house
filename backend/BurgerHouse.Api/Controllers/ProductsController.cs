@@ -23,7 +23,9 @@ public sealed class ProductsController(
                     product.Name,
                     product.Description,
                     product.Price,
-                    product.IsActive
+                    product.IsActive,
+                    product.EnglishName,
+                    product.EnglishDescription
                 )
             )
             .ToListAsync(
@@ -37,5 +39,7 @@ public sealed record PublicProductResponse(
     string Name,
     string Description,
     decimal Price,
-    bool IsActive
+    bool IsActive,
+    string EnglishName = "",
+    string EnglishDescription = ""
 );
