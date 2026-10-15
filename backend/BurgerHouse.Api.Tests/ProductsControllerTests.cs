@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using BurgerHouse.Api.Controllers;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace BurgerHouse.Api.Tests;
@@ -13,7 +14,10 @@ public sealed class ProductsControllerTests
     public ProductsControllerTests(
         WebApplicationFactory<Program> factory)
     {
-        this.factory = factory;
+        this.factory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Privacy:EncryptionKey", TestPersonalData.Key);
+        });
     }
 
     [Fact]
