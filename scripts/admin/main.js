@@ -9,8 +9,13 @@ function productClassification(fields) {
   const category = String(fields.get("category"));
   const rawPosition = String(fields.get("displayOrder") ?? "").trim();
   const displayOrder = Number(rawPosition);
-  if (!["menu", "sides", "drinks"].includes(category) || !rawPosition ||
-      !Number.isInteger(displayOrder) || displayOrder < 0 || displayOrder > 999999) {
+  if (
+    !["menu", "sides", "drinks"].includes(category) ||
+    !rawPosition ||
+    !Number.isInteger(displayOrder) ||
+    displayOrder < 0 ||
+    displayOrder > 999999
+  ) {
     throw new AdminError("Selecione uma categoria e uma ordem inteira entre 0 e 999999.", 400);
   }
   return { category, displayOrder };
@@ -307,8 +312,7 @@ export function createAdminApp(root, request = createAdminClient()) {
   function productTranslationInput(event) {
     const field = event.target;
 
-    if (!(field instanceof HTMLInputElement ||
-          field instanceof HTMLTextAreaElement)) return;
+    if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) return;
 
     if (field.name !== "name" && field.name !== "description") return;
 
@@ -321,7 +325,11 @@ export function createAdminApp(root, request = createAdminClient()) {
     const englishName = form.elements.namedItem("englishName");
     const englishDescription = form.elements.namedItem("englishDescription");
 
-    if (!(englishName instanceof HTMLInputElement) || !(englishDescription instanceof HTMLTextAreaElement)) return;
+    if (
+      !(englishName instanceof HTMLInputElement) ||
+      !(englishDescription instanceof HTMLTextAreaElement)
+    )
+      return;
 
     // Uma mudanca no texto original invalida a traducao existente.
     if (englishName.value.trim() || englishDescription.value.trim()) {
@@ -391,9 +399,7 @@ export function createAdminApp(root, request = createAdminClient()) {
               englishDescription,
               ...productClassification(fields),
               price: Number(fields.get("price")),
-              costPrice: fields.get("costPrice") === ""
-                ? null
-                : Number(fields.get("costPrice")),
+              costPrice: fields.get("costPrice") === "" ? null : Number(fields.get("costPrice")),
               isActive: !currentlyActive,
             },
           });
@@ -410,7 +416,6 @@ export function createAdminApp(root, request = createAdminClient()) {
         } finally {
           button.disabled = false;
         }
-
       } else if (button.hasAttribute("data-translate-product")) {
         event.preventDefault();
 
@@ -443,9 +448,12 @@ export function createAdminApp(root, request = createAdminClient()) {
             body: { name, description },
           });
 
-          if (String(nameInput.value).trim() !== name ||
-              String(descriptionInput.value).trim() !== description) {
-            if (status) status.textContent = "O português mudou durante a tradução. Traduza novamente.";
+          if (
+            String(nameInput.value).trim() !== name ||
+            String(descriptionInput.value).trim() !== description
+          ) {
+            if (status)
+              status.textContent = "O português mudou durante a tradução. Traduza novamente.";
             return;
           }
 
@@ -467,7 +475,6 @@ export function createAdminApp(root, request = createAdminClient()) {
           button.innerHTML = originalLabel;
           button.disabled = false;
         }
-
       } else if (button.id === "menu-toggle") {
         const open = button.getAttribute("aria-expanded") !== "true";
         button.setAttribute("aria-expanded", String(open));

@@ -33,17 +33,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     applyPublicCatalog(catalog);
 
-    setCart(
-      reconcileCartWithCatalog(
-        getCart(),
-        catalog,
-      ),
-    );
+    setCart(reconcileCartWithCatalog(getCart(), catalog));
   } catch (error) {
-    console.error(
-      "Nao foi possivel sincronizar o catalogo publico.",
-      error,
-    );
+    console.error("Nao foi possivel sincronizar o catalogo publico.", error);
   }
 
   renderMenu();

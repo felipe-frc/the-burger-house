@@ -23,18 +23,15 @@ async function imageRequest(request, productId, method, body) {
     throw new Error("Sessao sem token de seguranca. Entre novamente.");
   }
 
-  const url = new URL(
-    `/api/admin/products/${productId}/image`,
-    apiOrigin()
-  );
+  const url = new URL(`/api/admin/products/${productId}/image`, apiOrigin());
 
   const response = await fetch(url, {
     method,
     credentials: "same-origin",
     headers: {
-      "X-CSRF-TOKEN": csrf
+      "X-CSRF-TOKEN": csrf,
     },
-    ...(body ? { body } : {})
+    ...(body ? { body } : {}),
   });
 
   if (!response.ok) {
@@ -71,8 +68,7 @@ function attachImageEditor(form, request) {
 
   const section = document.createElement("section");
   section.className = "product-image-editor";
-  section.style.cssText =
-    "border:1px solid #ccc;border-radius:10px;padding:14px;margin:16px 0";
+  section.style.cssText = "border:1px solid #ccc;border-radius:10px;padding:14px;margin:16px 0";
 
   const title = document.createElement("strong");
   title.textContent = "Fotografia do produto";
@@ -80,8 +76,7 @@ function attachImageEditor(form, request) {
   const preview = document.createElement("img");
   preview.alt = "Fotografia atual";
   preview.style.cssText =
-    "display:none;width:160px;height:120px;object-fit:cover;" +
-    "border-radius:8px;margin:12px 0";
+    "display:none;width:160px;height:120px;object-fit:cover;" + "border-radius:8px;margin:12px 0";
 
   const input = document.createElement("input");
   input.type = "file";
@@ -100,8 +95,7 @@ function attachImageEditor(form, request) {
 
   for (const button of [save, remove]) {
     button.style.cssText =
-      "padding:8px 12px;margin:12px 8px 0 0;" +
-      "border:1px solid #777;border-radius:8px";
+      "padding:8px 12px;margin:12px 8px 0 0;" + "border:1px solid #777;border-radius:8px";
   }
 
   const status = document.createElement("p");
@@ -145,8 +139,7 @@ function attachImageEditor(form, request) {
       currentPath = product?.imageUrl ?? null;
       renderPreview();
     } catch (error) {
-      status.textContent =
-        error instanceof Error ? error.message : "Falha ao carregar fotografia.";
+      status.textContent = error instanceof Error ? error.message : "Falha ao carregar fotografia.";
     }
   }
 
@@ -162,9 +155,7 @@ function attachImageEditor(form, request) {
       return;
     }
 
-    if (!TYPES.has(file.type) ||
-        file.size <= 0 ||
-        file.size > MAX_SIZE) {
+    if (!TYPES.has(file.type) || file.size <= 0 || file.size > MAX_SIZE) {
       status.textContent = "Use JPG, PNG ou WebP de ate 5 MB.";
       return;
     }
@@ -184,8 +175,7 @@ function attachImageEditor(form, request) {
 
       status.textContent = "Fotografia salva com sucesso.";
     } catch (error) {
-      status.textContent =
-        error instanceof Error ? error.message : "Falha no upload.";
+      status.textContent = error instanceof Error ? error.message : "Falha no upload.";
     } finally {
       busy(false);
     }
@@ -208,8 +198,7 @@ function attachImageEditor(form, request) {
 
       status.textContent = "Fotografia removida.";
     } catch (error) {
-      status.textContent =
-        error instanceof Error ? error.message : "Falha ao remover.";
+      status.textContent = error instanceof Error ? error.message : "Falha ao remover.";
     } finally {
       busy(false);
     }
@@ -232,6 +221,6 @@ export function setupProductImages(root, request) {
 
   observer.observe(root, {
     childList: true,
-    subtree: true
+    subtree: true,
   });
 }

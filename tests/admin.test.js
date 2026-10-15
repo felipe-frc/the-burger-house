@@ -362,12 +362,9 @@ it("finance filters custom periods and shows methods coverage and transactions",
   expect(document.body.textContent).toContain("Produto atualizado");
   expect(document.body.textContent).toContain("Pagamento sincronizado");
   expect(document.body.textContent).toContain("preço: 30 → 32");
-  expect(
-    request.mock.calls.some(
-      ([path]) =>
-        path.startsWith("finance/audit?period=7d")
-    )
-  ).toBe(true);
+  expect(request.mock.calls.some(([path]) => path.startsWith("finance/audit?period=7d"))).toBe(
+    true,
+  );
   document.querySelector('[name="period"]').value = "custom";
   submit("#period-form");
   await flush();
@@ -507,28 +504,49 @@ it("creates a product with category and position without losing translations", a
   await app.start();
   await app.go("/admin/products");
   const form = document.querySelector("#create-product-form");
-  for (const [name, value] of Object.entries({ name: "Suco", description: "Suco natural", englishName: "Juice", englishDescription: "Fresh juice", category: "drinks", displayOrder: "0", price: "12" })) {
+  for (const [name, value] of Object.entries({
+    name: "Suco",
+    description: "Suco natural",
+    englishName: "Juice",
+    englishDescription: "Fresh juice",
+    category: "drinks",
+    displayOrder: "0",
+    price: "12",
+  })) {
     form.querySelector(`[name="${name}"]`).value = value;
   }
   expect(form.querySelector("[data-translate-product]")).not.toBeNull();
   submit("#create-product-form");
   await flush();
-  expect(request).toHaveBeenCalledWith("products", { method: "POST", body: {
-    name: "Suco", description: "Suco natural", englishName: "Juice", englishDescription: "Fresh juice",
-    category: "drinks", displayOrder: 0, price: 12, costPrice: null, isActive: true,
-  } });
+  expect(request).toHaveBeenCalledWith("products", {
+    method: "POST",
+    body: {
+      name: "Suco",
+      description: "Suco natural",
+      englishName: "Juice",
+      englishDescription: "Fresh juice",
+      category: "drinks",
+      displayOrder: 0,
+      price: 12,
+      costPrice: null,
+      isActive: true,
+    },
+  });
 });
 
-it.each(["", "-1", "1.5", "1000000"])("rejects invalid display position %s before sending", async (position) => {
-  const request = setup();
-  await app.start();
-  await app.go("/admin/products");
-  document.querySelector('[data-product="1"] [name="displayOrder"]').value = position;
-  submit('[data-product="1"]');
-  await flush();
-  expect(request.mock.calls.some(([, options]) => options?.method === "PATCH")).toBe(false);
-  expect(document.getElementById("admin-message").textContent).toContain("ordem inteira");
-});
+it.each(["", "-1", "1.5", "1000000"])(
+  "rejects invalid display position %s before sending",
+  async (position) => {
+    const request = setup();
+    await app.start();
+    await app.go("/admin/products");
+    document.querySelector('[data-product="1"] [name="displayOrder"]').value = position;
+    submit('[data-product="1"]');
+    await flush();
+    expect(request.mock.calls.some(([, options]) => options?.method === "PATCH")).toBe(false);
+    expect(document.getElementById("admin-message").textContent).toContain("ordem inteira");
+  },
+);
 
 it("mobile menu toggles accessibly and dashboard period changes", async () => {
   const request = setup();

@@ -230,7 +230,10 @@ export const MENU_PRODUCT_BY_ID = new Map(MENU_PRODUCTS.map((item) => [item.id, 
 const ORIGINAL_PRODUCTS = new Map(MENU_PRODUCT_BY_ID);
 const ORIGINAL_CLASSIFICATION = new Map(
   MENU_CATEGORIES.flatMap((category) =>
-    category.items.map((product, index) => [product.id, { category: category.id, displayOrder: index + 1 }]),
+    category.items.map((product, index) => [
+      product.id,
+      { category: category.id, displayOrder: index + 1 },
+    ]),
   ),
 );
 
@@ -239,14 +242,32 @@ export function applyPublicCatalog(rows) {
   const categories = new Map(MENU_CATEGORIES.map((category) => [category.id, category]));
   const catalog = new Map();
   for (const row of rows) {
-    if (!row || typeof row.code !== "string" || !row.code.trim() ||
-        typeof row.name !== "string" || !row.name.trim() ||
-        typeof row.description !== "string" || !row.description.trim() ||
-        !Number.isFinite(row.price) || row.price <= 0 || typeof row.isActive !== "boolean") continue;
-    const fallback = ORIGINAL_CLASSIFICATION.get(row.code) ?? { category: "menu", displayOrder: 1000 };
+    if (
+      !row ||
+      typeof row.code !== "string" ||
+      !row.code.trim() ||
+      typeof row.name !== "string" ||
+      !row.name.trim() ||
+      typeof row.description !== "string" ||
+      !row.description.trim() ||
+      !Number.isFinite(row.price) ||
+      row.price <= 0 ||
+      typeof row.isActive !== "boolean"
+    )
+      continue;
+    const fallback = ORIGINAL_CLASSIFICATION.get(row.code) ?? {
+      category: "menu",
+      displayOrder: 1000,
+    };
     const category = row.category ?? fallback.category;
     const displayOrder = row.displayOrder ?? fallback.displayOrder;
-    if (!categories.has(category) || !Number.isInteger(displayOrder) || displayOrder < 0 || displayOrder > 999999) continue;
+    if (
+      !categories.has(category) ||
+      !Number.isInteger(displayOrder) ||
+      displayOrder < 0 ||
+      displayOrder > 999999
+    )
+      continue;
     catalog.set(row.code, { ...row, category, displayOrder });
   }
 
@@ -255,26 +276,47 @@ export function applyPublicCatalog(rows) {
   const nextProducts = [];
   for (const row of catalog.values()) {
     /** @type {MenuProduct} */
-    const product = MENU_PRODUCT_BY_ID.get(row.code) ?? ORIGINAL_PRODUCTS.get(row.code) ?? {
-      id: row.code, name: row.name, description: row.description, price: row.price,
-      image: "./assets/logo-burger.webp", imageAlt: row.name,
-      translations: { "en-US": { imageAlt: row.name } },
-    };
+    const product = MENU_PRODUCT_BY_ID.get(row.code) ??
+      ORIGINAL_PRODUCTS.get(row.code) ?? {
+        id: row.code,
+        name: row.name,
+        description: row.description,
+        price: row.price,
+        image: "./assets/logo-burger.webp",
+        imageAlt: row.name,
+        translations: { "en-US": { imageAlt: row.name } },
+      };
     Object.assign(product, {
-      name: row.name, description: row.description, price: row.price,
-      isActive: row.isActive, category: row.category, displayOrder: row.displayOrder,
+      name: row.name,
+      description: row.description,
+      price: row.price,
+      isActive: row.isActive,
+      category: row.category,
+      displayOrder: row.displayOrder,
     });
     const english = product.translations["en-US"];
-    english.name = typeof row.englishName === "string" && row.englishName.trim() ? row.englishName.trim() : row.name;
-    english.description = typeof row.englishDescription === "string" && row.englishDescription.trim() ? row.englishDescription.trim() : row.description;
+    english.name =
+      typeof row.englishName === "string" && row.englishName.trim()
+        ? row.englishName.trim()
+        : row.name;
+    english.description =
+      typeof row.englishDescription === "string" && row.englishDescription.trim()
+        ? row.englishDescription.trim()
+        : row.description;
     categories.get(row.category).items.push(product);
     product.imageUrl = typeof row.imageUrl === "string" ? row.imageUrl : null;
     nextProducts.push(product);
   }
   for (const category of MENU_CATEGORIES) {
-    category.items.sort((a, b) => a.displayOrder - b.displayOrder || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    category.items.sort(
+      (a, b) => a.displayOrder - b.displayOrder || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
   }
-  MENU_PRODUCTS.splice(0, MENU_PRODUCTS.length, ...MENU_CATEGORIES.flatMap((category) => category.items));
+  MENU_PRODUCTS.splice(
+    0,
+    MENU_PRODUCTS.length,
+    ...MENU_CATEGORIES.flatMap((category) => category.items),
+  );
   MENU_PRODUCT_BY_ID.clear();
   // Missing original products remain unavailable, but can still be resolved by existing cart entries.
   for (const [id, product] of ORIGINAL_PRODUCTS) MENU_PRODUCT_BY_ID.set(id, product);

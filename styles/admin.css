@@ -1504,7 +1504,6 @@ body:has(.notifications-open) #admin-message {
   }
 }
 
-
 /* 10C - Disponibilidade dos produtos */
 .product-status {
   display: inline-flex;

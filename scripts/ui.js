@@ -613,9 +613,7 @@ export function setupCartVisibility() {
 }
 
 export function setupCategoryNavigation() {
-  const navContainer = document.querySelector(
-    "#category-nav .category-nav-container",
-  );
+  const navContainer = document.querySelector("#category-nav .category-nav-container");
 
   if (navContainer) {
     navContainer
@@ -623,13 +621,13 @@ export function setupCategoryNavigation() {
       .forEach((link) => link.remove());
 
     const existingCategories = new Set(
-      Array.from(navContainer.querySelectorAll("[data-category-link]"))
-        .map((link) => link.getAttribute("data-category-link")),
+      Array.from(navContainer.querySelectorAll("[data-category-link]")).map((link) =>
+        link.getAttribute("data-category-link"),
+      ),
     );
 
-    MENU_CATEGORIES
-      .filter((category) => !existingCategories.has(category.id))
-      .forEach((category) => {
+    MENU_CATEGORIES.filter((category) => !existingCategories.has(category.id)).forEach(
+      (category) => {
         const link = document.createElement("a");
         link.href = `#${category.id}`;
         link.className = "category-nav-link";
@@ -643,12 +641,13 @@ export function setupCategoryNavigation() {
         const label = document.createElement("span");
         label.textContent =
           document.documentElement.lang === "en"
-            ? category.translations?.["en-US"]?.title ?? category.title
+            ? (category.translations?.["en-US"]?.title ?? category.title)
             : category.title;
 
         link.append(symbol, label);
         navContainer.append(link);
-      });
+      },
+    );
   }
 
   if (typeof cleanupCategoryNavigation === "function") {
@@ -666,9 +665,9 @@ export function setupCategoryNavigation() {
   );
 
   const sections = /** @type {HTMLElement[]} */ (
-    MENU_CATEGORIES
-      .map((category) => document.getElementById(category.id))
-      .filter((section) => section instanceof HTMLElement)
+    MENU_CATEGORIES.map((category) => document.getElementById(category.id)).filter(
+      (section) => section instanceof HTMLElement,
+    )
   );
 
   if (!nav || navLinks.length === 0 || sections.length === 0) {

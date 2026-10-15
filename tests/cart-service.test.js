@@ -100,11 +100,7 @@ describe("cart-service", () => {
       },
     ];
 
-    const reconciled =
-      reconcileCartWithCatalog(
-        cart,
-        catalog
-      );
+    const reconciled = reconcileCartWithCatalog(cart, catalog);
 
     expect(reconciled).toEqual([
       {

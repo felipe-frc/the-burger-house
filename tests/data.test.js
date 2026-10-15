@@ -101,19 +101,11 @@ describe("menu data", () => {
 
       expect(crown.name).toBe("Joia da Coroa Especial");
       expect(crown.description).toBe("Descricao atualizada pelo Admin.");
-      expect(crown.translations["en-US"].name).toBe(
-        "Special Crown Jewel"
-      );
-      expect(crown.translations["en-US"].description).toBe(
-        "Updated description from Azure."
-      );
+      expect(crown.translations["en-US"].name).toBe("Special Crown Jewel");
+      expect(crown.translations["en-US"].description).toBe("Updated description from Azure.");
 
-      expect(praiano.translations["en-US"].name).toBe(
-        "The Beachgoer"
-      );
-      expect(praiano.translations["en-US"].description).toBe(
-        "Updated description for testing."
-      );
+      expect(praiano.translations["en-US"].name).toBe("The Beachgoer");
+      expect(praiano.translations["en-US"].description).toBe("Updated description for testing.");
 
       expect(crown.price).toBe(59.9);
       expect(crown.isActive).toBe(true);
@@ -124,10 +116,8 @@ describe("menu data", () => {
 
         product.name = snapshot.name;
         product.description = snapshot.description;
-        product.translations["en-US"].name =
-          snapshot.englishName;
-        product.translations["en-US"].description =
-          snapshot.englishDescription;
+        product.translations["en-US"].name = snapshot.englishName;
+        product.translations["en-US"].description = snapshot.englishDescription;
         product.price = snapshot.price;
 
         if (snapshot.isActive === undefined) {
@@ -146,8 +136,7 @@ describe("menu data", () => {
       name: praiano.name,
       description: praiano.description,
       englishName: praiano.translations["en-US"].name,
-      englishDescription:
-        praiano.translations["en-US"].description,
+      englishDescription: praiano.translations["en-US"].description,
       isActive: praiano.isActive,
     };
 
@@ -164,22 +153,16 @@ describe("menu data", () => {
         },
       ]);
 
-      expect(praiano.translations["en-US"].name).toBe(
-        "O Praiano"
-      );
+      expect(praiano.translations["en-US"].name).toBe("O Praiano");
 
-      expect(praiano.translations["en-US"].description).toBe(
-        "Descricao em portugues."
-      );
+      expect(praiano.translations["en-US"].description).toBe("Descricao em portugues.");
     } finally {
       praiano.name = previous.name;
       praiano.description = previous.description;
 
-      praiano.translations["en-US"].name =
-        previous.englishName;
+      praiano.translations["en-US"].name = previous.englishName;
 
-      praiano.translations["en-US"].description =
-        previous.englishDescription;
+      praiano.translations["en-US"].description = previous.englishDescription;
 
       if (previous.isActive === undefined) {
         delete praiano.isActive;

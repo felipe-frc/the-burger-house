@@ -49,7 +49,17 @@ export const detail = {
   payments: [{ method: "Pix", status: "Approved", amount: 60, updatedAt: "2026-10-05T21:00:00Z" }],
 };
 export const products = [
-  { id: 1, name: "O Praiano", description: "Hambúrguer com queijo coalho", price: 30, costPrice: 10, margin: 20, isActive: true, category: "menu", displayOrder: 1 },
+  {
+    id: 1,
+    name: "O Praiano",
+    description: "Hambúrguer com queijo coalho",
+    price: 30,
+    costPrice: 10,
+    margin: 20,
+    isActive: true,
+    category: "menu",
+    displayOrder: 1,
+  },
 ];
 export const auditLogs = [
   {
@@ -91,8 +101,8 @@ export function mockData(path) {
   if (path.startsWith("finance/revenue")) return structuredClone(points);
   if (path.startsWith("finance/payment-methods"))
     return [{ method: "Pix", count: 2, revenue: 120, percentage: 100 }];
-  if (path.startsWith("finance/audit"))
-    return structuredClone(auditLogs);  if (path.startsWith("finance/transactions"))
+  if (path.startsWith("finance/audit")) return structuredClone(auditLogs);
+  if (path.startsWith("finance/transactions"))
     return {
       items: [
         {

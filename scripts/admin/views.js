@@ -142,7 +142,18 @@ export function orderDetails(data) {
   );
 }
 function productClassificationFields(category = "menu", displayOrder = 1000) {
-  return `<label>Categoria<select name="category" required>${[["menu", "Hambúrgueres"], ["sides", "Acompanhamentos"], ["drinks", "Bebidas"]].map(([value, label]) => `<option value="${value}" ${category === value ? "selected" : ""}>${label}</option>`).join("")}</select></label><label>Ordem de exibição — números menores aparecem primeiro<input name="displayOrder" type="number" min="0" max="999999" step="1" required value="${esc(displayOrder)}"></label>`;
+  return `<label>Categoria<select name="category" required>${[
+    ["menu", "Hambúrgueres"],
+    ["sides", "Acompanhamentos"],
+    ["drinks", "Bebidas"],
+  ]
+    .map(
+      ([value, label]) =>
+        `<option value="${value}" ${category === value ? "selected" : ""}>${label}</option>`,
+    )
+    .join(
+      "",
+    )}</select></label><label>Ordem de exibição — números menores aparecem primeiro<input name="displayOrder" type="number" min="0" max="999999" step="1" required value="${esc(displayOrder)}"></label>`;
 }
 export function products(rows) {
   return (

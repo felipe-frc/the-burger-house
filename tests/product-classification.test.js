@@ -6,17 +6,27 @@ beforeEach(async () => {
   data = await import("../scripts/data.js");
 });
 const row = (code, category, displayOrder, extra = {}) => ({
-  code, category, displayOrder, name: "Produto", description: "Descrição",
-  price: 20, isActive: true, ...extra,
+  code,
+  category,
+  displayOrder,
+  name: "Produto",
+  description: "Descrição",
+  price: 20,
+  isActive: true,
+  ...extra,
 });
-const codes = (category) => data.MENU_CATEGORIES.find((c) => c.id === category).items.map((p) => p.id);
+const codes = (category) =>
+  data.MENU_CATEGORIES.find((c) => c.id === category).items.map((p) => p.id);
 
 it("moves original products between categories while retaining images, objects and translations", () => {
   const original = data.MENU_PRODUCT_BY_ID.get("burger-praiano");
   const image = original.image;
-  data.applyPublicCatalog([row(original.id, "drinks", 0, {
-    englishName: "Beach Burger", englishDescription: "English description",
-  })]);
+  data.applyPublicCatalog([
+    row(original.id, "drinks", 0, {
+      englishName: "Beach Burger",
+      englishDescription: "English description",
+    }),
+  ]);
   expect(codes("menu")).not.toContain(original.id);
   expect(codes("drinks")).toEqual([original.id]);
   expect(data.MENU_PRODUCT_BY_ID.get(original.id)).toBe(original);
@@ -26,7 +36,11 @@ it("moves original products between categories while retaining images, objects a
 });
 
 it("orders old and new products by position then code, regardless of response order", () => {
-  const rows = [row("new-z", "sides", 2), row("side-batata-rustica", "sides", 1), row("new-a", "sides", 2)];
+  const rows = [
+    row("new-z", "sides", 2),
+    row("side-batata-rustica", "sides", 1),
+    row("new-a", "sides", 2),
+  ];
   data.applyPublicCatalog(rows);
   expect(codes("sides")).toEqual(["side-batata-rustica", "new-a", "new-z"]);
   data.applyPublicCatalog([...rows].reverse());
