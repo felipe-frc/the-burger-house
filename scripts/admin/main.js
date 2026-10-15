@@ -16,6 +16,19 @@ function productClassification(fields) {
   return { category, displayOrder };
 }
 
+function productPayload(fields) {
+  return {
+    name: String(fields.get("name") ?? "").trim(),
+    description: String(fields.get("description") ?? "").trim(),
+    englishName: String(fields.get("englishName") ?? "").trim(),
+    englishDescription: String(fields.get("englishDescription") ?? "").trim(),
+    ...productClassification(fields),
+    price: Number(fields.get("price")),
+    costPrice: fields.get("costPrice") === "" ? null : Number(fields.get("costPrice")),
+    isActive: fields.has("isActive"),
+  };
+}
+
 export function createAdminApp(root, request = createAdminClient()) {
   setupProductImages(root, request);
   let disposed = false;
@@ -581,16 +594,7 @@ export function createAdminApp(root, request = createAdminClient()) {
       } else if (form.id === "create-product-form") {
         await request("products", {
           method: "POST",
-          body: {
-            name: String(fields.get("name") ?? "").trim(),
-            description: String(fields.get("description") ?? "").trim(),
-            englishName: String(fields.get("englishName") ?? "").trim(),
-            englishDescription: String(fields.get("englishDescription") ?? "").trim(),
-            ...productClassification(fields),
-            price: Number(fields.get("price")),
-            costPrice: fields.get("costPrice") === "" ? null : Number(fields.get("costPrice")),
-            isActive: fields.has("isActive"),
-          },
+          body: productPayload(fields),
         });
 
         await go(route, true);
@@ -598,16 +602,7 @@ export function createAdminApp(root, request = createAdminClient()) {
       } else if (form.dataset.product) {
         await request(`products/${form.dataset.product}`, {
           method: "PATCH",
-          body: {
-            name: String(fields.get("name") ?? "").trim(),
-            description: String(fields.get("description") ?? "").trim(),
-            englishName: String(fields.get("englishName") ?? "").trim(),
-            englishDescription: String(fields.get("englishDescription") ?? "").trim(),
-            ...productClassification(fields),
-            price: Number(fields.get("price")),
-            costPrice: fields.get("costPrice") === "" ? null : Number(fields.get("costPrice")),
-            isActive: fields.has("isActive"),
-          },
+          body: productPayload(fields),
         });
         await go(route, true);
         message(
