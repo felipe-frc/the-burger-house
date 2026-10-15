@@ -39,7 +39,8 @@ test("session notifications are accessible, transient and track payment transiti
   await expect(page.locator("#notification-list")).toContainText("Pedido #109");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const panel = await page.locator("#notifications-panel").boundingBox();
-  expect(panel.width).toBeLessThanOrEqual(420);
+  // Browser transforms can introduce subpixel rounding in boundingBox().
+  expect(panel.width).toBeLessThanOrEqual(420 + 0.001);
   expect(panel.height).toBe(page.viewportSize().height);
   if (page.viewportSize().width <= 640) {
     await expect(page.locator("#notifications-overlay")).toBeVisible();
