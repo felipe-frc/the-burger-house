@@ -1,6 +1,6 @@
 /**
  * @typedef {{id: string, name: string, description: string, price: number, image: string,
- * imageAlt: string, tag?: string, isActive?: boolean, category?: string, displayOrder?: number,
+ * imageAlt: string, imageUrl?: string | null, tag?: string, isActive?: boolean, category?: string, displayOrder?: number,
  * translations: {"en-US": {imageAlt: string, tag?: string, name?: string, description?: string}}}} MenuProduct
  */
 /** @type {Array<{id: string, title: string, icon: string, subtitle: string, translations: {"en-US": {title: string, subtitle: string}}, items: MenuProduct[]}>} */
