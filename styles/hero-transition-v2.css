@@ -1,0 +1,394 @@
+/* THE BURGER HOUSE 2.0 - TRANSITION V2 */
+
+:root {
+  --transition-blue: #263F79;
+  --transition-orange: #CF693A;
+  --transition-cream: #FFFCF8;
+  --transition-ivory: #F8F6F2;
+  --transition-orange-text: #A9501F;
+
+  --transition-overlap: 42px;
+  --marquee-speed: 38s;
+  --marquee-mobile-speed: 52s;
+  --marquee-height: 84px;
+}
+
+body > nav.bh-pretty-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: var(--transition-cream);
+}
+
+body > header.transition-story {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: clip !important;
+  isolation: isolate;
+  background: var(--transition-cream) !important;
+}
+
+.transition-story .bh-hero-legacy {
+  display: none !important;
+}
+
+.transition-hero-a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 620px;
+  height: calc(100svh - 104px);
+  overflow: hidden;
+  background: var(--transition-cream);
+  transform-origin: center top;
+}
+
+.transition-diagonals {
+  position: absolute;
+  inset: -20%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  transform: rotate(-10deg);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.transition-diagonal {
+  display: flex;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.transition-diagonal-track {
+  display: flex;
+  width: max-content;
+  animation: transition-diagonal-move 38s linear infinite alternate;
+}
+
+.transition-diagonal-track span {
+  flex: 0 0 auto;
+  padding-right: .7em;
+  font: 800 clamp(60px, 7vw, 126px)/1.1 "Poppins", sans-serif;
+  letter-spacing: -.045em;
+}
+
+.transition-diagonal--orange span {
+  color: var(--transition-orange);
+}
+
+.transition-diagonal--outline span {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--transition-blue);
+}
+
+.transition-diagonal--outline .transition-diagonal-track {
+  animation-direction: alternate-reverse;
+}
+
+@keyframes transition-diagonal-move {
+  from { transform: translateX(0); }
+  to { transform: translateX(-25%); }
+}
+
+.transition-hero-circle {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  width: min(46vw, calc(100svh - 230px), 680px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--transition-cream);
+  transform: translateY(-32px);
+}
+
+.transition-hero-circle img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.transition-scroll-cue {
+  position: absolute;
+  z-index: 3;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 24px;
+  border-radius: 999px;
+  background: var(--transition-blue);
+  color: var(--transition-cream) !important;
+  font: 800 14px "Poppins", sans-serif;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.transition-scroll-cue:hover,
+.transition-scroll-cue:focus-visible {
+  background: #1B305E;
+}
+
+.transition-divider {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  width: 100%;
+  overflow: hidden;
+  background: var(--transition-cream);
+}
+
+.marquee-band {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: var(--marquee-height);
+  overflow: hidden;
+}
+
+.marquee-band--blue {
+  background: var(--transition-blue);
+  color: var(--transition-cream);
+}
+
+.marquee-band--orange {
+  background: var(--transition-orange);
+  color: var(--transition-cream);
+}
+
+.marquee-viewport {
+  width: 100%;
+  overflow: hidden;
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-loop var(--marquee-speed) linear infinite;
+}
+
+.marquee-band--orange .marquee-track {
+  animation-direction: reverse;
+}
+
+.marquee-group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 24px;
+  padding-right: 24px;
+  white-space: nowrap;
+  font: 800 clamp(1.5rem, 3vw, 3rem)/1
+    "Poppins", sans-serif;
+}
+
+.marquee-icon {
+  font-size: .75em;
+}
+
+@keyframes marquee-loop {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.transition-divider:hover .marquee-track,
+.transition-divider:focus-within .marquee-track,
+.transition-divider.is-paused .marquee-track {
+  animation-play-state: paused;
+}
+
+.marquee-pause {
+  justify-self: end;
+  margin: 8px 16px 10px;
+  padding: 8px 15px;
+  border: 2px solid var(--transition-blue);
+  border-radius: 999px;
+  background: var(--transition-cream);
+  color: var(--transition-blue);
+  font: 700 14px "Poppins", sans-serif;
+  cursor: pointer;
+}
+
+.marquee-pause:focus-visible,
+.transition-cta:focus-visible,
+.transition-scroll-cue:focus-visible {
+  outline: 3px solid var(--transition-orange-text);
+  outline-offset: 3px;
+}
+
+.transition-hero-b {
+  position: relative;
+  z-index: 4;
+  width: 100%;
+  margin-top: calc(-1 * var(--transition-overlap));
+  padding-top: var(--transition-overlap);
+  border-radius: 26px 26px 0 0;
+  overflow: hidden;
+  background: var(--transition-ivory);
+}
+
+.transition-hero-b-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 55px 24px 40px;
+  text-align: center;
+}
+
+.transition-hero-b h1 {
+  margin: 0;
+  color: var(--transition-blue);
+  font: 800 clamp(2rem, 4vw, 3.5rem)/1.12
+    "Poppins", sans-serif;
+  text-wrap: balance;
+}
+
+.transition-hero-b p {
+  margin: 0;
+  max-width: 700px;
+  color: #343434;
+  font: 400 1rem/1.7 "Poppins", sans-serif;
+}
+
+.transition-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  margin-top: 8px;
+  padding: 12px 28px;
+  border-radius: 999px;
+  background: var(--transition-blue);
+  color: var(--transition-cream) !important;
+  font: 800 1rem "Poppins", sans-serif;
+  text-decoration: none;
+}
+
+.transition-cta:hover {
+  background: #1B305E;
+}
+
+.transition-hero-b-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1920 / 900;
+  object-fit: contain;
+  background: var(--transition-ivory);
+}
+
+/* Fallback com IntersectionObserver */
+.transition-story.transition-fallback .transition-hero-b {
+  transform: translateY(26px);
+  opacity: .96;
+  transition:
+    transform 420ms cubic-bezier(.22, 1, .36, 1),
+    opacity 420ms ease;
+}
+
+.transition-story.transition-fallback.transition-in-view
+.transition-hero-b {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Scroll-driven animation */
+@keyframes transition-enter {
+  from { transform: translateY(35px); opacity: .94; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes transition-recede {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(.985); opacity: .86; }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .transition-story:not(.transition-fallback) {
+      timeline-scope: --transition-arrival;
+    }
+
+    .transition-story:not(.transition-fallback)
+    .transition-hero-b {
+      view-timeline-name: --transition-arrival;
+      view-timeline-axis: block;
+      animation: transition-enter linear both;
+      animation-timeline: --transition-arrival;
+      animation-range: entry 0% entry 100%;
+    }
+
+    .transition-story:not(.transition-fallback)
+    .transition-hero-a {
+      animation: transition-recede linear both;
+      animation-timeline: --transition-arrival;
+      animation-range: entry 0% entry 100%;
+    }
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --marquee-height: 58px;
+    --transition-overlap: 24px;
+  }
+
+  .transition-hero-a {
+    min-height: 540px;
+    height: calc(100svh - 100px);
+  }
+
+  .transition-hero-circle {
+    width: min(90vw, calc(100svh - 200px));
+    transform: translateY(-22px);
+  }
+
+  .transition-diagonal-track span {
+    font-size: 56px;
+  }
+
+  .marquee-track {
+    animation-duration: var(--marquee-mobile-speed);
+  }
+
+  .marquee-group {
+    gap: 16px;
+    padding-right: 16px;
+    font-size: clamp(1.2rem, 5vw, 2rem);
+  }
+
+  .transition-hero-b-content {
+    padding: 35px 18px 30px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track,
+  .transition-diagonal-track {
+    animation: none !important;
+  }
+
+  .transition-story .transition-hero-a,
+  .transition-story .transition-hero-b {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}

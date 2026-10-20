@@ -43,6 +43,27 @@ const translations = {
     "payment.back": "Voltar à revisão",
     "hero.cta": "Explorar Cardápio",
     "hero.ctaAria": "Ir para o cardápio",
+    "prettyNav.about": "SOBRE",
+    "prettyNav.menu": "CARDÁPIO",
+    "prettyNav.contact": "CONTATO",
+    "prettyNav.delivery": "PEDIR DELIVERY",
+    "prettyNav.brandAria": "The Burger House - Início",
+    "transition.diagonal.fire": "FEITO NA BRASA",
+    "transition.diagonal.home": "SABOR DE CASA",
+    "transition.diagonal.burgers": "BURGERS INCRÍVEIS",
+    "transition.diagonal.craft": "ARTESANAL DE VERDADE",
+    "transition.marquee.fire": "SABOR DE BRASA VIVA",
+    "transition.marquee.craft": "HAMBÚRGUER ARTESANAL",
+    "transition.discover": "DESCUBRA NOSSO SABOR",
+    "transition.expandedHeadline": "SEU PRÓXIMO BURGER FAVORITO ESTÁ AQUI.",
+    "transition.expandedDescription": "Hambúrgueres artesanais, acompanhamentos irresistíveis e muito sabor em cada pedido.",
+    "transition.expandedCta": "EXPLORAR CARDÁPIO",
+    "transition.title": "Feito com carinho. Servido com sabor de casa.",
+    "transition.description": "Hambúrgueres artesanais, ingredientes especiais e aquele sabor que faz você querer voltar.",
+    "transition.cta": "Ver cardápio",
+    "transition.pause": "Pausar animação",
+    "transition.resume": "Retomar animação",
+    "transition.imageAlt": "Três hambúrgueres artesanais com batatas e soda italiana.",
 
     "nav.aria": "Navegação por categorias do cardápio",
     "nav.burgers": "Hambúrgueres",
@@ -190,6 +211,27 @@ const translations = {
     "payment.back": "Back to review",
     "hero.cta": "Explore Menu",
     "hero.ctaAria": "Go to menu",
+    "prettyNav.about": "ABOUT",
+    "prettyNav.menu": "MENU",
+    "prettyNav.contact": "CONTACT",
+    "prettyNav.delivery": "ORDER DELIVERY",
+    "prettyNav.brandAria": "The Burger House - Home",
+    "transition.diagonal.fire": "FLAME GRILLED",
+    "transition.diagonal.home": "A TASTE OF HOME",
+    "transition.diagonal.burgers": "AMAZING BURGERS",
+    "transition.diagonal.craft": "TRULY HANDCRAFTED",
+    "transition.marquee.fire": "LIVE FIRE FLAVOR",
+    "transition.marquee.craft": "CRAFT BURGERS",
+    "transition.discover": "DISCOVER OUR FLAVOR",
+    "transition.expandedHeadline": "YOUR NEXT FAVORITE BURGER IS RIGHT HERE.",
+    "transition.expandedDescription": "Handcrafted burgers, irresistible sides, and delicious flavor in every order.",
+    "transition.expandedCta": "EXPLORE OUR MENU",
+    "transition.title": "Made with care. Served with a taste of home.",
+    "transition.description": "Handcrafted burgers, special ingredients, and flavors worth coming back for.",
+    "transition.cta": "View menu",
+    "transition.pause": "Pause animation",
+    "transition.resume": "Resume animation",
+    "transition.imageAlt": "Three handcrafted burgers with fries and Italian soda.",
 
     "nav.aria": "Menu category navigation",
     "nav.burgers": "Burgers",
@@ -411,6 +453,10 @@ export function applyStaticTranslations(language = getCurrentLanguage()) {
     element.setAttribute("aria-label", translate(key, language));
   });
 
+  document.querySelectorAll("[data-i18n-alt]").forEach((element) => {
+    const key = element.getAttribute("data-i18n-alt");
+    if (key) element.setAttribute("alt", translate(key, language));
+  });
   document.title = translate("meta.title", language);
 
   const description = document.querySelector('meta[name="description"]');

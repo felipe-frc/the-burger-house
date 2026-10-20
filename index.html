@@ -40,13 +40,89 @@
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="output.css" />
     <link rel="stylesheet" href="./styles/navbar-pretty.css" />
+    <link rel="stylesheet" href="./styles/hero-transition-v2.css" />
+    <link rel="stylesheet" href="./styles/transition-photo-scroll.css" />
     <link rel="shortcut icon" href="assets/icon.ico" type="image/x-icon" />
 
     <title>The Burger House</title>
   </head>
 
   <body>
-    <header
+    <header class="bh-hero-scenes transition-story">
+
+  <section class="transition-hero-a" aria-label="The Burger House">
+    <div class="transition-diagonals" aria-hidden="true">
+      <div class="transition-diagonal transition-diagonal--orange">
+        <div class="transition-diagonal-track">
+          <span data-i18n="transition.diagonal.fire">FEITO NA BRASA</span>
+          <span data-i18n="transition.diagonal.fire">FEITO NA BRASA</span>
+          <span data-i18n="transition.diagonal.fire">FEITO NA BRASA</span>
+          <span data-i18n="transition.diagonal.fire">FEITO NA BRASA</span>
+        </div>
+      </div>
+      <div class="transition-diagonal transition-diagonal--outline">
+        <div class="transition-diagonal-track">
+          <span data-i18n="transition.diagonal.home">SABOR DE CASA</span>
+          <span data-i18n="transition.diagonal.home">SABOR DE CASA</span>
+          <span data-i18n="transition.diagonal.home">SABOR DE CASA</span>
+          <span data-i18n="transition.diagonal.home">SABOR DE CASA</span>
+        </div>
+      </div>
+      <div class="transition-diagonal transition-diagonal--orange">
+        <div class="transition-diagonal-track">
+          <span data-i18n="transition.diagonal.burgers">BURGERS INCRÍVEIS</span>
+          <span data-i18n="transition.diagonal.burgers">BURGERS INCRÍVEIS</span>
+          <span data-i18n="transition.diagonal.burgers">BURGERS INCRÍVEIS</span>
+          <span data-i18n="transition.diagonal.burgers">BURGERS INCRÍVEIS</span>
+        </div>
+      </div>
+      <div class="transition-diagonal transition-diagonal--outline">
+        <div class="transition-diagonal-track">
+          <span data-i18n="transition.diagonal.craft">ARTESANAL DE VERDADE</span>
+          <span data-i18n="transition.diagonal.craft">ARTESANAL DE VERDADE</span>
+          <span data-i18n="transition.diagonal.craft">ARTESANAL DE VERDADE</span>
+          <span data-i18n="transition.diagonal.craft">ARTESANAL DE VERDADE</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="transition-hero-circle">
+      <img
+        src="/assets/branding/hero-burger-house-desktop.png"
+        alt="Combo artesanal The Burger House"
+        data-i18n-alt="transition.imageAlt"
+        width="1920"
+        height="900"
+        fetchpriority="high"
+      />
+    </div>
+
+    <a href="#menu"
+       class="transition-scroll-cue"
+       data-i18n="transition.discover">
+      DESCUBRA NOSSO SABOR
+    </a>
+
+    <div class="transition-expanded-copy"
+         aria-hidden="true"
+         inert>
+      <div class="transition-expanded-intro">
+        <h2 data-i18n="transition.expandedHeadline">
+          SEU PRÓXIMO BURGER FAVORITO ESTÁ AQUI.
+        </h2>
+      </div>
+
+      <a class="transition-expanded-cta"
+         href="#menu"
+         data-i18n="transition.expandedCta">
+        EXPLORAR CARDÁPIO
+      </a>
+    </div>
+  </section>
+
+  <div class="transition-scroll-runway" aria-hidden="true"></div>
+<div class="bh-hero-legacy" aria-hidden="true">
+<header
       class="relative flex min-h-screen w-full items-center overflow-hidden bg-black font-['Poppins'] text-white"
       aria-label="The Burger House"
     >
@@ -193,6 +269,8 @@
         </div>
       </div>
     </header>
+</div>
+</header>
 
     <nav
       id="category-nav"
@@ -787,7 +865,8 @@
     </footer>
 
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
-    <script defer src="./scripts/navbar-pretty.js"></script>
+    <script type="module" src="./scripts/navbar-pretty.js"></script>
     <script type="module" src="./scripts/main.js"></script>
-  </body>
+    <script type="module" src="./scripts/transition-photo-scroll.js"></script>
+</body>
 </html>
