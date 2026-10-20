@@ -1,3 +1,4 @@
+import { applyStaticTranslations, getCurrentLanguage } from "./i18n.js";
 (function () {
   "use strict";
 
@@ -16,19 +17,19 @@
     const nav = document.createElement("nav");
 
     nav.className = "bh-pretty-nav";
-    nav.setAttribute("aria-label", "Navegacao principal");
+    nav.setAttribute("aria-label", "Navegação principal");
 
     nav.innerHTML = `
       <div class="bh-pretty-nav-links">
-        <a href="#menu">SOBRE</a>
-        <a href="#menu">CARDÁPIO</a>
-        <a href="#menu">CONTATO</a>
+        <a href="#menu" data-i18n="prettyNav.about">SOBRE</a>
+        <a href="#menu" data-i18n="prettyNav.menu">CARDÁPIO</a>
+        <a href="#menu" data-i18n="prettyNav.contact">CONTATO</a>
       </div>
 
       <a
         class="bh-pretty-nav-brand"
         href="#"
-        aria-label="The Burger House - Inicio"
+        aria-label="The Burger House - Início" data-i18n-aria-label="prettyNav.brandAria"
       >
         <img
           src="/assets/branding/logo-burger-house.png"
@@ -39,7 +40,7 @@
 
       <div class="bh-pretty-nav-actions">
         <div class="bh-pretty-nav-language">
-          <div class="bh-pretty-flags" role="group" aria-label="Idioma">
+          <div class="bh-pretty-flags" role="group" aria-label="Idioma" data-i18n-aria-label="language.label">
   <button type="button" class="bh-pretty-flag" data-lang="pt-BR" aria-label="Português">
     <img src="/assets/branding/flags/br.svg" alt="">
     <span>PT</span>
@@ -57,7 +58,7 @@
           class="bh-pretty-nav-action bh-pretty-nav-action--delivery"
           data-pretty-delivery
         >
-          PEDIR DELIVERY
+          <span data-i18n="prettyNav.delivery">PEDIR DELIVERY</span>
         </button>
 
         <button
@@ -92,7 +93,17 @@
 
       const flagButtons = nav.querySelectorAll(".bh-pretty-flag");
 
+      language.value = getCurrentLanguage();
+
       const syncFlags = () => {
+        const en = language.value === "en-US";
+
+        // Corrige explicitamente o atributo que falhou no Playwright.
+        nav.setAttribute(
+          "aria-label",
+          en ? "Main navigation" : "Navegação principal"
+        );
+
         flagButtons.forEach((button) => {
           const active = button.dataset.lang === language.value;
           button.classList.toggle("is-active", active);
@@ -104,13 +115,20 @@
         button.addEventListener("click", () => {
           if (language.value !== button.dataset.lang) {
             language.value = button.dataset.lang;
+            localStorage.setItem("burgerShop:language", language.value);
             language.dispatchEvent(new Event("change", { bubbles: true }));
           }
+          applyStaticTranslations(language.value);
           syncFlags();
         });
       });
 
-      language.addEventListener("change", syncFlags);
+      language.addEventListener("change", () => {
+        applyStaticTranslations(language.value);
+        syncFlags();
+      });
+
+      applyStaticTranslations(language.value);
       syncFlags();
     }
 
@@ -144,12 +162,14 @@
 
         visualCount.textContent = count > 99 ? "99+" : String(count);
         visualCount.hidden = count === 0;
-        navCart.setAttribute(
-          "aria-label",
-          count === 0
-            ? "Abrir meu carrinho, vazio"
-            : `Abrir meu carrinho, ${count} itens`
-        );
+        const en = language.value === "en-US";
+        const label = count === 0
+          ? (en ? "Open my cart, empty" : "Abrir meu carrinho, vazio")
+          : en
+            ? `Open my cart, ${count} ${count === 1 ? "item" : "items"}`
+            : `Abrir meu carrinho, ${count} ${count === 1 ? "item" : "itens"}`;
+
+        navCart.setAttribute("aria-label", label);
       };
 
       new MutationObserver(syncCartCount).observe(originalCount, {
@@ -158,6 +178,7 @@
         subtree: true
       });
 
+      language.addEventListener("change", syncCartCount);
       syncCartCount();
     }
     nav
