@@ -1,0 +1,49 @@
+name: Backend production deploy (manual only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: 'Confirm an explicitly authorized Production deployment'
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main' && inputs.confirm_production == true
+    uses: ./.github/workflows/backend-deploy.yml
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && inputs.confirm_production == true
+    environment: Production
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v4
+        with:
+          name: .net-app
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_1971EA0194254B7BB2A0C8EC8D4D5268 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_4BE20FA27D894EB091568FEB1DD5AD7A }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_8D473E4BB429496B81469D4AD0F9C091 }}
+
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: "the-burger-house-api"
+          slot-name: "Production"
+          package: .

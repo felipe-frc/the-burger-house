@@ -439,7 +439,7 @@ describe("cart", () => {
       },
     ]);
 
-    expect(uiMock.showToast).toHaveBeenCalledWith("Burger Localizado adicionado", "#16a34a");
+    expect(uiMock.showToast).toHaveBeenCalledWith("Burger Localizado adicionado", "#ffd340");
 
     expect(button.classList.contains("scale-110")).toBe(true);
 

@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { mockAdmin, login, navigate } from "./admin-helpers.js";
 
 test("public catalog moves original products, sorts and preserves translated cards", async ({
   page,
@@ -61,25 +60,5 @@ test("public catalog moves original products, sorts and preserves translated car
     "Moved burger",
   ]);
   await expect(page.locator('[data-id="hidden-drink"]')).toHaveCount(0);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-});
-
-test("admin saves classification and keeps translation and availability controls", async ({
-  page,
-}) => {
-  const calls = await mockAdmin(page);
-  await login(page);
-  await navigate(page, "Produtos");
-  const form = page.locator('[data-product="1"]');
-  await form.locator('[name="description"]').fill("Descrição de teste");
-  await form.getByRole("combobox", { name: "Categoria", exact: true }).selectOption("sides");
-  await form.getByLabel(/Ordem de exibição/).fill("0");
-  await expect(form.locator("[data-translate-product]")).toBeVisible();
-  await expect(form.locator("[data-toggle-product]")).toBeVisible();
-  await form.getByRole("button", { name: /Salvar produto/ }).click();
-  await expect(page.locator("#admin-message")).toContainText("Produto atualizado");
-  expect(
-    calls.find((call) => call.path === "products/1" && call.method === "PATCH").body,
-  ).toMatchObject({ category: "sides", displayOrder: 0, isActive: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

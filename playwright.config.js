@@ -1,6 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import { playwrightOutput } from "./tests/playwright-output.js";
 
 export default defineConfig({
+  ...playwrightOutput("e2e"),
   testDir: "./tests/e2e",
   testMatch: "**/*.e2e.js",
   timeout: 30000,
@@ -15,7 +17,7 @@ export default defineConfig({
   webServer: process.env.CI
     ? undefined
     : {
-        command: "npm run serve:e2e",
+        command: "node scripts/serve-built-local.mjs",
         url: "http://127.0.0.1:4173",
         reuseExistingServer: true,
         timeout: 120000,

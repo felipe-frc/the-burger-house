@@ -60,7 +60,7 @@ beforeEach(() => {
   mocks.cart = [{ id: "burger-praiano", quantity: 1, price: 43.9 }];
   document.body.innerHTML =
     '<input id="customer-name" value="Cliente Teste" /><input id="customer-phone" value="11999990000" /><input id="customer-email" value="cliente@teste.com" /><input id="customer-tax-id" value="52998224725" /><p id="checkout-status"></p><button id="check-payment-btn"></button><button id="confirm-whatsapp-btn" class="hidden"></button>';
-  mocks.createOrder.mockResolvedValue({ orderId: 99, subtotal: 43.9, deliveryFee: 0, total: 43.9 });
+  mocks.createOrder.mockResolvedValue({ orderId: 99, orderAccessToken: "synthetic-order-proof", subtotal: 43.9, deliveryFee: 0, total: 43.9 });
   mocks.createCheckout.mockResolvedValue({
     paymentId: 17,
     checkoutUrl: "https://pagamento.pagbank.com.br/checkout/CHEC_test",
@@ -90,7 +90,7 @@ it("creates an order and PagBank checkout, preserving return context without cho
     complement: null,
     observation: null,
   });
-  expect(mocks.createCheckout).toHaveBeenCalledWith(99);
+  expect(mocks.createCheckout).toHaveBeenCalledWith(99, "synthetic-order-proof");
   const context = JSON.parse(sessionStorage.getItem("burger-house-checkout"));
   expect(context.paymentId).toBe(17);
   expect(context.message).toContain("Rua dos Testes 123");
@@ -106,7 +106,7 @@ it("requires the final checkoutUrl contract", async () => {
 
   await (await import("../scripts/order.js")).openPaymentStep();
 
-  expect(mocks.createCheckout).toHaveBeenCalledWith(99);
+  expect(mocks.createCheckout).toHaveBeenCalledWith(99, "synthetic-order-proof");
   expect(JSON.parse(sessionStorage.getItem("burger-house-checkout")).paymentId).toBeNull();
   expect(mocks.toast).toHaveBeenCalledWith("Invalid URL");
 });
@@ -420,7 +420,7 @@ it.each([
   order.bindOrderEvents();
   expect(document.getElementById(field).value).toBe(value);
   mocks.createOrder.mockResolvedValue({
-    orderId: 100,
+    orderId: 100, orderAccessToken: "synthetic-order-proof",
     subtotal: 43.9,
     deliveryFee: 5,
     total: 48.9,
@@ -428,7 +428,7 @@ it.each([
   await order.openPaymentStep();
 
   expect(mocks.createOrder).toHaveBeenCalledTimes(2);
-  expect(mocks.createCheckout).toHaveBeenLastCalledWith(100);
+  expect(mocks.createCheckout).toHaveBeenLastCalledWith(100, "synthetic-order-proof");
   expect(currentSession().fingerprint).not.toBe(previous.fingerprint);
   expect(currentSession().fingerprint).toBe(
     "v2:" + JSON.stringify(mocks.createOrder.mock.calls[1][0]),
@@ -489,7 +489,7 @@ it("never reuses a legacy cart-only identity for a new checkout", async () => {
   order.bindOrderEvents();
   await order.openPaymentStep();
   expect(mocks.createOrder).toHaveBeenCalledOnce();
-  expect(mocks.createCheckout).toHaveBeenCalledWith(99);
+  expect(mocks.createCheckout).toHaveBeenCalledWith(99, "synthetic-order-proof");
   expect(currentSession().orderId).toBe(99);
 });
 
@@ -536,7 +536,7 @@ it("keeps identity and saved fields tied to the submitted snapshot during async 
   const pending = order.openPaymentStep();
   const payload = mocks.createOrder.mock.calls[0][0];
   document.getElementById("customer-name").value = "Edited While Waiting";
-  resolveOrder({ orderId: 99, subtotal: 43.9, deliveryFee: 0, total: 43.9 });
+  resolveOrder({ orderId: 99, orderAccessToken: "synthetic-order-proof", subtotal: 43.9, deliveryFee: 0, total: 43.9 });
   await pending;
   expect(currentSession().fields["customer-name"]).toBe(payload.customerName);
   expect(currentSession().fingerprint).toBe("v2:" + JSON.stringify(payload));
@@ -573,7 +573,7 @@ function savedContext() {
   sessionStorage.setItem(
     "burger-house-checkout",
     JSON.stringify({
-      orderId: 99,
+      orderId: 99, orderAccessToken: "synthetic-order-proof",
       paymentId: 17,
       total: 43.9,
       fingerprint: "saved",
@@ -617,7 +617,7 @@ it("ignores approved URL parameters and uses the local backend status", async ()
   window.history.replaceState({}, "", "/?status=approved&payment_id=666");
   mocks.getPaymentStatus.mockResolvedValue({ paymentId: 17, orderId: 99, amount: 43.9, status: 1 });
   await (await import("../scripts/order.js")).checkCheckoutReturn();
-  expect(mocks.getPaymentStatus).toHaveBeenCalledWith(17);
+  expect(mocks.getPaymentStatus).toHaveBeenCalledWith(17, "synthetic-order-proof");
   expect(document.getElementById("confirm-whatsapp-btn").classList.contains("hidden")).toBe(true);
   expect(document.getElementById("checkout-status").textContent).toContain("Aguardando");
 });

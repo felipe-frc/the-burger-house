@@ -36,7 +36,7 @@ describe("payment status API", () => {
   it("gets the current payment status", async () => {
     const { getPaymentStatus } = await import("../scripts/api.js");
 
-    const result = await getPaymentStatus(200);
+    const result = await getPaymentStatus(200, "synthetic-order-proof");
 
     expect(fetch).toHaveBeenCalledOnce();
 
@@ -45,6 +45,7 @@ describe("payment status API", () => {
     expect(url).toContain("/api/payments/200");
 
     expect(options.method).toBe("GET");
+    expect(options.headers["X-Order-Access"]).toBe("synthetic-order-proof");
 
     expect(result.status).toBe(1);
 
@@ -67,7 +68,7 @@ it("posts the order and obtains hosted checkout without payment data", async () 
     observation: "Sem cebola",
   };
   await createOrder({ orderType: "pickup", items, ...fulfillment });
-  await createCheckout(99);
+  await createCheckout(99, "synthetic-order-proof");
   expect(fetch.mock.calls[0][0]).toContain("/api/orders");
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
     orderType: "pickup",
@@ -85,15 +86,22 @@ it("preserves API error status and safe message for checkout retries", async () 
     status: 409,
   });
   const { createCheckout } = await import("../scripts/api.js");
-  await expect(createCheckout(99)).rejects.toMatchObject({
+  await expect(createCheckout(99, "synthetic-order-proof")).rejects.toMatchObject({
     name: "ApiError",
     status: 409,
     message: "Checkout unavailable",
     data: { error: "Checkout unavailable" },
   });
   fetch.mockResolvedValue({ ok: false, status: 502, headers: { get: () => null } });
-  await expect(createCheckout(99)).rejects.toMatchObject({
+  await expect(createCheckout(99, "synthetic-order-proof")).rejects.toMatchObject({
     status: 502,
     message: "A API retornou o status 502.",
   });
+});
+
+it("never queries numeric payment or checkout identities without proof", async () => {
+  const { getPaymentStatus, createCheckout } = await import("../scripts/api.js");
+  await expect(getPaymentStatus(200)).rejects.toMatchObject({ status: 0 });
+  await expect(createCheckout(99)).rejects.toMatchObject({ status: 0 });
+  expect(fetch).not.toHaveBeenCalled();
 });

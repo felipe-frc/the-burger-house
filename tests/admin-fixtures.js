@@ -84,6 +84,8 @@ export const points = [
   { date: "2026-10-05", revenue: 120 },
 ];
 export function mockData(path) {
+  if (path.startsWith("orders/movement"))
+    return { start: "2026-10-01", end: "2026-10-28", today: "2026-10-28", hours: [], schedule: null };
   if (path.startsWith("notifications"))
     return { until: "2026-10-05T22:00:00Z", nextAfterId: null, newPaidOrders: 1, items: [] };
   if (path === "dashboard") return structuredClone(dashboard);
@@ -94,10 +96,14 @@ export function mockData(path) {
       pageNumber: Number(new URLSearchParams(path.split("?")[1]).get("page") || 1),
       pageSize: 20,
     };
+  if (path.startsWith("customers?")) return [];
   if (path === "orders/108") return structuredClone(detail);
   if (path === "products") return structuredClone(products);
   if (path === "store") return { deliveryFee: 5 };
+  if (path === "operation/settings") return { revision: 0, limits: { preparing: 0, readyForPickup: 0, outForDelivery: 0 } };
   if (path.startsWith("finance/summary")) return structuredClone(summary);
+  if (path.startsWith("finance/revenue-by-category"))
+    return { categories: [], unclassifiedRevenue: 0, deliveryFees: 0, unallocatedPayments: 0, grossRevenue: 0, refundedAmount: 0 };
   if (path.startsWith("finance/revenue")) return structuredClone(points);
   if (path.startsWith("finance/payment-methods"))
     return [{ method: "Pix", count: 2, revenue: 120, percentage: 100 }];
