@@ -5,6 +5,7 @@ namespace BurgerHouse.Api.Controllers;
 
 [ApiController]
 [Route("api/payments")]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("StorefrontRead")]
 public sealed class PaymentsController(GetPaymentStatusHandler handler) : ControllerBase
 {
     [HttpGet("{paymentId:int}")]

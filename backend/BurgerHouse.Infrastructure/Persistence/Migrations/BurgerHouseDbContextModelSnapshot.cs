@@ -17,6 +17,97 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.19");
 
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.AddonOption", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MaximumQuantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProductCategory")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Code");
+
+                    b.ToTable("AddonOptions", (string)null);
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.AdminAgendaEvent", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Date")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EndTime")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("StartTime")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Date", "Deleted");
+
+                    b.ToTable("AdminAgendaEvents", (string)null);
+                });
+
             modelBuilder.Entity("BurgerHouse.Domain.Entities.AdminAuditLog", b =>
                 {
                     b.Property<int>("Id")
@@ -109,6 +200,90 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                     b.ToTable("AdminUser");
                 });
 
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.Coupon", b =>
+                {
+                    b.Property<string>("Code")
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("FixedAmount")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("MinimumSubtotal")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Percentage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ProductCategory")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartsAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UsageLimit")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UsedCount")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Code");
+
+                    b.ToTable("Coupons", (string)null);
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.DeliveryTracking", b =>
+                {
+                    b.Property<int>("OrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double?>("Accuracy")
+                        .HasColumnType("REAL");
+
+                    b.Property<int>("CourierId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastReportedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("REAL");
+
+                    b.Property<Guid?>("RunId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Sharing")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("OrderId");
+
+                    b.HasIndex("CourierId");
+
+                    b.HasIndex("ExpiresAtUtc");
+
+                    b.ToTable("DeliveryTracking", (string)null);
+                });
+
             modelBuilder.Entity("BurgerHouse.Domain.Entities.Order", b =>
                 {
                     b.Property<int>("Id")
@@ -119,6 +294,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Complement")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CouponCode")
+                        .HasMaxLength(40)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
@@ -142,6 +321,12 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("DeliveryFee")
                         .HasPrecision(10, 2)
                         .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Discount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue(0m);
 
                     b.Property<string>("HouseNumber")
                         .HasColumnType("TEXT");
@@ -180,6 +365,15 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal>("DiscountAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(10, 2)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue(0m);
+
+                    b.Property<string>("ExtrasJson")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Observation")
                         .HasColumnType("TEXT");
 
@@ -191,6 +385,10 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("SaleCategory")
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("UnitCost")
                         .HasPrecision(10, 2)
@@ -207,6 +405,24 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProductId");
 
                     b.ToTable("OrderItems", (string)null);
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.OwnerNotificationState", b =>
+                {
+                    b.Property<int>("OwnerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Archived")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("OwnerId", "OrderId");
+
+                    b.HasIndex("OrderId");
+
+                    b.ToTable("OwnerNotificationStates", (string)null);
                 });
 
             modelBuilder.Entity("BurgerHouse.Domain.Entities.Payment", b =>
@@ -516,6 +732,197 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.StockItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Minimum")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Quantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("StockItems", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Stock_Balance", "Quantity >= 0 AND Minimum >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.StockMovement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ActorId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Balance")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Delta")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StockItemId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StockItemId", "CreatedAt");
+
+                    b.ToTable("StockMovement");
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.TeamJournalEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("AtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Note")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("OvertimeHourlyRate")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("OwnerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("RecordedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reference")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ReplacesId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Status")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TeamMemberId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("ReplacesId")
+                        .IsUnique();
+
+                    b.HasIndex("TeamMemberId", "Date", "Kind");
+
+                    b.ToTable("TeamJournalEntries", (string)null);
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.TeamMember", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Department")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Shift")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("TeamMembers", (string)null);
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.TeamWorkDay", b =>
+                {
+                    b.Property<int>("TeamMemberId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("EndsAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PlannedBreakMinutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("StartsAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("TeamMemberId", "Date");
+
+                    b.ToTable("TeamWorkDays", (string)null);
+                });
+
             modelBuilder.Entity("BurgerHouse.Domain.Entities.AdminAuditLog", b =>
                 {
                     b.HasOne("BurgerHouse.Domain.Entities.AdminUser", null)
@@ -529,6 +936,21 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                     b.HasOne("BurgerHouse.Domain.Entities.AdminUser", null)
                         .WithMany()
                         .HasForeignKey("AdminUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.DeliveryTracking", b =>
+                {
+                    b.HasOne("BurgerHouse.Domain.Entities.TeamMember", null)
+                        .WithMany()
+                        .HasForeignKey("CourierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurgerHouse.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -548,6 +970,21 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.OwnerNotificationState", b =>
+                {
+                    b.HasOne("BurgerHouse.Domain.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("BurgerHouse.Domain.Entities.AdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("BurgerHouse.Domain.Entities.Payment", b =>
                 {
                     b.HasOne("BurgerHouse.Domain.Entities.Order", null)
@@ -562,6 +999,44 @@ namespace BurgerHouse.Infrastructure.Persistence.Migrations
                     b.HasOne("BurgerHouse.Domain.Entities.Payment", null)
                         .WithMany("Refunds")
                         .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.StockMovement", b =>
+                {
+                    b.HasOne("BurgerHouse.Domain.Entities.StockItem", null)
+                        .WithMany()
+                        .HasForeignKey("StockItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.TeamJournalEntry", b =>
+                {
+                    b.HasOne("BurgerHouse.Domain.Entities.AdminUser", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("BurgerHouse.Domain.Entities.TeamJournalEntry", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacesId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("BurgerHouse.Domain.Entities.TeamMember", null)
+                        .WithMany()
+                        .HasForeignKey("TeamMemberId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("BurgerHouse.Domain.Entities.TeamWorkDay", b =>
+                {
+                    b.HasOne("BurgerHouse.Domain.Entities.TeamMember", null)
+                        .WithMany()
+                        .HasForeignKey("TeamMemberId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+<!-- THE BURGER HOUSE: prevent visible fallback-font flash -->
+<style id="tbh-font-guard">
+  html.tbh-fonts-pending .tbh-hero-title,
+  html.tbh-fonts-pending .tbh-nav-link,
+  html.tbh-fonts-pending .tbh-nav-order,
+  html.tbh-fonts-pending .tbh-nav-menu-toggle,
+  html.tbh-fonts-pending .tbh-nav-language-trigger {
+    visibility: hidden !important;
+  }
+</style>
+<script id="tbh-font-guard-script" src="/font-guard.js"></script>
+
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Burger House — Demonstração de portfólio</title>
+    <meta name="description" content="Projeto demonstrativo de restaurante: catálogo, checkout PagBank Sandbox e painel administrativo. Sem atendimento ou cobranças reais." />
+    <meta property="og:title" content="The Burger House — Demonstração de portfólio" />
+    <meta property="og:description" content="Projeto demonstrativo de restaurante: catálogo, checkout PagBank Sandbox e painel administrativo. Sem atendimento ou cobranças reais." />
+    <meta property="og:type" content="website" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:image" content="/social-preview.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/webp" href="/assets/branding/the-burger-house-logo-440.webp" />
+    <link rel="preload" as="image" href="/assets/mascots/mascot-recovered-poster-optimized.webp" fetchpriority="high" />
+    <link id="tbh-storefront-fonts" href="/src/styles/fonts.css" rel="stylesheet" />
+</head>
+  <body class="bg-[#F5F3EE] text-[#171717] antialiased selection:bg-[#E85D4A] selection:text-[#F5F3EE]">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

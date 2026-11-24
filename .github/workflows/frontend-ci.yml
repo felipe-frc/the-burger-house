@@ -1,122 +1,32 @@
-name: CI (Front-end)
-
+name: Official storefront
 on:
   push:
-    branches:
-      - main
-      - "fix/**"
-      - "refactor/**"
-      - "feature/**"
-      - "chore/**"
+    branches: [main, 'feat/**', 'fix/**', 'refactor/**', 'feature/**', 'chore/**']
   pull_request:
-    branches:
-      - main
-
+    branches: [main]
 jobs:
   quality:
-    name: Qualidade e testes
     runs-on: ubuntu-latest
-
     steps:
-      - name: Baixar código
-        uses: actions/checkout@v4
-
-      - name: Instalar Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
-
-      - name: Instalar dependências
-        run: npm ci
-
-      - name: Auditar dependências de produção
-        run: npm audit --omit=dev
-
-      - name: Verificar qualidade do JavaScript
-        run: npm run lint
-
-      - name: Verificar formatação
-        run: npm run format:check
-
-      - name: Verificar tipos do JavaScript
-        run: npm run typecheck
-
-      - name: Executar testes com cobertura
-        run: npm run test:coverage
-
-      - name: Publicar relatório de cobertura
-        if: always()
-        uses: actions/upload-artifact@v4
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+            owner-ui/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix frontend
+      - run: npm ci --prefix owner-ui
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:frontend
+      - run: npm --prefix owner-ui test
+      - run: npm run build
+      - run: npm run build:owner
+      - uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: coverage/
-          if-no-files-found: warn
-          retention-days: 7
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    needs: quality
-
-    steps:
-      - name: Baixar código
-        uses: actions/checkout@v4
-
-      - name: Instalar Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Instalar dependências
-        run: npm ci
-
-      - name: Gerar build de produção
-        run: npm run build
-
-  e2e:
-    name: Testes E2E
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Baixar código
-        uses: actions/checkout@v4
-
-      - name: Instalar Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Instalar dependências
-        run: npm ci
-
-      - name: Instalar navegador do Playwright
-        run: npx playwright install --with-deps chromium
-
-      - name: Gerar build de produção
-        run: npm run build
-
-      - name: Subir servidor local para E2E
-        run: nohup npm run serve:e2e > vite-e2e.log 2>&1 &
-
-      - name: Aguardar servidor local
-        run: |
-          for i in {1..60}; do
-            if curl -fsS http://127.0.0.1:4173 > /dev/null; then
-              exit 0
-            fi
-            sleep 2
-          done
-
-          cat vite-e2e.log
-          exit 1
-
-      - name: Executar testes E2E
-        run: npm run e2e:ci
-
-      - name: Exibir log do servidor em caso de falha
-        if: failure()
-        run: cat vite-e2e.log
+          name: official-storefront
+          path: frontend/dist/

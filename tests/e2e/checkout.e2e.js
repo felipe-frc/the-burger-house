@@ -68,7 +68,7 @@ test.beforeEach(async ({ page }) => {
     }
     const deliveryFee = body.orderType === "pickup" ? 0 : 5;
     await route.fulfill({
-      json: { orderId: 99, subtotal: 43.9, deliveryFee, total: 43.9 + deliveryFee },
+      json: { orderId: 99, orderAccessToken: "synthetic-order-proof-not-a-real-token", subtotal: 43.9, deliveryFee, total: 43.9 + deliveryFee },
     });
   });
   await page.route("**/api/checkout/99", (route) =>
@@ -204,6 +204,7 @@ for (const status of [1, 3, 4]) {
         "burger-house-checkout",
         JSON.stringify({
           orderId: 99,
+          orderAccessToken: "synthetic-order-proof-not-a-real-token",
           paymentId: 17,
           total: 48.9,
           fingerprint: "saved",

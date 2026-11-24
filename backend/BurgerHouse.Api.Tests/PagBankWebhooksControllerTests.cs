@@ -954,15 +954,15 @@ public class PagBankWebhooksControllerTests
         "https://sandbox.api.pagseguro.com",
         true,
         "missing",
-        true,
-        true
+        false,
+        false
     )]
     [InlineData(
         "https://sandbox.api.pagseguro.com/",
         true,
         "missing",
-        true,
-        true
+        false,
+        false
     )]
     [InlineData(
         "https://sandbox.api.pagseguro.com",
@@ -1048,7 +1048,7 @@ public class PagBankWebhooksControllerTests
         false,
         false
     )]
-    public async Task UnsignedOverrideRequiresExplicitSandboxAndAbsentHeader(
+    public async Task LegacyUnsignedFlagNeverBypassesAuthentication(
         string baseUrl,
         bool allowUnsigned,
         string header,
@@ -1142,42 +1142,26 @@ public class PagBankWebhooksControllerTests
     }
 
     [Fact]
-    public async Task UnsignedOverrideStillRequiresSuccessfulProviderVerification()
+    public async Task MissingSignatureNeverConsultsProviderWithLegacyFlag()
     {
-        using var fixture =
-            new Fixture
-            {
-                AllowUnsigned =
-                    true,
+        using var fixture = new Fixture { AllowUnsigned = true, SignatureHeader = "missing",
+            LookupStatus = HttpStatusCode.InternalServerError };
+        Assert.IsType<UnauthorizedObjectResult>(await fixture.Receive());
+        Assert.Equal(0, fixture.PublicKeyCalls);
+        Assert.Equal(0, fixture.LookupCalls);
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
+        Assert.Equal(BurgerHouse.Domain.Enums.OrderStatus.PendingPayment, await fixture.OrderStatus());
+    }
 
-                SignatureHeader =
-                    "missing",
-
-                LookupStatus =
-                    HttpStatusCode.InternalServerError
-            };
-
-        Assert.Equal(
-            502,
-            Assert.IsType<ObjectResult>(
-                await fixture.Receive()
-            ).StatusCode
-        );
-
-        Assert.Equal(
-            0,
-            fixture.PublicKeyCalls
-        );
-
-        Assert.Equal(
-            1,
-            fixture.LookupCalls
-        );
-
-        Assert.Equal(
-            PaymentStatus.Pending,
-            (await fixture.Payment()).Status
-        );
+    [Fact]
+    public async Task ChunkedOversizedPayloadStopsReadingAtBoundBeforeAuthenticating()
+    {
+        using var fixture = new Fixture { RequestBody = new MemoryStream(new byte[4 * 1024 * 1024]) };
+        Assert.IsType<BadRequestObjectResult>(await fixture.Receive());
+        Assert.True(fixture.RequestBody.Position <= 256 * 1024 + 1);
+        Assert.Equal(0, fixture.PublicKeyCalls);
+        Assert.Equal(0, fixture.LookupCalls);
+        Assert.Equal(PaymentStatus.Pending, (await fixture.Payment()).Status);
     }
 
     private sealed class CaptureLogger
@@ -1308,6 +1292,7 @@ public class PagBankWebhooksControllerTests
             "https://sandbox.api.pagseguro.com";
 
         public bool AllowUnsigned;
+        public Stream? RequestBody;
 
         public string? SignatureHeader;
 
@@ -1681,12 +1666,12 @@ public class PagBankWebhooksControllerTests
                 new DefaultHttpContext();
 
             context.Request.Body =
-                new MemoryStream(
+                RequestBody ?? new MemoryStream(
                     body
                 );
 
             context.Request.ContentLength =
-                body.Length;
+                RequestBody is null ? body.Length : null;
 
             context.Request.ContentType =
                 "application/json";

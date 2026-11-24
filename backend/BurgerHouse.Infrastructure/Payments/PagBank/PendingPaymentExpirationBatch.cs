@@ -18,7 +18,8 @@ public sealed class PendingPaymentExpirationBatch(
             options.Value.CheckoutExpirationMinutes
         );
 
-    public async Task<int> RunAsync(
+    public async Task<(int Expired, int NextCursor)> RunAsync(
+        int afterId,
         CancellationToken cancellationToken = default)
     {
         if (_expiration <= TimeSpan.Zero)
@@ -35,6 +36,7 @@ public sealed class PendingPaymentExpirationBatch(
             await db.Orders
                 .AsNoTracking()
                 .Where(order =>
+                    order.Id > afterId &&
                     order.Status == OrderStatus.PendingPayment &&
                     order.CreatedAt <= cutoff
                 )
@@ -57,7 +59,7 @@ public sealed class PendingPaymentExpirationBatch(
             }
         }
 
-        return expiredCount;
+        return (expiredCount, orderIds.Length == 20 ? orderIds[^1] : 0);
     }
 
     private async Task<bool> TryExpireAsync(
@@ -99,12 +101,16 @@ public sealed class PendingPaymentExpirationBatch(
 
         if (payment?.ExternalCheckoutId is not null)
         {
-            string? checkoutStatus;
+            // Leave linked charges and checkouts that contain provider orders to reconciliation.
+            if (payment.ExternalPaymentId is not null)
+                return false;
+
+            bool expiredWithoutOrders;
 
             try
             {
-                checkoutStatus =
-                    await paymentLookup.GetCheckoutStatusAsync(
+                expiredWithoutOrders =
+                    await paymentLookup.IsExpiredCheckoutWithoutOrdersAsync(
                         payment.ExternalCheckoutId,
                         payment.Id,
                         cancellationToken
@@ -134,11 +140,7 @@ public sealed class PendingPaymentExpirationBatch(
                 return false;
             }
 
-            if (!string.Equals(
-                    checkoutStatus,
-                    "EXPIRED",
-                    StringComparison.OrdinalIgnoreCase
-                ))
+            if (!expiredWithoutOrders)
             {
                 return false;
             }

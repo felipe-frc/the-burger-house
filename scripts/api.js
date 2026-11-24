@@ -49,12 +49,18 @@ export async function createOrder(orderPayload) {
   });
 }
 
-export async function createCheckout(orderId) {
-  return request(`/api/checkout/${orderId}`, { method: "POST" });
+function orderAccessHeaders(token) {
+  if (typeof token !== "string" || !token || token.length > 2048)
+    throw new ApiError("Comprovante de acesso ausente. Preserve o pedido e solicite verificação.", 0);
+  return { "X-Order-Access": token };
+}
+export async function createCheckout(orderId, token) {
+  return request(`/api/checkout/${orderId}`, { method: "POST", headers: orderAccessHeaders(token) });
 }
 
-export async function getPaymentStatus(paymentId) {
+export async function getPaymentStatus(paymentId, token) {
   return request(`/api/payments/${paymentId}`, {
     method: "GET",
+    headers: orderAccessHeaders(token),
   });
 }

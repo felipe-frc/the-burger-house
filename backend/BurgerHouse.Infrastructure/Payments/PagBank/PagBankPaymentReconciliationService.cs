@@ -4,7 +4,7 @@ using BurgerHouse.Application.Payments.SynchronizeCheckoutPayment;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
 using BurgerHouse.Infrastructure.Persistence;
-using Microsoft.Data.Sqlite;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -163,7 +163,7 @@ public sealed class PagBankPaymentReconciliationService(
                 externalPaymentId
             );
         }
-        catch (Exception exception) when (exception is InvalidOperationException or DbUpdateException or SqliteException)
+        catch (Exception exception) when (exception is InvalidOperationException or DbUpdateException or DbException)
         {
             dbContext.ChangeTracker.Clear();
             logger.LogWarning(

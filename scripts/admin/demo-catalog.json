@@ -1,0 +1,187 @@
+{
+  "synthetic": true,
+  "products": [
+    {
+      "code": "demo-crispy-cheddar",
+      "name": "Crispy Cheddar",
+      "description": "Filé de frango empanado, cheddar derretido, bacon, alface, tomate e maionese defumada no pão brioche.",
+      "englishName": "Crispy Cheddar",
+      "englishDescription": "Breaded chicken, melted cheddar, bacon, lettuce, tomato and smoked mayo on a brioche bun.",
+      "price": 35.9,
+      "category": "menu",
+      "displayOrder": 40
+    },
+    {
+      "code": "demo-onion-crunch",
+      "name": "Onion Crunch",
+      "description": "Hambúrguer bovino, queijo suíço, bacon, onion rings crocantes e aioli de alho assado no pão brioche.",
+      "englishName": "Onion Crunch",
+      "englishDescription": "Beef patty, Swiss cheese, bacon, crispy onion rings and roasted garlic aioli on a brioche bun.",
+      "price": 43.9,
+      "category": "menu",
+      "displayOrder": 50
+    },
+    {
+      "code": "demo-o-praiano",
+      "name": "O Praiano",
+      "description": "Queijo coalho, banana-da-terra, bacon crocante, fio de mel e maionese defumada no pão brioche.",
+      "englishName": "O Praiano",
+      "englishDescription": "Coalho cheese, plantain, crispy bacon, honey and smoked mayo on a brioche bun.",
+      "price": 43.9,
+      "category": "menu",
+      "displayOrder": 60
+    },
+    {
+      "code": "demo-the-classic",
+      "name": "The Classic",
+      "description": "Carne smash, cheddar, cebola, picles e molho da casa no pão brioche.",
+      "englishName": "The Classic",
+      "englishDescription": "Smash patty, cheddar, onion, pickles and house sauce on a brioche bun.",
+      "price": 34.9,
+      "category": "menu",
+      "displayOrder": 10
+    },
+    {
+      "code": "demo-double-smash",
+      "name": "Double Smash",
+      "description": "Dois smash burgers, cheddar duplo, picles e cebola caramelizada no pão brioche.",
+      "englishName": "Double Smash",
+      "englishDescription": "Two smash patties, double cheddar, pickles and caramelized onion on a brioche bun.",
+      "price": 42.9,
+      "category": "menu",
+      "displayOrder": 20
+    },
+    {
+      "code": "demo-smokehouse-bbq",
+      "name": "Smokehouse BBQ",
+      "description": "Carne smash, cheddar, bacon crocante, cebola e barbecue defumado no pão brioche.",
+      "englishName": "Smokehouse BBQ",
+      "englishDescription": "Smash patty, cheddar, crispy bacon, onion and smoky barbecue sauce on a brioche bun.",
+      "price": 43.9,
+      "category": "menu",
+      "displayOrder": 30
+    },
+    {
+      "code": "demo-classic-fries",
+      "name": "Classic Fries",
+      "description": "Batatas sequinhas com sal da casa e molho especial à parte.",
+      "englishName": "Classic Fries",
+      "englishDescription": "Crispy fries with house salt and special sauce on the side.",
+      "price": 17.9,
+      "category": "sides",
+      "displayOrder": 10
+    },
+    {
+      "code": "demo-loaded-fries",
+      "name": "Loaded Fries",
+      "description": "Fritas crocantes cobertas com creme de cheddar e cubos de bacon.",
+      "englishName": "Loaded Fries",
+      "englishDescription": "Crispy fries topped with creamy cheddar and bacon bites.",
+      "price": 23.9,
+      "category": "sides",
+      "displayOrder": 20
+    },
+    {
+      "code": "demo-chicken-tenders",
+      "name": "Chicken Tenders",
+      "description": "Tiras de frango empanadas, crocantes por fora e suculentas por dentro.",
+      "englishName": "Chicken Tenders",
+      "englishDescription": "Breaded chicken strips, crunchy outside and juicy inside.",
+      "price": 26.9,
+      "category": "sides",
+      "displayOrder": 30
+    },
+    {
+      "code": "demo-strawberry-soda",
+      "name": "Strawberry Soda",
+      "description": "Soda artesanal de morango, gelo e o toque refrescante da casa.",
+      "englishName": "Strawberry Soda",
+      "englishDescription": "House strawberry soda with ice and a refreshing finish.",
+      "price": 12.9,
+      "category": "drinks",
+      "displayOrder": 10
+    },
+    {
+      "code": "demo-coca-cola-original",
+      "name": "Coca-Cola Original",
+      "description": "Lata de 350 ml servida bem gelada.",
+      "englishName": "Coca-Cola Original",
+      "englishDescription": "A chilled 350 ml can.",
+      "price": 5.9,
+      "category": "drinks",
+      "displayOrder": 20
+    },
+    {
+      "code": "demo-coca-cola-zero",
+      "name": "Coca-Cola Zero",
+      "description": "Lata de 350 ml sem açúcar, servida bem gelada.",
+      "englishName": "Coca-Cola Zero",
+      "englishDescription": "A chilled, sugar-free 350 ml can.",
+      "price": 5.9,
+      "category": "drinks",
+      "displayOrder": 30
+    },
+    {
+      "code": "demo-agua-mineral",
+      "name": "Água Mineral",
+      "description": "Água mineral sem gás, garrafa de 500 ml.",
+      "englishName": "Mineral Water",
+      "englishDescription": "Still mineral water, 500 ml bottle.",
+      "price": 4.9,
+      "category": "drinks",
+      "displayOrder": 40
+    },
+    {
+      "code": "demo-agua-com-gas",
+      "name": "Água com Gás",
+      "description": "Água mineral com gás, garrafa de 500 ml.",
+      "englishName": "Sparkling Water",
+      "englishDescription": "Sparkling mineral water, 500 ml bottle.",
+      "price": 5.9,
+      "category": "drinks",
+      "displayOrder": 50
+    },
+    {
+      "code": "demo-suco-laranja",
+      "name": "Suco de Laranja",
+      "description": "Suco de laranja refrescante servido bem gelado.",
+      "englishName": "Orange Juice",
+      "englishDescription": "Refreshing orange juice served chilled.",
+      "price": 11.9,
+      "category": "drinks",
+      "displayOrder": 60
+    }
+  ],
+  "extras": [
+    {
+      "code": "extra-cheese",
+      "name": "Queijo Cheddar Extra",
+      "price": 4.5
+    },
+    {
+      "code": "crispy-bacon",
+      "name": "Bacon Crocante Extra",
+      "price": 6
+    },
+    {
+      "code": "pickles",
+      "name": "Picles Artesanal Extra",
+      "price": 3
+    },
+    {
+      "code": "onion-rings",
+      "name": "Onion Rings (3 unid.)",
+      "price": 6.5
+    },
+    {
+      "code": "queijo-coalho",
+      "name": "Queijo Coalho Grelhado",
+      "price": 7
+    },
+    {
+      "code": "molho-casa",
+      "name": "Molho da Casa Extra",
+      "price": 3.5
+    }
+  ]
+}

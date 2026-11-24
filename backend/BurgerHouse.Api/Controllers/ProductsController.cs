@@ -10,6 +10,11 @@ public sealed class ProductsController(
     BurgerHouseDbContext dbContext)
     : ControllerBase
 {
+    [HttpGet("extras")]
+    public async Task<IActionResult> Extras(CancellationToken ct) =>
+        Ok(await dbContext.Set<BurgerHouse.Domain.Entities.AddonOption>().AsNoTracking()
+            .Where(x => x.IsActive).OrderBy(x => x.Code).ToListAsync(ct));
+
     [HttpGet]
     public async Task<IReadOnlyList<PublicProductResponse>> Get(
         CancellationToken cancellationToken)

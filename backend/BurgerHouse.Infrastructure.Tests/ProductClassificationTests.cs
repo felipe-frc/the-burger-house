@@ -24,10 +24,12 @@ public sealed class ProductClassificationTests
             await migrator.MigrateAsync(previous);
             await db.Database.ExecuteSqlRawAsync("UPDATE Products SET Price = '47.50', EnglishName = 'Beach', EnglishDescription = 'Revised', IsActive = 0 WHERE Id = 1");
             await db.Database.ExecuteSqlRawAsync("INSERT INTO Products(Code,Name,Description,Price,IsActive) VALUES('later-product','Novo','Descrição','12.00',1)");
-            var order = new Order(0, "pickup", "Teste", "11999990000", "cliente@teste.com", "52998224725");
-            order.AddItem(new OrderItem(1, 1, 47.5m));
-            db.Orders.Add(order);
-            await db.SaveChangesAsync();
+            // Populate the historical schema before applying the new model's columns.
+            await db.Database.ExecuteSqlRawAsync(
+                "INSERT INTO Orders(DeliveryFee,Status,CreatedAt,OrderType,CustomerName,CustomerPhone) VALUES('0.00',0,'2026-10-14 00:00:00','pickup','Teste','11999990000')");
+            var historicalId = await db.Database.SqlQueryRaw<long>("SELECT MAX(Id) AS Value FROM Orders").SingleAsync();
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO OrderItems(OrderId,ProductId,Quantity,UnitPrice) VALUES({historicalId},1,1,{47.5m})");
             var sql = migrator.GenerateScript(previous);
             Assert.DoesNotContain("DROP TABLE", sql, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("DELETE FROM", sql, StringComparison.OrdinalIgnoreCase);
@@ -45,6 +47,9 @@ public sealed class ProductClassificationTests
             Assert.Equal(47.5m, products[0].Price);
             Assert.Equal("Beach", products[0].EnglishName);
             Assert.False(products[0].IsActive);
+            var historical = await db.Set<OrderItem>().SingleAsync();
+            Assert.Equal(47.5m, historical.UnitPrice);
+            Assert.Null(historical.SaleCategory);
             await migrator.MigrateAsync(previous);
             Assert.Equal(12, await db.Database.SqlQueryRaw<int>("SELECT COUNT(*) AS Value FROM Products").SingleAsync());
             Assert.Equal(1, await db.Orders.CountAsync());

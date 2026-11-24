@@ -8,4 +8,7 @@ public interface IProductRepository
         string code,
         CancellationToken cancellationToken = default
     );
+    Task<IReadOnlyList<Product>> GetByCodesAsync(
+        IReadOnlyCollection<string> codes,
+        CancellationToken cancellationToken = default);
 }

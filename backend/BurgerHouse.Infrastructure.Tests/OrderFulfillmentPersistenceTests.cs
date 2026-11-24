@@ -81,6 +81,7 @@ public class OrderFulfillmentPersistenceTests
             Assert.Equal(type == "delivery" ? "Cidade" : null, saved.City);
             Assert.Equal(type == "delivery" ? "Apto" : null, saved.Complement);
             Assert.Equal("item", saved.Items.Single().Observation);
+            Assert.Equal("menu", saved.Items.Single().SaleCategory);
             Assert.Equal(fee, saved.DeliveryFee);
             Assert.False(db.Database.HasPendingModelChanges());
         }

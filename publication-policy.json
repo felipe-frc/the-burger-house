@@ -1,0 +1,56 @@
+{
+  "privatePaths": [
+    "docs/catalog-history-preserving-options-2026-10-28.md",
+    "docs/catalog-inventory-2026-10-28.md",
+    "docs/catalog-rehearsal-copy-only-2026-10-28.md",
+    "docs/credit-sandbox-manual-2026-10-28.md",
+    "docs/final-acceptance-2026-10-27.md",
+    "docs/final-hosted-validation-2026-10-27.md",
+    "docs/frontend-migration-evidence-loss.md",
+    "docs/fullstack-integration-final-report.md",
+    "docs/github-precommit-readiness.md",
+    "docs/images/endereco.png",
+    "docs/images/revisao.png",
+    "docs/integration-closeout-2026-10-28.md",
+    "docs/integration-validation-2026-10-27.md",
+    "docs/owner-recovery-transfer-2026-10-27.md",
+    "docs/pagbank-422-investigation-2026-10-28.md",
+    "docs/pagbank-reuse-2026-10-28.md",
+    "docs/pagbank-support-request-2026-10-28.md",
+    "docs/pix-settlement-2026-10-28.md",
+    "docs/production-catalog-cleanup-2026-10-28.md",
+    "docs/production-catalog-final-authorization-2026-10-28.md",
+    "docs/production-catalog-registration-2026-10-27.md",
+    "docs/technical-closeout-2026-10-28.md",
+    "docs/technical-closeout-manual-checks-2026-10-28.md",
+    "scripts/admin/compare-pagbank-history.mjs",
+    "scripts/admin/verify-paid-owner.mjs",
+    "scripts/admin/verify-paid-return.mjs",
+    "scripts/admin/verify-pix-settlement.mjs",
+    "scripts/admin/catalog-final-manifest.mjs",
+    "docs/images/address.png",
+    "docs/images/review.png"
+  ],
+  "historicalSyntheticExceptions": [
+    {
+      "path": "docs/images/address.png",
+      "commit": "879f08294049151c0183929f56cd7b171a2da9bc",
+      "blob": "0cb4651d6b82f7084ac4904085c008e7d3d852ff"
+    },
+    {
+      "path": "docs/images/review.png",
+      "commit": "879f08294049151c0183929f56cd7b171a2da9bc",
+      "blob": "a25ec140d9cb4f570c312bea6fa5db07899ba904"
+    },
+    {
+      "path": "docs/images/endereco.png",
+      "commit": "cc43d296c5598740514980a7f4bf9d32ef4a8f51",
+      "blob": "88e4632f2179f4758135c18b7d931f6e94ef30b1"
+    },
+    {
+      "path": "docs/images/revisao.png",
+      "commit": "cc43d296c5598740514980a7f4bf9d32ef4a8f51",
+      "blob": "dfc7be82a6e499dce3d7808d4ff8cd4842732f64"
+    }
+  ]
+}

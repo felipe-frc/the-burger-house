@@ -98,9 +98,9 @@ public class PagBankPaymentLookupTests
     }
 
     [Theory]
-    [InlineData("ACTIVE")]
-    [InlineData("EXPIRED")]
-    public async Task ReadsCorrelatedCheckoutStatus(string status)
+    [InlineData("ACTIVE", false)]
+    [InlineData("EXPIRED", true)]
+    public async Task IdentifiesCorrelatedExpiredCheckoutWithoutOrders(string status, bool expected)
     {
         HttpRequestMessage? captured = null;
 
@@ -131,13 +131,13 @@ public class PagBankPaymentLookupTests
 
         var actual =
             await Lookup(http)
-                .GetCheckoutStatusAsync(
+                .IsExpiredCheckoutWithoutOrdersAsync(
                     "CHEC_1",
                     17
                 );
 
         Assert.Equal(
-            status,
+            expected,
             actual
         );
 
@@ -147,13 +147,13 @@ public class PagBankPaymentLookupTests
         );
 
         Assert.Equal(
-            "https://sandbox.api.pagseguro.com/checkouts/CHEC_1",
+            "https://sandbox.api.pagseguro.com/checkouts/CHEC_1?offset=0&limit=100",
             captured.RequestUri!.ToString()
         );
     }
 
     [Fact]
-    public async Task CheckoutStatusReturnsNullForNotFound()
+    public async Task CheckoutExpirationReturnsFalseForNotFound()
     {
         using var http =
             new HttpClient(
@@ -169,12 +169,12 @@ public class PagBankPaymentLookupTests
 
         var result =
             await Lookup(http)
-                .GetCheckoutStatusAsync(
+                .IsExpiredCheckoutWithoutOrdersAsync(
                     "CHEC_MISSING",
                     17
                 );
 
-        Assert.Null(result);
+        Assert.False(result);
     }
 
     [Fact]
@@ -201,7 +201,7 @@ public class PagBankPaymentLookupTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () =>
                 Lookup(http)
-                    .GetCheckoutStatusAsync(
+                    .IsExpiredCheckoutWithoutOrdersAsync(
                         "CHEC_1",
                         17
                     )
@@ -227,7 +227,7 @@ public class PagBankPaymentLookupTests
             await Assert.ThrowsAsync<HttpRequestException>(
                 () =>
                     Lookup(http)
-                        .GetCheckoutStatusAsync(
+                        .IsExpiredCheckoutWithoutOrdersAsync(
                             "CHEC_1",
                             17
                         )

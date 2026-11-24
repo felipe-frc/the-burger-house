@@ -254,7 +254,7 @@ function setGoToPaymentLoading(isLoading) {
     button.innerHTML = `
       <span class="inline-flex items-center gap-2">
         <span
-          class="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin"
+          class="w-5 h-5 border-2 border-[#F5F3EE]/40 border-t-[#F5F3EE] rounded-full animate-spin"
         ></span>
 
         Preparando...
@@ -318,7 +318,7 @@ function loadReview() {
           </p>
         </div>
 
-        <span class="font-semibold text-amber-700 whitespace-nowrap">
+        <span class="font-semibold text-[#171717] whitespace-nowrap">
           ${formatPrice(itemSubtotal)}
         </span>
       `;
@@ -466,7 +466,7 @@ export async function openPaymentStep() {
       };
       saveCheckoutContext();
     }
-    const checkout = await createCheckout(checkoutSession.orderId);
+    const checkout = await createCheckout(checkoutSession.orderId, checkoutSession.orderAccessToken);
     const url = new URL(checkout.checkoutUrl);
     if (
       url.protocol !== "https:" ||
@@ -530,7 +530,7 @@ export async function checkCheckoutReturn() {
   openModal(elements.paymentModal);
   hidePaymentError();
   try {
-    const payment = await getPaymentStatus(checkoutSession.paymentId);
+    const payment = await getPaymentStatus(checkoutSession.paymentId, checkoutSession.orderAccessToken);
     if (context !== checkoutSession) return null;
     if (
       payment.paymentId !== checkoutSession.paymentId ||

@@ -1,0 +1,78 @@
+/* Six original products, natural section height and a readable ingredients layer. */
+#root #menu.tbh-showcase-section { background: var(--tbh-porcelain); padding: var(--tbh-section-space) 0; color: var(--tbh-ink); height: auto; min-height: 0; overflow: visible; }
+#menu .tbh-showcase-header { text-align: left; margin-bottom: var(--tbh-space-content); }
+#menu .tbh-showcase-header h2 { color: var(--tbh-blue); max-width: 24ch; }
+#menu .tbh-showcase-header p { margin: 16px 0 0; }
+#menu .tbh-showcase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 40px; row-gap: 50px; align-items: start; }
+#menu .tbh-showcase-item { min-width: 0; text-align: center; }
+#menu .tbh-showcase-reveal { display: block; width: 100%; padding: 0; border: 0; border-radius: var(--tbh-radius-control); background: transparent; color: inherit; cursor: pointer; font: inherit; text-align: center; touch-action: manipulation; }
+#menu .tbh-showcase-reveal:focus-visible { outline: 3px solid var(--tbh-blue); outline-offset: 5px; }
+#menu .tbh-showcase-visual { position: relative; display: grid; height: 260px; perspective: 1100px; }
+#menu .tbh-showcase-photo-face, #menu .tbh-showcase-ingredients { grid-area: 1 / 1; min-width: 0; min-height: 0; }
+#menu .tbh-showcase-photo-face { position: relative; display: grid; place-items: center; backface-visibility: hidden; -webkit-backface-visibility: hidden; transform-origin: center; transform: rotateX(0deg); transition: transform 500ms ease-in-out, opacity 220ms ease; }
+#menu .tbh-showcase-photo-face img { display: block; width: min(100%, 340px); height: var(--tbh-showcase-image-height, 90%); max-height: 260px; object-fit: contain; }
+/* Compensate for each asset’s transparent padding within the same frame. */
+#menu [data-product='the-classic'] { --tbh-showcase-image-height: 89%; }
+#menu [data-product='double-smash'] { --tbh-showcase-image-height: 91%; }
+#menu [data-product='smokehouse-bbq'] { --tbh-showcase-image-height: 97%; }
+#menu [data-product='crispy-cheddar'] { --tbh-showcase-image-height: 88%; }
+#menu [data-product='onion-crunch'] { --tbh-showcase-image-height: 86%; }
+#menu .tbh-showcase-item[data-open='true'] .tbh-showcase-photo-face { transform: rotateX(100deg); opacity: 0; }
+#menu .tbh-showcase-ingredients { align-self: center; display: flex; flex-direction: column; gap: 12px; padding: 16px; opacity: 0; visibility: hidden; transform: none; filter: none; backdrop-filter: none; transition: opacity 220ms ease, visibility 220ms; text-rendering: geometricPrecision; -webkit-font-smoothing: antialiased; }
+#menu .tbh-showcase-item[data-open='true'] .tbh-showcase-ingredients { opacity: 1; visibility: visible; transition-delay: 180ms; }
+#menu .tbh-showcase-ingredients-label { color: var(--tbh-blue); font-size: 16px; font-weight: 800; line-height: 1.3; }
+#menu .tbh-showcase-ingredient-list { font-size: var(--tbh-text-description); font-weight: 500; line-height: var(--tbh-leading-body); }
+#menu .tbh-showcase-hint { display: flex; justify-content: center; align-items: center; gap: 6px; min-height: 28px; margin-top: 12px; color: var(--tbh-blue); font-size: var(--tbh-text-small); font-weight: 600; }
+#root #menu .tbh-showcase-name { margin: 12px 0 8px; font-family: var(--tbh-font-title); font-size: var(--tbh-text-product); font-weight: 400; line-height: 1.2; text-transform: uppercase; }
+#menu .tbh-showcase-price { display: block; font-size: clamp(1.4rem,2.5vw,1.8rem); line-height: 1.2; color:var(--tbh-blue); font-weight: 800; font-variant-numeric: tabular-nums; }
+#menu .tbh-showcase-badge { position: absolute; right: 4%; top: 6%; padding: 6px 10px; border-radius: var(--tbh-radius-button); background: var(--tbh-blue); color: var(--tbh-porcelain); font-size: 12px; font-weight: 700; line-height: 1.2; }
+#menu .tbh-showcase-badge--onion { background: var(--tbh-yellow); color: var(--tbh-ink); }
+#menu .tbh-showcase-badge--chicken { background: var(--tbh-coral); color: var(--tbh-ink); }
+#menu .tbh-showcase-add { margin-top: 10px; min-height: 36px; padding: 0 14px; font-size: 13px;}
+#menu .tbh-showcase-add:disabled { opacity:1; }
+#menu .tbh-showcase-footer { display: flex; justify-content: center; margin-top: 40px; }
+@media (max-width: 1000px) { #menu .tbh-showcase-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 48px 28px; } }
+@media (max-width: 600px) {
+  #menu .tbh-showcase-grid { gap: 48px 20px; }
+  #menu .tbh-showcase-visual { height: 260px; }
+  #menu .tbh-showcase-ingredients { padding: 4px; }
+  #menu .tbh-showcase-hint { font-size: 13px; }
+  #menu .tbh-showcase-badge { font-size: 11px; }
+}
+@media (max-width: 480px) {
+  #menu .tbh-showcase-grid { grid-template-columns: minmax(0, 1fr); row-gap: 48px; }
+  #menu .tbh-showcase-visual { height: 260px; }
+  #menu .tbh-showcase-ingredients { padding-inline: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #menu .tbh-showcase-photo-face, #menu .tbh-showcase-ingredients { transition: none; }
+  #menu .tbh-showcase-item[data-open='true'] .tbh-showcase-ingredients { transition-delay: 0ms; }
+  #menu .tbh-showcase-item[data-open='true'] .tbh-showcase-photo-face { transform: none; }
+}
+
+/* Nutritional information — homepage reveal */
+#menu .tbh-showcase-nutrition-strip {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  padding: 7px 10px;
+  background: #fff;
+  border: 1px solid var(--tbh-blue);
+  border-radius: 999px;
+  color: #171717;
+  font-family: Gabarito, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+#menu .tbh-showcase-nutrition-strip strong {
+  color: var(--tbh-blue);
+}
+#menu .tbh-showcase-nutrition-legend {
+  font-family: Gabarito, sans-serif;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #383633;
+}

@@ -4,7 +4,7 @@ using BurgerHouse.Api.Webhooks.PagBank;
 using BurgerHouse.Application.Payments.ProcessPaymentWebhook;
 using BurgerHouse.Infrastructure.Payments.PagBank;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.Sqlite;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -12,6 +12,7 @@ namespace BurgerHouse.Api.Controllers;
 
 [ApiController]
 [Route("api/webhooks/pagbank")]
+[Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("PagBankWebhook")]
 public sealed class PagBankWebhooksController(
     PagBankWebhookSignatureValidator signatureValidator,
     ProcessPaymentWebhookHandler webhookHandler,
@@ -27,6 +28,7 @@ public sealed class PagBankWebhooksController(
 
     [HttpPost]
     [Consumes("application/json")]
+    [RequestSizeLimit(MaximumPayloadBytes)]
     public async Task<IActionResult> Receive(
         CancellationToken cancellationToken)
     {
@@ -52,42 +54,12 @@ public sealed class PagBankWebhooksController(
 
             try
             {
-                var options =
-                    pagBankOptions?.Value;
+                // Sandbox is not an authentication exemption. Keep the legacy setting
+                // readable for existing configuration, but never use it to authorize a body.
+                if (pagBankOptions?.Value.AllowUnsignedSandboxWebhooks == true)
+                    logger?.LogWarning("Legacy unsigned webhook configuration ignored; a valid signature is required.");
 
-                // An explicitly configured Sandbox endpoint permits this opt-in on hosted
-                // test environments too. A present (even empty) header never bypasses validation.
-                var allowUnsigned =
-                    !Request.Headers.ContainsKey(
-                        "x-payload-signature"
-                    ) &&
-                    signatures.Length == 0 &&
-                    options?.AllowUnsignedSandboxWebhooks ==
-                        true &&
-                    (
-                        string.Equals(
-                            options.BaseUrl,
-                            "https://sandbox.api.pagseguro.com/",
-                            StringComparison.OrdinalIgnoreCase
-                        ) ||
-                        string.Equals(
-                            options.BaseUrl,
-                            "https://sandbox.api.pagseguro.com",
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    );
-
-                if (allowUnsigned)
-                {
-                    logger?.LogWarning(
-                        "PagBank unsigned sandbox webhook accepted by explicit development override."
-                    );
-                }
-                else if (!await signatureValidator.IsValidAsync(
-                             rawBody,
-                             signatures,
-                             cancellationToken
-                         ))
+                if (!await signatureValidator.IsValidAsync(rawBody, signatures, cancellationToken))
                 {
                     logger?.LogWarning(
                         "PagBank webhook signature validation failed."
@@ -322,12 +294,12 @@ public sealed class PagBankWebhooksController(
                 }
             );
         }
-        catch (SqliteException exception)
+        catch (DbException exception)
         {
             logger?.LogWarning(
-                "PagBank webhook SQLite failure at stage: {Stage}, Code: {Code}; transaction was not committed.",
+                "PagBank webhook database failure at stage: {Stage}, Code: {Code}; transaction was not committed.",
                 stage,
-                exception.SqliteErrorCode
+                exception.ErrorCode
             );
 
             return StatusCode(
@@ -371,10 +343,18 @@ public sealed class PagBankWebhooksController(
         await using var buffer =
             new MemoryStream();
 
-        await Request.Body.CopyToAsync(
-            buffer,
-            cancellationToken
-        );
+        // Content-Length is optional. Stop at limit + 1 even for chunked streams,
+        // rather than buffering an unbounded body before checking its length.
+        var chunk = new byte[8192];
+        while (true)
+        {
+            var remaining = MaximumPayloadBytes + 1 - (int)buffer.Length;
+            var read = await Request.Body.ReadAsync(chunk.AsMemory(0, Math.Min(chunk.Length, remaining)), cancellationToken);
+            if (read == 0) break;
+            await buffer.WriteAsync(chunk.AsMemory(0, read), cancellationToken);
+            if (buffer.Length > MaximumPayloadBytes)
+                throw new JsonException("Webhook payload is too large.");
+        }
 
         if (buffer.Length == 0 ||
             buffer.Length > MaximumPayloadBytes)

@@ -7,129 +7,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace BurgerHouse.Infrastructure.Admin;
 
-public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
+public sealed partial class AdminService(BurgerHouseDbContext db) : IAdminService
 {
-    private IQueryable<Payment> Period(DateRange range) => db.Payments.AsNoTracking()
-        .Where(p => (p.UpdatedAt ?? p.CreatedAt) >= range.Start && (p.UpdatedAt ?? p.CreatedAt) < range.End);
-    private IQueryable<Payment> Approved(DateRange range) => db.Payments.AsNoTracking()
-        .Where(p => p.ApprovedAt >= range.Start && p.ApprovedAt < range.End);
-
-    public async Task<FinanceSummary> SummaryAsync(DateRange range, CancellationToken ct)
-    {
-        var payments = Approved(range);
-        var revenue = await payments.SumAsync(p => p.Amount, ct);
-        var count = await payments.CountAsync(ct);
-        var completeOrders = db.Orders.Where(o => payments.Any(p => p.OrderId == o.Id)
-            && o.Items.Any() && o.Items.All(i => i.UnitCost != null));
-        var covered = await completeOrders.CountAsync(ct);
-        var profit = await completeOrders.SelectMany(o => o.Items)
-            .SumAsync(i => (i.UnitPrice - i.UnitCost!.Value) * i.Quantity, ct);
-        var refundEvents = db.PaymentRefunds.AsNoTracking().Where(r => r.CreatedAt >= range.Start && r.CreatedAt < range.End);
-        var refunded = await refundEvents.SumAsync(r => r.Amount, ct);
-        var partial = await (from r in refundEvents join p in db.Payments on r.PaymentId equals p.Id
-            where r.CumulativeRefundedAmount < p.Amount select p.Id).Distinct().CountAsync(ct);
-        var estimated = await payments.CountAsync(p => p.ApprovalDateSource == ApprovalDateSource.LegacyEstimate, ct);
-        // These quality indicators describe the entire history, not dated period totals.
-        var unknown = await db.Payments.CountAsync(p => p.ApprovedAt == null &&
-            (p.Status == PaymentStatus.Approved || p.Status == PaymentStatus.PartiallyRefunded ||
-             p.Status == PaymentStatus.Refunded || p.Status == PaymentStatus.ChargedBack), ct);
-        var unreconstructed = await db.Payments.CountAsync(p => p.RefundTrackingStartedAt == null, ct);
-        var openingBalance = await db.Payments.SumAsync(p => p.RefundedAmount, ct) -
-            await db.PaymentRefunds.SumAsync(r => r.Amount, ct);
-        return new(revenue, refunded, revenue - refunded, count, count == 0 ? 0 : decimal.Round(revenue / count, 2),
-            covered == 0 ? null : profit, covered, partial, estimated, unknown, unreconstructed, openingBalance);
-    }
-    public async Task<IReadOnlyList<RevenuePoint>> RevenueAsync(DateRange range, CancellationToken ct)
-    {
-        // Current shop dates use São Paulo (UTC-3); group in SQL, return at most 367 days.
-        var rows = await Approved(range).GroupBy(p => p.ApprovedAt!.Value.AddHours(-3).Date)
-            .Select(g => new { Date = g.Key, Revenue = g.Sum(p => p.Amount) }).ToListAsync(ct);
-        var values = rows.ToDictionary(r => r.Date, r => r.Revenue);
-        var result = new List<RevenuePoint>();
-        for (var date = DateRange.LocalToday(range.Start); date < DateRange.LocalToday(range.End); date = date.AddDays(1))
-            result.Add(new(date.ToString("yyyy-MM-dd"), values.GetValueOrDefault(date)));
-        return result;
-    }
-    public async Task<IReadOnlyList<MethodSummary>> MethodsAsync(DateRange range, CancellationToken ct)
-    {
-        var rows = await Approved(range).GroupBy(p => p.Method)
-            .Select(g => new { Method = g.Key, Count = g.Count(), Revenue = g.Sum(p => p.Amount) }).ToListAsync(ct);
-        var total = rows.Sum(r => r.Revenue);
-        return rows.Select(r => new MethodSummary(r.Method.ToString(), r.Count, r.Revenue,
-            total == 0 ? 0 : decimal.Round(r.Revenue * 100 / total, 2))).ToList();
-    }
-    public async Task<Page<TransactionRow>> TransactionsAsync(DateRange range, int page, CancellationToken ct)
-    {
-        ValidatePage(page);
-        var query = Period(range);
-        var total = await query.CountAsync(ct);
-        var rows = await (from p in query join o in db.Orders on p.OrderId equals o.Id
-            orderby (p.UpdatedAt ?? p.CreatedAt) descending, p.Id descending
-            select new { p.OrderId, o.CustomerName, Date = p.UpdatedAt ?? p.CreatedAt, p.Method, p.Amount, p.Status,
-                p.ApprovedAt, p.ApprovalDateSource, p.RefundedAmount })
-            .Skip((page - 1) * 20).Take(20).ToListAsync(ct);
-        return new(rows.Select(r => new TransactionRow(r.OrderId, r.CustomerName, r.Date,
-            r.Method.ToString(), r.Amount, r.Status.ToString(), r.ApprovedAt,
-            r.ApprovalDateSource.ToString(), r.RefundedAmount)).ToList(), total, page);
-    }
-    public async Task<IReadOnlyList<AuditLogRow>> AuditLogsAsync(
-        DateRange range,
-        CancellationToken ct)
-    {
-        var rows =
-            await db.AdminAuditLogs
-                .AsNoTracking()
-                .Where(log =>
-                    log.CreatedAtUtc >= range.Start &&
-                    log.CreatedAtUtc < range.End
-                )
-                .OrderByDescending(log =>
-                    log.CreatedAtUtc
-                )
-                .ThenByDescending(log =>
-                    log.Id
-                )
-                .Take(50)
-                .Select(log =>
-                    new
-                    {
-                        log.CreatedAtUtc,
-                        log.AdminUserId,
-                        log.ActorType,
-                        log.Action,
-                        log.EntityType,
-                        log.EntityId,
-                        log.Changes
-                    }
-                )
-                .ToListAsync(ct);
-
-        return rows
-            .Select(row =>
-                new AuditLogRow(
-                    row.CreatedAtUtc,
-                    row.ActorType switch
-                    {
-                        "Admin" when row.AdminUserId.HasValue =>
-                            $"Administrador #{row.AdminUserId.Value}",
-
-                        "Provider" =>
-                            "PagBank",
-
-                        "System" =>
-                            "Sistema",
-
-                        _ =>
-                            row.ActorType
-                    },
-                    row.Action,
-                    row.EntityType,
-                    row.EntityId,
-                    row.Changes
-                )
-            )
-            .ToList();
-    }
     public async Task<Dashboard> DashboardAsync(DateTime utcNow, CancellationToken ct)
     {
         var today = DateRange.LocalToday(utcNow);
@@ -141,7 +20,14 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
         var open = await paid.CountAsync(o => o.Status != OrderStatus.Completed && o.Status != OrderStatus.Cancelled, ct);
         var received = await paid.CountAsync(o => o.Status == OrderStatus.Received, ct);
         var recent = await Rows(paid.OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id).Take(8), ct);
-        return new(day, week, month, last30, open, received, recent);
+        var counts = await db.Orders.AsNoTracking().GroupBy(order => new { order.Status, order.OrderType })
+            .Select(group => new { group.Key, Count = group.Count() }).ToListAsync(ct);
+        var settings = await OperationSettingsAsync(ct);
+        var range = DateRange.ForShift(utcNow, settings.Limits.Schedule);
+        var shift = range is null ? null : new DashboardShift(utcNow >= range.Start && utcNow < range.End, range.Start, range.End,
+            await SummaryAsync(range, ct));
+        return new(day, week, month, last30, open, received, recent, counts.Select(row =>
+            new OrderQueueCount(row.Key.Status.ToString(), row.Key.OrderType, row.Count)).ToList(), shift);
     }
     public async Task<NotificationBatch> NotificationsAsync(DateTime? since, DateTime until, int afterId, CancellationToken ct)
     {
@@ -155,416 +41,69 @@ public sealed class AdminService(BurgerHouseDbContext db) : IAdminService
         var rows = await Rows(query.OrderBy(o => o.Id).Take(51), ct);
         return new(until, rows.Count > 50 ? rows[49].Id : null, count, rows.Take(50).ToList());
     }
-    public async Task<Page<OrderRow>> OrdersAsync(OrderFilter filter, CancellationToken ct)
+    public async Task<OperationSettings> OperationSettingsAsync(CancellationToken ct)
     {
-        ValidatePage(filter.Page);
-        var query = db.Orders.AsNoTracking();
-        if (!string.IsNullOrEmpty(filter.Status))
-        {
-            if (!Enum.TryParse<OrderStatus>(filter.Status, out var status) || !Enum.IsDefined(status))
-                throw new ArgumentException("Invalid status.");
-            query = query.Where(o => o.Status == status);
-        }
-        var search = filter.Search?.Trim();
-        if (search?.Length > 120) throw new ArgumentException("Search too long.");
-        if (!string.IsNullOrEmpty(search))
-        {
-            var id = int.TryParse(search.TrimStart('#'), out var parsed) ? parsed : 0;
-            query = query.Where(o => o.Id == id || o.CustomerName.ToLower().Contains(search.ToLower()));
-        }
-        if (filter.Sort is not ("newest" or "oldest")) throw new ArgumentException("Invalid sort.");
-        var total = await query.CountAsync(ct);
-        var sorted = filter.Sort == "oldest" ? query.OrderBy(o => o.CreatedAt).ThenBy(o => o.Id)
-            : query.OrderByDescending(o => o.CreatedAt).ThenByDescending(o => o.Id);
-        return new(await Rows(sorted.Skip((filter.Page - 1) * 20).Take(20), ct), total, filter.Page);
-    }
-    private async Task<IReadOnlyList<OrderRow>> Rows(IQueryable<Order> query, CancellationToken ct)
-    {
-        var rows = await query.Select(o => new
-        {
-            o.Id, o.CreatedAt, o.CustomerName, o.OrderType, ItemCount = o.Items.Sum(i => i.Quantity),
-            Total = o.Items.Sum(i => i.UnitPrice * i.Quantity) + o.DeliveryFee, o.Status,
-            PaymentMethod = db.Payments.Where(p => p.OrderId == o.Id).OrderByDescending(p => p.Id).Select(p => (PaymentMethod?)p.Method).FirstOrDefault(),
-            PaymentStatus = db.Payments.Where(p => p.OrderId == o.Id).OrderByDescending(p => p.Id).Select(p => (PaymentStatus?)p.Status).FirstOrDefault()
-        }).ToListAsync(ct);
-        return rows.Select(r => new OrderRow(r.Id, r.CreatedAt, r.CustomerName, r.OrderType, r.ItemCount, r.Total,
-            r.Status.ToString(), r.PaymentMethod?.ToString(), r.PaymentStatus?.ToString())).ToList();
-    }
-    public async Task<OrderDetail?> OrderAsync(int id, CancellationToken ct)
-    {
-        var o = await db.Orders.AsNoTracking().SingleOrDefaultAsync(o => o.Id == id, ct);
-        if (o is null) return null;
-        var row = (await Rows(db.Orders.Where(o => o.Id == id), ct)).Single();
-        var items = await (from item in db.OrderItems
-            where EF.Property<int>(item, "OrderId") == id
-            join product in db.Products on item.ProductId equals product.Id
-            select new ItemDetail(product.Name, item.Quantity, item.UnitPrice, item.UnitPrice * item.Quantity, item.Observation)).ToListAsync(ct);
-        var payments = await db.Payments.AsNoTracking().Where(p => p.OrderId == id).OrderByDescending(p => p.Id)
-            .Select(p => new PaymentDetail(p.Status.ToString(), p.Method.ToString(), p.Amount, p.UpdatedAt ?? p.CreatedAt)).ToListAsync(ct);
-        var delivery = o.OrderType == "delivery";
-        return new(row, o.CustomerPhone, delivery ? o.ZipCode : null, delivery ? o.Street : null,
-            delivery ? o.HouseNumber : null, delivery ? o.Neighborhood : null, delivery ? o.City : null,
-            delivery ? o.Complement : null, o.Observation, o.DeliveryFee, items, payments);
-    }
-    public async Task AdvanceAsync(
-        int id,
-        OrderStatus expected,
-        OrderStatus next,
-        int adminUserId,
-        DateTime utcNow,
-        CancellationToken ct)
-    {
-        if (adminUserId <= 0)
-            throw new ArgumentException(
-                "Invalid admin user.",
-                nameof(adminUserId)
-            );
-
-        if (utcNow.Kind != DateTimeKind.Utc)
-            throw new ArgumentException(
-                "Audit timestamp must be UTC.",
-                nameof(utcNow)
-            );
-
-        await using var transaction =
-            await db.Database.BeginTransactionAsync(ct);
-
-        var order =
-            await db.Orders.SingleOrDefaultAsync(
-                o => o.Id == id,
-                ct
-            )
-            ?? throw new KeyNotFoundException();
-
-        if (order.Status != expected)
-            throw new InvalidOperationException(
-                "Order changed."
-            );
-
-        if (!await db.Payments.AnyAsync(
-                p =>
-                    p.OrderId == id &&
-                    p.Status == PaymentStatus.Approved,
-                ct))
-            throw new InvalidOperationException(
-                "Payment is not approved."
-            );
-
-        order.AdvanceStatus(next);
-
-        var changes =
-            JsonSerializer.Serialize(
-                new
-                {
-                    status = new
-                    {
-                        from = expected.ToString(),
-                        to = next.ToString()
-                    }
-                }
-            );
-
-        db.AdminAuditLogs.Add(
-            new AdminAuditLog(
-                adminUserId,
-                "Admin",
-                "OrderStatusChanged",
-                "Order",
-                id.ToString(),
-                changes,
-                utcNow
-            )
-        );
-
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            throw new InvalidOperationException(
-                "Order changed."
-            );
-        }
-
-        await transaction.CommitAsync(ct);
+        var latest = await db.AdminAuditLogs.AsNoTracking()
+            .Where(log => log.EntityType == "Store" && log.EntityId == "operation" && log.Action == "OperationLimitsChanged")
+            .OrderByDescending(log => log.Id).FirstOrDefaultAsync(ct);
+        return latest is null ? new(0, new(0, 0, 0)) :
+            new(latest.Id, JsonSerializer.Deserialize<OperationLimits>(latest.Changes)
+                ?? throw new InvalidOperationException("Invalid stored operation settings."));
     }
 
-    public async Task<IReadOnlyList<ProductRow>> ProductsAsync(CancellationToken ct) =>
-        await db.Products.AsNoTracking().OrderBy(p => p.Category).ThenBy(p => p.DisplayOrder).ThenBy(p => p.Code).Select(p => new ProductRow(p.Id, p.Name, p.Description, p.Price, p.CostPrice, p.IsActive, p.EnglishName, p.EnglishDescription, p.Category, p.DisplayOrder, p.ImageUrl)).ToListAsync(ct);
-    public async Task<int> CreateProductAsync(
-        string name,
-        string description,
-        decimal price,
-        decimal? cost,
-        bool active,
-        int adminUserId,
-        DateTime utcNow,
-        CancellationToken ct, string? englishName = null, string? englishDescription = null, string category = "menu", int displayOrder = 1000)
+    public async Task<IReadOnlyList<CustomerSummary>> CustomersAsync(DateTime since, string? search, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 150)
-            throw new ArgumentException("Invalid product name.", nameof(name));
+        var rows = await db.Orders.AsNoTracking()
+            .Where(order => order.CreatedAt >= since && order.CustomerTaxId != null &&
+                db.Payments.Any(payment => payment.OrderId == order.Id && payment.ApprovedAt != null))
+            .OrderByDescending(order => order.CreatedAt).ThenByDescending(order => order.Id)
+            .Select(order => new
+            {
+                order.Id, order.CustomerName, order.CustomerTaxId, order.CreatedAt, order.CustomerPhone,
+                order.OrderType, order.Street, order.HouseNumber, order.Neighborhood, order.City,
+                ApprovedAmount = db.Payments.Where(payment => payment.OrderId == order.Id && payment.ApprovedAt != null)
+                    .OrderByDescending(payment => payment.Id).Select(payment => payment.Amount).First()
+            }).ToListAsync(ct);
 
-        if (string.IsNullOrWhiteSpace(description) || description.Trim().Length > 500)
-            throw new ArgumentException("Invalid product description.", nameof(description));
+        var term = search?.Trim().TrimStart('#');
+        var id = int.TryParse(term, out var orderId) ? orderId : 0;
+        return rows.Where(row => row.CustomerTaxId is { Length: 11 } taxId && taxId.All(char.IsAsciiDigit))
+            .GroupBy(row => row.CustomerTaxId)
+            .Where(group => string.IsNullOrEmpty(term) || group.Any(row =>
+                row.Id == id || row.CustomerName.Contains(term, StringComparison.OrdinalIgnoreCase)))
+            .Take(100)
+            .Select(group =>
+            {
+                var latest = group.First();
+                return new CustomerSummary(latest.CustomerName,
+                    group.Select(row => new CustomerPurchase(row.Id, DateTime.SpecifyKind(row.CreatedAt, DateTimeKind.Utc),
+                        row.ApprovedAmount)).ToArray(), latest.CustomerPhone,
+                    latest.OrderType == "delivery" ? string.Join(", ", new[] { latest.Street, latest.HouseNumber,
+                        latest.Neighborhood, latest.City }.Where(value => !string.IsNullOrWhiteSpace(value))) : null);
+            }).ToArray();
+    }
 
-        if (price <= 0 || price > 99999999.99m || decimal.Round(price, 2) != price)
-            throw new ArgumentException("Invalid product price.", nameof(price));
-
-        if (adminUserId <= 0)
-            throw new ArgumentException("Invalid admin user.", nameof(adminUserId));
-
-        if (utcNow.Kind != DateTimeKind.Utc)
-            throw new ArgumentException("Audit timestamp must be UTC.", nameof(utcNow));
-
-        var normalized = name.Trim().Normalize(System.Text.NormalizationForm.FormD);
-        var slug = new System.Text.StringBuilder();
-
-        foreach (var character in normalized)
-        {
-            var unicodeCategory = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(character);
-
-            if (unicodeCategory == System.Globalization.UnicodeCategory.NonSpacingMark)
-                continue;
-
-            var lower = char.ToLowerInvariant(character);
-
-            if ((lower >= 'a' && lower <= 'z') || (lower >= '0' && lower <= '9'))
-                slug.Append(lower);
-            else if (slug.Length > 0 && slug[slug.Length - 1] != '-')
-                slug.Append('-');
-        }
-
-        var prefix = slug.ToString().Trim('-');
-
-        if (string.IsNullOrEmpty(prefix))
-            prefix = "produto";
-
-        if (prefix.Length > 87)
-            prefix = prefix.Substring(0, 87).TrimEnd('-');
-
-        var code = $"{prefix}-{Guid.NewGuid():N}".Substring(0, prefix.Length + 13);
-
-        var product = Product.Create(
-            code,
-            name,
-            description,
-            price,
-            cost,
-            active
-        );
-
-        product.UpdateEnglishDetails(englishName, englishDescription);
-        product.UpdateClassification(category, displayOrder);
+    public async Task SaveOperationSettingsAsync(OperationSettings settings, int adminUserId, DateTime utcNow, CancellationToken ct)
+    {
+        if (settings.Limits is not { } limits || limits.Preparing is < 0 or > 1440 ||
+            limits.ReadyForPickup is < 0 or > 1440 || limits.OutForDelivery is < 0 or > 1440 ||
+            limits.PendingPaymentAgeHours is < 0 or > 8760 ||
+            limits.Schedule is { Enabled: true } schedule && !schedule.TryGetHours(out _, out _))
+            throw new ArgumentException("Invalid operation limits.");
 
         await using var transaction = await db.Database.BeginTransactionAsync(ct);
-
-        db.Products.Add(product);
-        await db.SaveChangesAsync(ct);
-
-        var changes = new
+        var current = await OperationSettingsAsync(ct);
+        if (current.Revision != settings.Revision)
+            throw new InvalidOperationException("Operation settings changed.");
+        limits = limits with { Schedule = limits.Schedule ?? current.Limits.Schedule,
+            PendingPaymentAgeHours = limits.PendingPaymentAgeHours ?? current.Limits.PendingPaymentAgeHours };
+        if (current.Limits != limits)
         {
-            code = product.Code,
-            name = product.Name,
-            description = product.Description,
-            englishName = product.EnglishName,
-            englishDescription = product.EnglishDescription,
-            price = product.Price,
-            costPrice = product.CostPrice,
-            isActive = product.IsActive,
-            category = product.Category,
-            displayOrder = product.DisplayOrder
-        };
-
-        db.AdminAuditLogs.Add(
-            new AdminAuditLog(
-                adminUserId,
-                "Admin",
-                "ProductCreated",
-                "Product",
-                product.Id.ToString(),
-                JsonSerializer.Serialize(changes),
-                utcNow
-            )
-        );
-
-        await db.SaveChangesAsync(ct);
+            db.AdminAuditLogs.Add(new AdminAuditLog(adminUserId, "Admin", "OperationLimitsChanged", "Store",
+                "operation", JsonSerializer.Serialize(limits), utcNow));
+            await db.SaveChangesAsync(ct);
+        }
         await transaction.CommitAsync(ct);
-
-        return product.Id;
-    }
-    public async Task UpdateProductAsync(
-        int id,
-        string name,
-        string description,
-        decimal price,
-        decimal? cost,
-        bool active,
-        int adminUserId,
-        DateTime utcNow,
-        CancellationToken ct, string? englishName = null, string? englishDescription = null, string? category = null, int? displayOrder = null)
-    {
-        if (string.IsNullOrWhiteSpace(name) ||
-            name.Trim().Length > 150)
-            throw new ArgumentException("Invalid product name.");
-
-        if (string.IsNullOrWhiteSpace(description) ||
-            description.Trim().Length > 500)
-            throw new ArgumentException("Invalid product description.");
-        if (price <= 0 ||
-            price > 99999999.99m ||
-            decimal.Round(price, 2) != price)
-            throw new ArgumentException("Invalid price.");
-
-        if (adminUserId <= 0)
-            throw new ArgumentException(
-                "Invalid admin user.",
-                nameof(adminUserId)
-            );
-
-        if (utcNow.Kind != DateTimeKind.Utc)
-            throw new ArgumentException(
-                "Audit timestamp must be UTC.",
-                nameof(utcNow)
-            );
-
-        var product =
-            await db.Products.SingleOrDefaultAsync(
-                p => p.Id == id,
-                ct
-            )
-            ?? throw new KeyNotFoundException();
-
-        var changes =
-            new Dictionary<string, object?>();
-        var normalizedName =
-            name.Trim();
-
-        var normalizedDescription =
-            description.Trim();
-
-        if (!string.Equals(
-                product.Name,
-                normalizedName,
-                StringComparison.Ordinal
-            ))
-        {
-            changes["name"] =
-                new
-                {
-                    from = product.Name,
-                    to = normalizedName
-                };
-        }
-
-        if (!string.Equals(
-                product.Description,
-                normalizedDescription,
-                StringComparison.Ordinal
-            ))
-        {
-            changes["description"] =
-                new
-                {
-                    from = product.Description,
-                    to = normalizedDescription
-                };
-        }
-
-
-        // Preserva traducoes revisadas no formulario.
-        // Campos vazios continuam pendentes para o Azure Translator.
-        var normalizedEnglishName = englishName?.Trim() ?? string.Empty;
-
-        var normalizedEnglishDescription = englishDescription?.Trim() ?? string.Empty;
-
-        if (!string.Equals(product.EnglishName, normalizedEnglishName, StringComparison.Ordinal))
-        {
-            changes["englishName"] = new
-            {
-                from = product.EnglishName,
-                to = normalizedEnglishName
-            };
-        }
-
-        if (!string.Equals(product.EnglishDescription, normalizedEnglishDescription, StringComparison.Ordinal))
-        {
-            changes["englishDescription"] = new
-            {
-                from = product.EnglishDescription,
-                to = normalizedEnglishDescription
-            };
-        }
-        if (product.Price != price)
-        {
-            changes["price"] = new
-            {
-                from = product.Price,
-                to = price
-            };
-        }
-
-        if (product.CostPrice != cost)
-        {
-            changes["costPrice"] = new
-            {
-                from = product.CostPrice,
-                to = cost
-            };
-        }
-
-        if (product.IsActive != active)
-        {
-            changes["isActive"] = new
-            {
-                from = product.IsActive,
-                to = active
-            };
-        }
-
-        var nextCategory = category ?? product.Category;
-        var nextDisplayOrder = displayOrder ?? product.DisplayOrder;
-        if (product.Category != nextCategory)
-            changes["category"] = new { from = product.Category, to = nextCategory };
-        if (product.DisplayOrder != nextDisplayOrder)
-            changes["displayOrder"] = new { from = product.DisplayOrder, to = nextDisplayOrder };
-
-        product.UpdateClassification(nextCategory, nextDisplayOrder);
-        if (changes.Count == 0)
-            return;
-
-        product.UpdateCost(cost);
-        product.UpdateDetails(
-            normalizedName,
-            normalizedDescription
-        );
-        product.UpdatePrice(price);
-
-        // Preserva a traducao revisada pelo administrador.
-        // Campos vazios ficam pendentes para o Azure Translator.
-        product.UpdateEnglishDetails(
-            normalizedEnglishName,
-            normalizedEnglishDescription
-        );
-
-        if (active)
-            product.Activate();
-        else
-            product.Deactivate();
-
-        db.AdminAuditLogs.Add(
-            new AdminAuditLog(
-                adminUserId,
-                "Admin",
-                "ProductUpdated",
-                "Product",
-                id.ToString(),
-                JsonSerializer.Serialize(changes),
-                utcNow
-            )
-        );
-
-        await db.SaveChangesAsync(ct);
     }
 
     private static void ValidatePage(int page)

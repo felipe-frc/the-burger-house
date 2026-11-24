@@ -63,7 +63,7 @@ public sealed class AdminIdentity(BurgerHouseDbContext db) : IAdminIdentity
         return true;
     }
 
-    public async Task ResetOwnerPasswordAsync(string newPassword, CancellationToken ct)
+    public async Task ResetOwnerPasswordAsync(string newPassword, CancellationToken ct, string? email = null)
     {
         ValidatePassword(newPassword);
 
@@ -72,6 +72,7 @@ public sealed class AdminIdentity(BurgerHouseDbContext db) : IAdminIdentity
         var user = await db.Set<AdminUser>().SingleOrDefaultAsync(ct)
             ?? throw new InvalidOperationException("Owner does not exist.");
 
+        if (email is not null) user.ChangeEmail(email);
         user.ReplaceHash(Hasher.HashPassword(user, newPassword));
         await db.SaveChangesAsync(ct);
 

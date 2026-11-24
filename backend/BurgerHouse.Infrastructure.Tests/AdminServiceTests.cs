@@ -37,15 +37,17 @@ public sealed class AdminServiceTests : IAsyncLifetime
     }
     public async Task DisposeAsync() { await db.DisposeAsync(); await connection.DisposeAsync(); }
 
-    private async Task<Order> Seed(PaymentStatus status = PaymentStatus.Approved, string type = "pickup", decimal? cost = 10m)
+    private async Task<Order> Seed(PaymentStatus status = PaymentStatus.Approved, string type = "pickup",
+        decimal? cost = 10m, string taxId = "52998224725", string? saleCategory = null,
+        decimal unitPrice = 30m, decimal? paymentAmount = null)
     {
         var order = new Order(type == "delivery" ? 5 : 0, type, "Cliente Teste", "11999990000",
-            "cliente@teste.com", "52998224725",
+            "cliente@teste.com", taxId,
             type == "delivery" ? "38400-000" : null, type == "delivery" ? "Rua Teste" : null,
             type == "delivery" ? "10" : null, type == "delivery" ? "Centro" : null, type == "delivery" ? "Cidade" : null);
-        order.AddItem(new OrderItem(1, 2, 30m, "Sem cebola", cost));
+        order.AddItem(new OrderItem(1, 2, unitPrice, "Sem cebola", cost, saleCategory));
         db.Orders.Add(order); await db.SaveChangesAsync();
-        var payment = new Payment(order.Id, order.Total, Guid.NewGuid().ToString(), PaymentMethod.Pix);
+        var payment = new Payment(order.Id, paymentAmount ?? order.Total, Guid.NewGuid().ToString(), PaymentMethod.Pix);
         switch (status)
         {
             case PaymentStatus.Rejected: payment.Reject(); break;
@@ -61,6 +63,94 @@ public sealed class AdminServiceTests : IAsyncLifetime
                 break;
         }
         db.Add(payment); await db.SaveChangesAsync(); return order;
+    }
+
+    [Fact]
+    public async Task CategoryRevenueUsesHistoricalItemsAndReconcilesAmbiguousChargesAndRefunds()
+    {
+        await Seed(PaymentStatus.PartiallyRefunded, "delivery", saleCategory: "menu", unitPrice: 31.37m);
+        await Seed(PaymentStatus.ChargedBack, saleCategory: "drinks");
+        await Seed(saleCategory: "sides");
+        await Seed();
+        await Seed(type: "delivery", saleCategory: "sides", paymentAmount: 55m);
+        await Seed(PaymentStatus.Pending, saleCategory: "menu");
+        await Seed(PaymentStatus.Rejected, saleCategory: "menu");
+        await Seed(PaymentStatus.Cancelled, saleCategory: "menu");
+        var duplicate = await Seed(PaymentStatus.Refunded, saleCategory: "menu");
+        var oldOrder = await Seed(saleCategory: "sides");
+        var oldPayment = await db.Payments.SingleAsync(p => p.OrderId == oldOrder.Id);
+        db.Entry(oldPayment).Property(p => p.ApprovedAt).CurrentValue = Today.Start.AddHours(-2);
+        var second = new Payment(duplicate.Id, duplicate.Total, Guid.NewGuid().ToString(), PaymentMethod.Pix);
+        second.Approve();
+        db.Add(second);
+        var product = await db.Products.FindAsync(1);
+        product!.UpdateClassification("sides", product.DisplayOrder);
+        product.UpdatePrice(98m);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var report = await service.CategoryRevenueAsync(Today, default);
+        Assert.Equal(62.74m, Assert.Single(report.Categories, r => r.Category == "menu").Revenue);
+        Assert.Equal(60m, Assert.Single(report.Categories, r => r.Category == "drinks").Revenue);
+        Assert.Equal(60m, Assert.Single(report.Categories, r => r.Category == "sides").Revenue);
+        Assert.Equal(60m, report.UnclassifiedRevenue);
+        Assert.Equal(5m, report.DeliveryFees);
+        Assert.Equal(175m, report.UnallocatedPayments);
+        Assert.Equal(report.GrossRevenue, report.Categories.Sum(r => r.Revenue) + report.UnclassifiedRevenue +
+            report.DeliveryFees + report.UnallocatedPayments);
+        var summary = await service.SummaryAsync(Today, default);
+        Assert.Equal(summary.GrossRevenue, report.GrossRevenue);
+        Assert.Equal(6, summary.PaidOrders);
+        Assert.Equal(decimal.Round(report.GrossRevenue / 6, 2), summary.AverageTicket);
+        var byMethod = await service.MethodsAsync(Today, default);
+        Assert.Equal(7, byMethod.Sum(method => method.Count));
+        var pickupSummary = await service.SummaryAsync(Today with { Channel = "pickup" }, default);
+        var deliverySummary = await service.SummaryAsync(Today with { Channel = "delivery" }, default);
+        Assert.Equal(summary.GrossRevenue, pickupSummary.GrossRevenue + deliverySummary.GrossRevenue);
+        Assert.Equal(summary.NetRevenue, pickupSummary.NetRevenue + deliverySummary.NetRevenue);
+        Assert.Equal(90m, report.RefundedAmount);
+        Assert.Equal(summary.RefundedAmount, report.RefundedAmount);
+
+        var delivery = await service.CategoryRevenueAsync(Today with { Channel = "delivery" }, default);
+        Assert.Equal("menu", Assert.Single(delivery.Categories).Category);
+        Assert.Equal(5m, delivery.DeliveryFees);
+        Assert.Equal(30m, delivery.RefundedAmount);
+        Assert.Equal(55m, delivery.UnallocatedPayments);
+        var earlier = await service.CategoryRevenueAsync(new(Today.Start.AddDays(-1), Today.Start), default);
+        Assert.Equal(60m, Assert.Single(earlier.Categories).Revenue);
+        Assert.Equal(0m, earlier.RefundedAmount);
+    }
+
+    [Fact]
+    public async Task SaleCategoryMigrationKeepsExistingItemsAndPaymentsWithoutInferringCategory()
+    {
+        var order = await Seed();
+        var migrator = db.GetService<IMigrator>();
+        await migrator.MigrateAsync("20261117175713_DeliveryTracking");
+        await migrator.MigrateAsync();
+        db.ChangeTracker.Clear();
+        var persisted = Assert.Single((await db.Orders.Include(o => o.Items).SingleAsync(o => o.Id == order.Id)).Items);
+        Assert.Null(persisted.SaleCategory);
+        Assert.Equal(30m, persisted.UnitPrice);
+        Assert.Equal(2, persisted.Quantity);
+        Assert.Equal(60m, (await db.Payments.SingleAsync(p => p.OrderId == order.Id)).Amount);
+    }
+
+    [Fact]
+    public async Task CustomerDirectoryKeepsSameNamesSeparateAndRetainsTheWholeMatchedProfile()
+    {
+        var first = await Seed();
+        var repeat = await Seed();
+        var namesake = await Seed(taxId: "11144477735");
+        await Seed(PaymentStatus.Pending);
+
+        var since = DateTime.UtcNow.AddDays(-1);
+        var profiles = await service.CustomersAsync(since, "Cliente", default);
+        Assert.Equal(2, profiles.Count);
+        Assert.Equal(namesake.Id, Assert.Single(profiles[0].Purchases).OrderId);
+        var match = Assert.Single(await service.CustomersAsync(since, first.Id.ToString(), default));
+        Assert.Equal(new[] { repeat.Id, first.Id }, match.Purchases.Select(purchase => purchase.OrderId));
+        Assert.All(match.Purchases, purchase => Assert.Equal(60m, purchase.ApprovedAmount));
     }
 
     [Theory]
@@ -155,8 +245,19 @@ public sealed class AdminServiceTests : IAsyncLifetime
         await service.AdvanceAsync(order.Id, OrderStatus.Received, OrderStatus.Preparing, owner.Id, DateTime.UtcNow, default);
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(order.Id, OrderStatus.Received, OrderStatus.Preparing, owner.Id, DateTime.UtcNow, default));
         await service.AdvanceAsync(order.Id, OrderStatus.Preparing, OrderStatus.ReadyForPickup, owner.Id, DateTime.UtcNow, default);
-        if (type == "delivery") await service.AdvanceAsync(order.Id, OrderStatus.ReadyForPickup, OrderStatus.OutForDelivery, owner.Id, DateTime.UtcNow, default);
-        await service.AdvanceAsync(order.Id, order.Status, OrderStatus.Completed, owner.Id, DateTime.UtcNow, default);
+        var release = type == "delivery" ? OrderStatus.OutForDelivery : OrderStatus.Completed;
+        await Assert.ThrowsAsync<ArgumentException>(() => service.AdvanceAsync(order.Id, OrderStatus.ReadyForPickup, release, owner.Id, DateTime.UtcNow, default));
+        await Assert.ThrowsAsync<ArgumentException>(() => service.AdvanceAsync(order.Id, OrderStatus.ReadyForPickup, release, owner.Id, DateTime.UtcNow, default, new(true, false, true)));
+        var releasedAt = DateTime.UtcNow;
+        await service.AdvanceAsync(order.Id, OrderStatus.ReadyForPickup, release, owner.Id, releasedAt, default, new(true, true, true));
+        var released = await service.OrderAsync(order.Id, default);
+        Assert.Equal(releasedAt, released!.Order.StageStartedAt);
+        Assert.Equal(DateTimeKind.Utc, released.Order.StageStartedAt!.Value.Kind);
+        var releaseAudit = await db.AdminAuditLogs.OrderByDescending(log => log.Id).FirstAsync();
+        Assert.Equal(owner.Id, releaseAudit.AdminUserId);
+        Assert.Contains("\"Packaging\":true", releaseAudit.Changes);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(order.Id, OrderStatus.ReadyForPickup, release, owner.Id, DateTime.UtcNow, default, new(true, true, true)));
+        if (type == "delivery") await service.AdvanceAsync(order.Id, OrderStatus.OutForDelivery, OrderStatus.Completed, owner.Id, DateTime.UtcNow, default);
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(order.Id, OrderStatus.Completed, OrderStatus.Received, owner.Id, DateTime.UtcNow, default));
         var pending = await Seed(PaymentStatus.Pending);
         await Assert.ThrowsAsync<InvalidOperationException>(() => service.AdvanceAsync(pending.Id, OrderStatus.PendingPayment, OrderStatus.Received, owner.Id, DateTime.UtcNow, default));

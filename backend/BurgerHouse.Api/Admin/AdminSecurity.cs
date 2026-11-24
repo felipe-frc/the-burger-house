@@ -16,6 +16,13 @@ public static class AdminSecurity
     {
         services.AddScoped<IAdminIdentity, AdminIdentity>();
         services.AddScoped<IAdminService, AdminService>();
+        services.AddScoped<INotificationInboxService, NotificationInboxService>();
+        services.AddScoped<IAdminStockService, AdminStockService>();
+        services.AddScoped<IAdminAgendaService, AdminAgendaService>();
+        services.AddScoped<ITeamService, TeamService>();
+        services.AddScoped<ITeamOperationsService, TeamOperationsService>();
+        services.AddScoped<IDeliveryTrackingService, DeliveryTrackingService>();
+        services.AddHostedService<DeliveryTrackingRetention>();
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<AdminLoginProtection>();
         // Preserve restricted host trust (TLS may terminate before Linux/Kestrel).
@@ -63,7 +70,13 @@ public static class AdminSecurity
             "Admin forwarding requires a finite hop limit between 1 and 5.").ValidateOnStart();
         var keys = services.AddDataProtection().SetApplicationName("TheBurgerHouse.Owner");
         var keyPath = configuration["Admin:DataProtectionPath"];
-        if (!string.IsNullOrWhiteSpace(keyPath)) keys.PersistKeysToFileSystem(new DirectoryInfo(keyPath));
+        if (!string.IsNullOrWhiteSpace(keyPath))
+        {
+            keys.PersistKeysToFileSystem(new DirectoryInfo(keyPath));
+            // Explicit persistence disables the default key-at-rest protection.
+            // New Windows keys stay bound to the current user; existing key IDs remain valid.
+            if (OperatingSystem.IsWindows()) keys.ProtectKeysWithDpapi();
+        }
         services.AddAuthentication(Scheme).AddCookie(Scheme, options =>
         {
             options.Cookie.Name = "BurgerHouse.Owner";
@@ -103,10 +116,35 @@ public static class AdminSecurity
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = 429;
+            options.AddPolicy("StorefrontWrite", context => RateLimitPartition.GetFixedWindowLimiter(
+                AdminLoginProtection.ClientAddress(context.Connection.RemoteIpAddress), _ => new()
+            {
+                PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
+            }));
+            options.AddPolicy("StorefrontRead", context => RateLimitPartition.GetFixedWindowLimiter(
+                AdminLoginProtection.ClientAddress(context.Connection.RemoteIpAddress), _ => new()
+            {
+                PermitLimit = 180, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
+            }));
+            options.AddPolicy("PrivacyRequests", context => RateLimitPartition.GetFixedWindowLimiter(
+                AdminLoginProtection.ClientAddress(context.Connection.RemoteIpAddress), _ => new()
+            {
+                PermitLimit = 30, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
+            }));
+            options.AddPolicy("PagBankWebhook", context => RateLimitPartition.GetFixedWindowLimiter(
+                AdminLoginProtection.ClientAddress(context.Connection.RemoteIpAddress), _ => new()
+            {
+                PermitLimit = 120, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
+            }));
             options.AddPolicy("OwnerLogin", context => RateLimitPartition.GetFixedWindowLimiter(
                 AdminLoginProtection.ClientAddress(context.Connection.RemoteIpAddress), _ => new()
             {
                 PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
+            }));
+            options.AddPolicy("CourierTracking", context => RateLimitPartition.GetFixedWindowLimiter(
+                AdminLoginProtection.ClientAddress(context.Connection.RemoteIpAddress), _ => new()
+            {
+                PermitLimit = 90, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
             }));
         });
         return services;
@@ -133,86 +171,51 @@ public static class AdminSecurity
         Console.WriteLine("Owner created. No HTTP server started.");
     }
 
-    public static async Task ResetOwnerPasswordAsync(IServiceProvider services)
+    public static async Task ResetOwnerPasswordAsync(IServiceProvider services, bool updateEmail = false)
     {
         if (Console.IsInputRedirected)
-            throw new InvalidOperationException(
-                "Use an interactive private terminal to reset the Owner password.");
+            throw new InvalidOperationException("Use an interactive private terminal to reset the Owner password.");
 
-        Console.Write("New Owner password (14-128 characters; hidden): ");
-
-        var password = new System.Text.StringBuilder();
-
-        while (true)
-        {
-            var key = Console.ReadKey(true);
-
-            if (key.Key == ConsoleKey.Enter)
-                break;
-
-            if (key.Key == ConsoleKey.Backspace)
-            {
-                if (password.Length > 0)
-                    password.Length--;
-
-                continue;
-            }
-
-            if (!char.IsControl(key.KeyChar) && password.Length < 129)
-                password.Append(key.KeyChar);
-        }
-
-        Console.WriteLine();
-        Console.Write("Confirm new password (hidden): ");
-
-        var confirmation = new System.Text.StringBuilder();
-
-        while (true)
-        {
-            var key = Console.ReadKey(true);
-
-            if (key.Key == ConsoleKey.Enter)
-                break;
-
-            if (key.Key == ConsoleKey.Backspace)
-            {
-                if (confirmation.Length > 0)
-                    confirmation.Length--;
-
-                continue;
-            }
-
-            if (!char.IsControl(key.KeyChar) && confirmation.Length < 129)
-                confirmation.Append(key.KeyChar);
-        }
-
-        Console.WriteLine();
-
+        var email = updateEmail ? ReadPrivateInput("New Owner email (hidden): ") : null;
+        var password = ReadPrivateInput("New Owner password (14-128 characters; hidden): ");
+        var confirmation = ReadPrivateInput("Confirm new password (hidden): ");
         try
         {
-            if (!password.ToString().Equals(
-                    confirmation.ToString(),
-                    StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    "Password confirmation does not match.");
-            }
+            if (!password.ToString().Equals(confirmation.ToString(), StringComparison.Ordinal))
+                throw new InvalidOperationException("Password confirmation does not match.");
+
+            Console.Write("Revoke all Owner sessions and save these credentials? Type ALTERAR: ");
+            if (!string.Equals(Console.ReadLine(), "ALTERAR", StringComparison.Ordinal))
+                throw new InvalidOperationException("Cancelled. Owner credentials were not changed.");
 
             using var scope = services.CreateScope();
-
-            await scope.ServiceProvider
-                .GetRequiredService<IAdminIdentity>()
-                .ResetOwnerPasswordAsync(
-                    password.ToString(),
-                    CancellationToken.None);
-
-            Console.WriteLine(
-                "Owner password reset. All administrative sessions were revoked.");
+            await scope.ServiceProvider.GetRequiredService<IAdminIdentity>()
+                .ResetOwnerPasswordAsync(password.ToString(), CancellationToken.None, email?.ToString());
+            Console.WriteLine("Owner credentials saved. Account preserved; all administrative sessions revoked.");
         }
         finally
         {
+            email?.Clear();
             password.Clear();
             confirmation.Clear();
         }
+    }
+
+    private static System.Text.StringBuilder ReadPrivateInput(string prompt)
+    {
+        Console.Write(prompt);
+        var value = new System.Text.StringBuilder();
+        while (true)
+        {
+            var key = Console.ReadKey(intercept: true);
+            if (key.Key == ConsoleKey.Enter) break;
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                if (value.Length > 0) value.Length--;
+            }
+            else if (!char.IsControl(key.KeyChar) && value.Length < 255) value.Append(key.KeyChar);
+        }
+        Console.WriteLine();
+        return value;
     }
 }

@@ -296,7 +296,7 @@ describe("ui extended behavior", () => {
 
     const ui = await loadUiModule();
 
-    ui.showToast("Pedido adicionado", "#16a34a");
+    ui.showToast("Pedido adicionado", "#ffd340");
 
     expect(toastify).toHaveBeenCalledWith({
       text: "Pedido adicionado",
@@ -305,8 +305,8 @@ describe("ui extended behavior", () => {
       position: "right",
       stopOnFocus: true,
       style: {
-        background: "#16a34a",
-        color: "#ffffff",
+        background: "#ffd340",
+        color: "#171717",
         borderRadius: "10px",
       },
     });
@@ -384,7 +384,7 @@ describe("ui extended behavior", () => {
 
     expect(statusText.textContent).toBe("Aberto agora");
 
-    expect(dateSpan.classList.contains("text-emerald-400")).toBe(true);
+    expect(dateSpan.classList.contains("status-open")).toBe(true);
 
     runtimeMock.isStoreOpen = false;
 
@@ -392,9 +392,9 @@ describe("ui extended behavior", () => {
 
     expect(statusText.textContent).toBe("Fechado agora");
 
-    expect(dateSpan.classList.contains("text-rose-400")).toBe(true);
+    expect(dateSpan.classList.contains("status-closed")).toBe(true);
 
-    expect(dateSpan.classList.contains("text-emerald-400")).toBe(false);
+    expect(dateSpan.classList.contains("status-open")).toBe(false);
   });
 
   it("reveals product cards when they enter the viewport", async () => {

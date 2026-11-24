@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+/* Tailwind v4 aliases share the official families defined below. */
+@theme inline {
+  --font-sans: var(--tbh-font-description);
+  --font-body: var(--tbh-font-description);
+  --font-heading: var(--tbh-font-description);
+  --font-display: var(--tbh-font-title);
+}
+
+@layer base {
+  :root {
+    --color-primary: #E85D4A;
+    --color-primary-hover: #D44A37;
+    --color-primary-active: #BF3E2C;
+    --color-background: #F5F3EE;
+    --color-surface: #F5F3EE;
+    --color-accent: #FF3816;
+    --color-accent-hover: #D92D0B;
+    --color-highlight: #FFDC32;
+    --color-ink: #171717;
+    --color-coral-light: #F7B7AD;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-ink);
+    font-family: var(--tbh-font-description);
+  }
+}
+
+.font-display {
+  font-family: var(--tbh-font-title);
+  letter-spacing: -0.01em;
+}
+
+.font-heading {
+  font-family: var(--tbh-font-description);
+}
+
+/* Custom marquee animation */
+@keyframes marquee {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 42s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Checkout drawer styles are scoped in components/OrderDrawer.css. */
+
+/* TBH_REFINEMENT_START */
+
+/* Titulo Sobre Nos */
+
+/* Remover Saiba Mais sem afetar outros botoes */
+.tbh-about-more-hidden {
+  display: none;
+}
+
+/* Padrao oficial para todas as faixas animadas identificadas */
+[data-tbh-marquee="true"] {
+  box-sizing: border-box;
+  width: 100%;
+  height: 88px;
+  min-height: 88px;
+  max-height: 88px;
+  padding-top: 0;
+  padding-bottom: 0;
+  background: #D2311B;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  contain: paint;
+
+}
+
+/* Mantem o movimento horizontal sem cortes verticais */
+[data-tbh-marquee="true"] > * {
+  flex-shrink: 0;
+}
+
+/* TBH_REFINEMENT_END */
+
+/* TBH_SMOOTH_MARQUEES_START */
+
+/* Suavizar todas as faixas animadas do projeto */
+[data-tbh-marquee="true"] *,
+[class*="marquee"] {
+  animation-timing-function: linear;
+}
+
+/* Reduzir a velocidade das faixas mantendo fluxo continuo */
+[data-tbh-marquee="true"] [class*="animate"],
+[data-tbh-marquee="true"] [style*="animation"],
+[class*="animate-marquee"],
+[class*="marquee-track"] {
+  animation-duration: 42s;
+  animation-timing-function: linear;
+}
+
+/* Manter layout e pintura estaveis */
+
+/* Acessibilidade: respeitar preferencia por menos movimento */
+@media (prefers-reduced-motion: reduce) {
+  [data-tbh-marquee="true"] *,
+  [class*="animate-marquee"],
+  [class*="marquee-track"] {
+    animation-play-state: paused;
+  }
+}
+
+/* TBH_SMOOTH_MARQUEES_END */
+
+/* Official font families; role sizing and leading live in styles/design-system.css. */
+html, body, #root { font-family: var(--tbh-font-description); }
+:where(h1, h2, h3, h4, h5, h6, .font-display) { font-family: var(--tbh-font-title); font-weight: 400; }
+#root .font-heading { font-family: var(--tbh-font-description); }
+:where(button, input, textarea, select) { font-family: var(--tbh-font-description); }

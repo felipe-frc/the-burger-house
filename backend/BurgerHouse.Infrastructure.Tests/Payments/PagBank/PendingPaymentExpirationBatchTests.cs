@@ -196,6 +196,18 @@ public class PendingPaymentExpirationBatchTests
     }
 
     [Fact]
+    public async Task LeavesExpiredCheckoutWithProviderOrderForReconciliation()
+    {
+        using var fixture = new Fixture(checkoutStatus: "EXPIRED", hasProviderOrder: true);
+        var orderId = await fixture.CreateOldPendingOrder();
+        var paymentId = await fixture.CreatePendingPayment(orderId, "CHEC_1");
+
+        Assert.Equal(0, await fixture.RunBatch());
+        Assert.Equal(OrderStatus.PendingPayment, await fixture.GetOrderStatus(orderId));
+        Assert.Equal(PaymentStatus.Pending, await fixture.GetPaymentStatus(paymentId));
+    }
+
+    [Fact]
     public async Task DoesNotExpireOldOrderWhenPagBankLookupFails()
     {
         using var fixture =
@@ -275,16 +287,19 @@ public class PendingPaymentExpirationBatchTests
         private readonly string _checkoutStatus;
 
         private readonly HttpStatusCode _responseStatus;
+        private readonly bool _hasProviderOrder;
 
         public Fixture(
             string checkoutStatus = "ACTIVE",
-            HttpStatusCode responseStatus = HttpStatusCode.OK)
+            HttpStatusCode responseStatus = HttpStatusCode.OK,
+            bool hasProviderOrder = false)
         {
             _checkoutStatus =
                 checkoutStatus;
 
             _responseStatus =
                 responseStatus;
+            _hasProviderOrder = hasProviderOrder;
 
             using var db =
                 Open();
@@ -448,7 +463,7 @@ public class PendingPaymentExpirationBatchTests
                                 {
                                   "id":"CHEC_1",
                                   "reference_id":"payment:{{GetPaymentId(db)}}",
-                                  "status":"{{_checkoutStatus}}"
+                                  "status":"{{_checkoutStatus}}"{{(_hasProviderOrder ? ",\"orders\":[{\"id\":\"ORDE_1\"}]" : "")}}
                                 }
                                 """
                             )
@@ -488,7 +503,7 @@ public class PendingPaymentExpirationBatchTests
                     NullLogger<PendingPaymentExpirationBatch>.Instance
                 );
 
-            return await batch.RunAsync();
+            return (await batch.RunAsync(0)).Expired;
         }
 
         public async Task<OrderStatus> GetOrderStatus(

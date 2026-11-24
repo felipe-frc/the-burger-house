@@ -1,0 +1,10 @@
+title = "The Burger House"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "pagbank-operational-reference"
+description = "Real-format payment identifiers in portfolio documentation"
+path = '''(?i)(^|/)docs/.*\.md$'''
+regex = '''(?i)\b(?:CHAR|CHEC|ORDE|PAY|REFU)_[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}\b'''

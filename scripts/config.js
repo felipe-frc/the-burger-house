@@ -27,4 +27,5 @@ export const TOAST_DURATION_MS = 3000;
 const forceStoreOpenFromUrl =
   new URLSearchParams(globalThis.location?.search ?? "").get("forceOpen") === "true";
 
-export const FORCE_STORE_OPEN = import.meta.env?.MODE === "test" ? false : forceStoreOpenFromUrl;
+export const FORCE_STORE_OPEN =
+  isLocalDevelopment && import.meta.env?.MODE !== "test" && forceStoreOpenFromUrl;

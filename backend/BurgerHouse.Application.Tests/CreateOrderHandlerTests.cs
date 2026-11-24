@@ -17,6 +17,7 @@ public class CreateOrderHandlerTests
             name: "O Praiano",
             price: 43.90m
         );
+        product.UpdateClassification("sides", 3);
 
         var productRepository =
             new FakeProductRepository(product);
@@ -73,6 +74,7 @@ public class CreateOrderHandlerTests
         Assert.Equal(1, item.ProductId);
         Assert.Equal(2, item.Quantity);
         Assert.Equal(43.90m, item.UnitPrice);
+        Assert.Equal("sides", item.SaleCategory);
 
         Assert.Equal(
             "Sem bacon",
@@ -332,6 +334,108 @@ public class CreateOrderHandlerTests
     }
 
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(20)]
+    public async Task HandleAsyncLoadsProductsOnceAndKeepsEveryLineAndObservation(int count)
+    {
+        var products = new FakeProductRepository(CreateProduct(1, "batch", "Synthetic", 10m));
+        var orders = new FakeOrderRepository();
+        var handler = new CreateOrderHandler(products, orders);
+        var request = new CreateOrderRequest
+        {
+            OrderType = OrderTypes.Pickup, CustomerName = "Synthetic", CustomerPhone = "11999990000",
+            CustomerEmail = "batch@example.invalid", CustomerTaxId = "52998224725",
+            Items = Enumerable.Range(0, count).Select(i => new CreateOrderItemRequest
+            { ProductCode = " batch ", Quantity = 1, Observation = $"Line {i}" }).ToList()
+        };
+        var response = await handler.HandleAsync(request);
+        Assert.Equal(1, products.BatchReads);
+        Assert.Equal(0, products.SingleReads);
+        Assert.Equal(count * 10m, response.Subtotal);
+        Assert.Equal(Enumerable.Range(0, count).Select(i => $"Line {i}"),
+            orders.AddedOrder!.Items.Select(i => i.Observation));
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldReject_WhenItemCountExceedsMaximum()
+    {
+        var handler = new CreateOrderHandler(
+            new FakeProductRepository(CreateProduct(1, "batch", "Synthetic", 10m)),
+            new FakeOrderRepository()
+        );
+        var request = new CreateOrderRequest
+        {
+            OrderType = OrderTypes.Pickup,
+            CustomerName = "Synthetic",
+            CustomerPhone = "11999990000",
+            CustomerEmail = "batch@example.invalid",
+            CustomerTaxId = "52998224725",
+            Items = Enumerable.Range(0, 100).Select(_ => new CreateOrderItemRequest
+            {
+                ProductCode = "batch",
+                Quantity = 1
+            }).ToList()
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(request));
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldReject_WhenQuantityExceedsMaximum()
+    {
+        var handler = new CreateOrderHandler(
+            new FakeProductRepository(CreateProduct(1, "batch", "Synthetic", 10m)),
+            new FakeOrderRepository()
+        );
+        var request = new CreateOrderRequest
+        {
+            OrderType = OrderTypes.Pickup,
+            CustomerName = "Synthetic",
+            CustomerPhone = "11999990000",
+            CustomerEmail = "batch@example.invalid",
+            CustomerTaxId = "52998224725",
+            Items =
+            [
+                new CreateOrderItemRequest
+                {
+                    ProductCode = "batch",
+                    Quantity = 100
+                }
+            ]
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(request));
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldReject_WhenItemObservationExceedsMaximumLength()
+    {
+        var handler = new CreateOrderHandler(
+            new FakeProductRepository(CreateProduct(1, "batch", "Synthetic", 10m)),
+            new FakeOrderRepository()
+        );
+        var request = new CreateOrderRequest
+        {
+            OrderType = OrderTypes.Pickup,
+            CustomerName = "Synthetic",
+            CustomerPhone = "11999990000",
+            CustomerEmail = "batch@example.invalid",
+            CustomerTaxId = "52998224725",
+            Items =
+            [
+                new CreateOrderItemRequest
+                {
+                    ProductCode = "batch",
+                    Quantity = 1,
+                    Observation = new string('a', 501)
+                }
+            ]
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(() => handler.HandleAsync(request));
+    }
+
     private static Product CreateProduct(
         int id,
         string code,
@@ -376,6 +480,8 @@ public class CreateOrderHandlerTests
         : IProductRepository
     {
         private readonly Product? _product;
+        public int BatchReads { get; private set; }
+        public int SingleReads { get; private set; }
 
         public FakeProductRepository(
             Product? product = null)
@@ -387,6 +493,7 @@ public class CreateOrderHandlerTests
             string code,
             CancellationToken cancellationToken = default)
         {
+            SingleReads++;
             if (_product?.Code == code)
             {
                 return Task.FromResult<Product?>(
@@ -397,6 +504,14 @@ public class CreateOrderHandlerTests
             return Task.FromResult<Product?>(
                 null
             );
+        }
+        public Task<IReadOnlyList<Product>> GetByCodesAsync(
+            IReadOnlyCollection<string> codes, CancellationToken cancellationToken = default)
+        {
+            BatchReads++;
+            return Task.FromResult<IReadOnlyList<Product>>(
+                _product is not null && codes.Any(code => code?.Trim() == _product.Code)
+                    ? new[] { _product } : Array.Empty<Product>());
         }
     }
 

@@ -45,6 +45,9 @@ public sealed class PrepareCheckoutPaymentHandler
             );
         }
 
+        if (order.Status == OrderStatus.Cancelled)
+            throw new CancelledCheckoutOrderException();
+
         if (order.Status != OrderStatus.PendingPayment)
         {
             throw new InvalidOperationException(
@@ -112,3 +115,6 @@ public sealed class PrepareCheckoutPaymentHandler
         return new PreparedCheckoutPayment(payment, customer);
     }
 }
+
+public sealed class CancelledCheckoutOrderException()
+    : InvalidOperationException("Only orders pending payment can start checkout.");

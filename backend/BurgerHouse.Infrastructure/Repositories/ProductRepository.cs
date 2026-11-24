@@ -32,4 +32,14 @@ public class ProductRepository : IProductRepository
                 cancellationToken
             );
     }
+    public async Task<IReadOnlyList<Product>> GetByCodesAsync(
+        IReadOnlyCollection<string> codes, CancellationToken cancellationToken = default)
+    {
+        var normalized = codes.Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code.Trim()).Distinct(StringComparer.Ordinal).ToArray();
+        if (normalized.Length == 0) return Array.Empty<Product>();
+        return await _dbContext.Products.AsNoTracking()
+            .Where(product => product.IsActive && normalized.Contains(product.Code))
+            .ToListAsync(cancellationToken);
+    }
 }

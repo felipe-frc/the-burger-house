@@ -1,0 +1,399 @@
+/* The Burger House — Refined Nutrition Facts Stylesheet */
+
+.tbh-nutrition-card {
+  box-sizing: border-box;
+  width: 100%;
+  background: #ffffff;
+  border: 1.5px solid var(--tbh-ink, #171717);
+  border-radius: var(--tbh-radius-card, 12px);
+  padding: 20px 22px;
+  color: var(--tbh-ink, #171717);
+  font-family: var(--tbh-font-nutrition, 'Gabarito', sans-serif);
+  box-shadow: 0 4px 16px rgba(23, 23, 23, 0.06);
+}
+
+.tbh-nutrition-card-header {
+  border-bottom: 2px solid var(--tbh-ink, #171717);
+  padding-bottom: 14px;
+  margin-bottom: 12px;
+}
+
+.tbh-nutrition-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.tbh-nutrition-title {
+  margin: 0;
+  font-family: var(--tbh-font-title, 'Anton', sans-serif);
+  font-size: 24px;
+  line-height: 1.1;
+  letter-spacing: var(--tbh-title-tracking, 0.01em);
+  color: var(--tbh-ink, #171717);
+  text-transform: uppercase;
+}
+
+.tbh-nutrition-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-family: var(--tbh-font-nutrition, 'Gabarito', sans-serif);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.tbh-nutrition-status-pill--estimated {
+  background: #FEF3D6;
+  color: #6B4500;
+  border: 1.5px solid #D98200;
+}
+
+.tbh-nutrition-status-pill--verified {
+  background: #EAF7EE;
+  color: #0E5E2C;
+  border: 1.5px solid #1E7E34;
+}
+
+.tbh-nutrition-serving-card {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: var(--tbh-porcelain, #F5F3EE);
+  border: 1px solid #D8D4CC;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #2C2B29;
+}
+
+.tbh-nutrition-serving-label {
+  font-weight: 600;
+  color: #383633;
+}
+
+.tbh-nutrition-serving-value {
+  color: var(--tbh-ink, #171717);
+  font-weight: 800;
+}
+
+.tbh-nutrition-size-note {
+  color: var(--tbh-blue, #2864F0);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* Nutritional Table */
+.tbh-nutrition-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--tbh-font-nutrition, 'Gabarito', sans-serif);
+  font-size: 14px;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+.tbh-nutrition-table thead tr {
+  background: var(--tbh-porcelain, #F5F3EE);
+  border-top: 2px solid var(--tbh-ink, #171717);
+  border-bottom: 2px solid var(--tbh-ink, #171717);
+}
+
+.tbh-nutrition-col-nutrient {
+  font-weight: 800;
+  color: var(--tbh-ink, #171717);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.tbh-nutrition-col-vd {
+  font-weight: 800;
+  color: var(--tbh-ink, #171717);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 10px;
+  text-align: right;
+  width: 70px;
+}
+
+.tbh-nutrition-vd {
+  text-align: right;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--tbh-ink, #171717);
+  padding: 8px 10px;
+  width: 70px;
+}
+
+.tbh-nutrition-vd-bold {
+  font-weight: 800;
+  color: var(--tbh-blue, #2864F0);
+}
+
+.tbh-nutrition-vd-muted {
+  color: #55514B;
+  font-weight: 600;
+}
+
+/* Row Styling */
+.tbh-nutrition-row-calories {
+  background: #FAF8F5;
+  border-bottom: 2px solid var(--tbh-ink, #171717);
+}
+
+.tbh-nutrition-row-calories th {
+  padding: 10px 10px;
+  text-align: left;
+}
+
+.tbh-nutrition-row-label-primary {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--tbh-ink, #171717);
+}
+
+.tbh-nutrition-amount-secondary {
+  display: inline-block;
+  white-space: nowrap;
+  margin-left: 10px;
+  font-weight: 800;
+  color: var(--tbh-blue, #2864F0);
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+}
+
+.tbh-nutrition-kj {
+  color: #383633;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.tbh-nutrition-row-main {
+  border-bottom: 1px solid #D8D4CC;
+}
+
+.tbh-nutrition-row-main th {
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.tbh-nutrition-row-last {
+  border-bottom: 2px solid var(--tbh-ink, #171717);
+}
+
+.tbh-nutrition-amount {
+  display: inline-block;
+  white-space: nowrap;
+  margin-left: 10px;
+  font-weight: 700;
+  color: var(--tbh-ink, #171717);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sub-items (Sugars, Saturated Fats) */
+.tbh-nutrition-row-sub {
+  background: rgba(245, 243, 238, 0.4);
+  border-bottom: 1px solid #E4E0D6;
+}
+
+.tbh-nutrition-row-sub th {
+  padding: 6px 10px 6px 20px;
+  text-align: left;
+}
+
+.tbh-nutrition-sub-indicator {
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--tbh-blue, #2864F0);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.tbh-nutrition-row-label-sub {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #2C2B29;
+}
+
+/* Footer & Disclaimers */
+.tbh-nutrition-footer {
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #2C2B29;
+}
+
+.tbh-nutrition-vd-legend {
+  margin: 0 0 6px;
+  color: #383633;
+  font-size: 12.5px;
+}
+
+.tbh-nutrition-audit {
+  margin-top: 14px;
+  padding: 14px 16px;
+  background: var(--tbh-porcelain, #F5F3EE);
+  border: 1.5px solid #D0CBC0;
+  border-radius: 10px;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tbh-nutrition-audit-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.tbh-nutrition-audit-icon {
+  flex-shrink: 0;
+  color: var(--tbh-blue, #2864F0);
+  margin-top: 2px;
+}
+
+.tbh-nutrition-audit-title {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--tbh-ink, #171717);
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.tbh-nutrition-audit-text {
+  margin: 0;
+  color: #2C2B29;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.tbh-nutrition-audit-disclaimer-box {
+  padding-top: 10px;
+  border-top: 1px solid #D8D4CC;
+}
+
+.tbh-nutrition-audit-disclaimer {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #383633;
+  font-style: italic;
+  font-weight: 500;
+}
+
+/* Unavailable State */
+.tbh-nutrition-unavailable {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  background: #FFF9E6;
+  border: 1.5px solid #E0B040;
+  border-radius: var(--tbh-radius-button, 10px);
+  color: #6B4500;
+  font-family: var(--tbh-font-nutrition, 'Gabarito', sans-serif);
+}
+
+.tbh-nutrition-unavailable svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #C07800;
+}
+
+.tbh-nutrition-unavailable-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  margin-bottom: 4px;
+  color: #5C3A00;
+}
+
+.tbh-nutrition-unavailable-desc {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: #6B4500;
+}
+
+/* Compact Mode (for inline strips) */
+.tbh-nutrition-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 8px;
+  font-family: var(--tbh-font-nutrition, 'Gabarito', sans-serif);
+}
+
+.tbh-nutrition-compact-pill {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 6px 12px;
+  background: #FFFFFF;
+  border: 1.5px solid var(--tbh-blue, #2864F0);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tbh-ink, #171717);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 4px rgba(40, 100, 240, 0.08);
+}
+
+.tbh-nutrition-compact-val {
+  font-weight: 800;
+  color: var(--tbh-blue, #2864F0);
+}
+
+.tbh-nutrition-compact-dot {
+  color: rgba(40, 100, 240, 0.5);
+  font-size: 11px;
+}
+
+.tbh-nutrition-compact-badge {
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.tbh-nutrition-compact-badge--est {
+  color: #7A4E00;
+}
+
+.tbh-nutrition-compact-badge--ver {
+  color: #0E5E2C;
+}
+
+@media (max-width: 480px) {
+  .tbh-nutrition-card {
+    padding: 16px 14px;
+  }
+  .tbh-nutrition-title {
+    font-size: 21px;
+  }
+  .tbh-nutrition-status-pill {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+  .tbh-nutrition-table {
+    font-size: 13px;
+  }
+}
