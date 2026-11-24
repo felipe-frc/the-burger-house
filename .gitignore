@@ -1,15 +1,17 @@
-﻿# =========================
+# =========================
 # Node / Front-end
 # =========================
 node_modules/
 dist/
 .vercel/
+.output/
+.wrangler/
+.vinxi/
 
 # =========================
 # Environment / Secrets
 # =========================
-.env
-.env.*
+.env*
 !.env.example
 
 secrets.json
@@ -38,6 +40,7 @@ coverage/
 playwright-report/
 test-results/
 TestResults/
+.test-tmp/
 
 # =========================
 # Logs
@@ -75,11 +78,143 @@ artifacts/
 *.db-wal
 *.sqlite
 *.sqlite3
+*.dump
+*.pgpass
+.pgpass
+pgpass.conf
+*.dpapi
 
 # Local implementation snapshots and diagnostic exports
 *.bak
+/backups/
 /translation-cleanup-backup/
 /diagnostico-*.txt
 /relatorio-git-*.txt
 /backup-*.zip
 /diagnostico-*.zip
+__pycache__/
+*.pyc
+
+# Caches reproduziveis do frontend
+/.tanstack/
+.vite/
+*.tsbuildinfo
+/frontend-ai-studio.zip
+
+# Private operational records and screenshots awaiting provenance review
+/docs/catalog-history-preserving-options-2026-10-28.md
+/docs/catalog-inventory-2026-10-28.md
+/docs/catalog-rehearsal-copy-only-2026-10-28.md
+/docs/credit-sandbox-manual-2026-10-28.md
+/docs/final-acceptance-2026-10-27.md
+/docs/final-hosted-validation-2026-10-27.md
+/docs/frontend-migration-evidence-loss.md
+/docs/fullstack-integration-final-report.md
+/docs/github-precommit-readiness.md
+/docs/images/endereco.png
+/docs/images/revisao.png
+/docs/integration-closeout-2026-10-28.md
+/docs/integration-validation-2026-10-27.md
+/docs/owner-recovery-transfer-2026-10-27.md
+/docs/pagbank-422-investigation-2026-10-28.md
+/docs/pagbank-reuse-2026-10-28.md
+/docs/pagbank-support-request-2026-10-28.md
+/docs/pix-settlement-2026-10-28.md
+/docs/production-catalog-cleanup-2026-10-28.md
+/docs/production-catalog-final-authorization-2026-10-28.md
+/docs/production-catalog-registration-2026-10-27.md
+/docs/technical-closeout-2026-10-28.md
+/docs/technical-closeout-manual-checks-2026-10-28.md
+/scripts/admin/compare-pagbank-history.mjs
+/scripts/admin/verify-paid-owner.mjs
+/scripts/admin/verify-paid-return.mjs
+/scripts/admin/verify-pix-settlement.mjs
+/scripts/admin/catalog-final-manifest.mjs
+/docs/images/address.png
+/docs/images/review.png
+
+# Local agent / editor tooling & one-off root helper scripts
+.agents/
+skills-lock.json
+.impeccable/
+.codegraph/
+/tbh-refinamento-conciliado.ps1
+/tbh-refinamento-unico.ps1
+/normalizar.py
+
+# === TBH 2.0 SECURITY HARDENING START ===
+
+# Configuracoes locais adicionais do ASP.NET Core
+appsettings.*.local.json
+appsettings.Local.*.json
+appsettings.*.Private.json
+appsettings.*.Secrets.json
+
+# Arquivos de credenciais e identidades
+*.credential
+*.credentials
+*.secret.json
+*.secrets.json
+*.keytab
+*.kdbx
+*.jks
+*.keystore
+*.p8
+id_rsa
+id_ecdsa
+id_ed25519
+
+# Terraform / infraestrutura local e estados sensiveis
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Credenciais locais de ferramentas cloud
+.azure/
+.aws/
+.gcloud/
+.kube/
+
+# Bancos e exportacoes locais
+*.db3
+*.sqlite-shm
+*.sqlite-wal
+*.dump.gz
+*.sql.gz
+*.sql.zip
+*.backup
+
+# Cache e artefatos de desenvolvimento
+.nyc_output/
+.turbo/
+.parcel-cache/
+.eslintcache
+*.cache
+*.tmp
+*.temp
+*.orig
+*.rej
+
+# Arquivos de diagnostico local
+*.prof
+*.profdata
+*.heapprofile
+*.heapsnapshot
+*.dmp
+
+# Arquivos temporarios de sistema e editores
+*~
+*.swp
+*.swo
+*.swn
+Desktop.ini
+ehthumbs.db
+
+# === TBH 2.0 SECURITY HARDENING END ===

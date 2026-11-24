@@ -32,6 +32,12 @@ O backend e o frontend aceitam apenas URLs HTTPS sem `userinfo` nos hosts `pagam
 
 ## Webhook financeiro
 
+A chave de webhook é consultada em `GET /public-keys/webhook` (tipo no caminho).
+Em 27/10/2026 essa rota retornou 200 no sandbox e uma chave Base64/X.509-SPKI
+ECDSA P-256 de 91 bytes compatível com `ImportSubjectPublicKeyInfo`.
+A variante antiga `public-keys?type=webhook` retornou 403 nesse ambiente.
+Não há fallback para chave de cartão, webhook sem assinatura ou segredo compartilhado.
+
 `POST /api/webhooks/pagbank` é o mecanismo principal de sincronização. O controller lê o corpo bruto, valida `x-payload-signature` com SHA-256, ECDSA e a chave pública obtida no endpoint oficial de chaves do PagBank, e só depois desserializa o evento.
 
 Eventos financeiros devem conter o objeto externo `ORDE_...`, `reference_id` e `charges[]`. Cada charge candidata precisa ter identificador `CHAR_...`, referência `payment:{Payment.Id}`, valor igual ao pagamento local, moeda `BRL`, status reconhecido e, quando liquidada, método reconhecido.
@@ -40,11 +46,25 @@ Um pedido externo pode conter várias tentativas. Se `ExternalPaymentId` já est
 
 A charge selecionada é confirmada por `GET /charges/{CHAR_...}` antes de iniciar a transação local. A transação curta recarrega `Payment` e `Order`, repete as correlações dependentes do estado atual e grava os dois de forma atômica. Webhooks repetidos são idempotentes e não substituem um `ExternalPaymentId` existente.
 
-No Sandbox, a entrega automática da notificação pode não ocorrer. Nesse caso, use o recurso oficial de reenvio ou simulação de notificação do ambiente PagBank; a aplicação não tenta descobrir `CHAR_...` consultando o checkout `CHEC_...`.
+No Sandbox, a entrega automática da notificação pode não ocorrer. A integração
+existente também possui reconciliação por consulta: quando ainda não há
+`ExternalPaymentId`, consulta o checkout `CHEC_...`, exige exatamente um pedido
+em `checkout.orders`, consulta esse `ORDE_...` e exige uma única charge com
+referência, valor e moeda compatíveis. Confirma então o `CHAR_...` pela consulta
+canônica da charge, antes de sincronizar pedido e pagamento. Coleções ausentes,
+ambíguas ou incompatíveis não aprovam o pedido. Não há inferência por manipulação
+dos identificadores nem navegação pelos links arbitrários retornados pelo provedor.
 
 ## Consulta de status
 
-`GET /api/payments/{paymentId}` retorna o estado local. Quando `ExternalPaymentId` ainda não existe, nenhuma chamada ao provedor é feita. Depois que um `CHAR_...` foi persistido, o backend pode consultar diretamente `GET /charges/{ExternalPaymentId}` e reconciliar o estado.
+`GET /api/payments/{paymentId}` executa a reconciliação existente e retorna o
+estado local confirmado. Sem `ExternalPaymentId`, um pagamento elegível com
+`ExternalCheckoutId` pode usar a descoberta descrita acima. Depois que um
+`CHAR_...` foi persistido, consulta diretamente `GET /charges/{ExternalPaymentId}`.
+Portanto, esse GET pode sincronizar o banco; não deve ser tratado como leitura
+sem efeitos ao investigar produção. Em Development, o worker existente também
+processa lotes de pagamentos pendentes; em Homologation, a consulta de status
+continua chamando o mesmo serviço de reconciliação, sem habilitar outro worker.
 
 Falhas ou respostas inválidas nessa consulta não alteram o banco e o endpoint mantém o último estado local conhecido. Pagamentos em estado terminal sem necessidade de reconciliação não geram chamada externa.
 
