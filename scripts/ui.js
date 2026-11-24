@@ -334,7 +334,7 @@ export function bindModalCloseEvents() {
  * @param {string} message
  * @param {string} [background]
  */
-export function showToast(message, background = "#ef4444") {
+export function showToast(message, background = "#ff3816") {
   const toastify = getToastify();
 
   if (!toastify) {
@@ -351,7 +351,7 @@ export function showToast(message, background = "#ef4444") {
     stopOnFocus: true,
     style: {
       background,
-      color: "#ffffff",
+      color: "#171717",
       borderRadius: "10px",
     },
   }).showToast();
@@ -419,7 +419,7 @@ function renderMenuCategory(category) {
     <section id="${escapeHTML(category.id)}" class="max-w-5xl mx-auto px-4 scroll-mt-28">
       <div class="section-header">
         <h2 class="section-title">
-          <i class="${escapeHTML(category.icon)} text-amber-500" aria-hidden="true"></i>
+          <i class="${escapeHTML(category.icon)} text-[#ff3816]" aria-hidden="true"></i>
           <span class="section-title-text">${escapeHTML(localizedCategory.title)}</span>
         </h2>
 
@@ -515,19 +515,21 @@ export function updateStoreStatus() {
     "text-rose-400",
     "text-red-400",
     "text-red-200",
+    "status-open",
+    "status-closed",
     "badge-open",
     "badge-closed",
   );
 
   if (isOpen) {
-    elements.dateSpan.classList.add("text-emerald-400");
+    elements.dateSpan.classList.add("status-open");
 
     elements.statusText.textContent = translate("status.open");
 
     return;
   }
 
-  elements.dateSpan.classList.add("text-rose-400");
+  elements.dateSpan.classList.add("status-closed");
 
   elements.statusText.textContent = translate("status.closed");
 }

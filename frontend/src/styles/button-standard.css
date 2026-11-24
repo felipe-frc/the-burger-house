@@ -1,0 +1,220 @@
+/* THE BURGER HOUSE | BUTTON DESIGN SYSTEM */
+
+:root {
+  --btn-yellow: #ffdc32;
+  --btn-hover: #ffe96a;
+  --btn-black: #171717;
+  --btn-blue: #2864f0;
+  --btn-motion: 1;
+}
+
+body :is(
+  .tbh-button,
+  .tbh-nav-order,
+  .tbh-nav-mobile-order,
+  .tbh-fullmenu-back,
+  .tbh-fullmenu-detail-tabs [role="tab"],
+  .checkout-primary,
+  .checkout-secondary,
+  .checkout-link,
+  .checkout-cep-row > button,
+  .tbh-footer-order,
+  .btn-add-item,
+  .category-nav-link
+) {
+  background: var(--btn-yellow);
+  color: var(--btn-black);
+  border: var(--btn-border-width, 2px) solid var(--btn-black);
+  border-radius: 999px;
+  box-shadow: 0 var(--btn-shadow, 7px) 0 var(--btn-black);
+  font-weight: var(--btn-font-weight, 800);
+  text-decoration: none;
+  cursor: pointer;
+  transform: translateY(0);
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  body :is(
+    .tbh-button,
+    .tbh-nav-order,
+    .tbh-nav-mobile-order,
+    .tbh-fullmenu-back,
+    .tbh-fullmenu-detail-tabs [role="tab"],
+    .checkout-primary,
+    .checkout-secondary,
+    .checkout-link,
+    .checkout-cep-row > button,
+    .tbh-footer-order,
+    .btn-add-item,
+    .category-nav-link
+  ):not(:disabled):not([aria-disabled="true"]):hover {
+    background: var(--btn-hover);
+    box-shadow: 0 var(--btn-hover-shadow, 3px) 0 var(--btn-black);
+    transform: translateY(calc(var(--btn-hover-offset, 4px) * var(--btn-motion)));
+  }
+}
+
+body :is(
+  .tbh-button,
+  .tbh-nav-order,
+  .tbh-nav-mobile-order,
+  .tbh-fullmenu-back,
+  .tbh-fullmenu-detail-tabs [role="tab"],
+  .checkout-primary,
+  .checkout-secondary,
+  .checkout-link,
+  .checkout-cep-row > button,
+  .tbh-footer-order,
+  .btn-add-item,
+  .category-nav-link
+):not(:disabled):not([aria-disabled="true"]):active {
+  box-shadow: 0 var(--btn-active-shadow, 1px) 0 var(--btn-black);
+  transform: translateY(calc(var(--btn-active-offset, 6px) * var(--btn-motion)));
+}
+
+body :is(
+  .tbh-button,
+  .tbh-nav-order,
+  .tbh-nav-mobile-order,
+  .checkout-primary,
+  .checkout-secondary
+):disabled,
+body :is(
+  .tbh-button,
+  .checkout-primary,
+  .checkout-secondary
+)[aria-disabled="true"] {
+  background: #dedbd5;
+  color: #55514b;
+  box-shadow: 0 3px 0 #77736c;
+  cursor: not-allowed;
+  transform: none;
+}
+
+body :is(
+  .tbh-fullmenu-detail-tabs [role="tab"]
+)[aria-selected="true"] {
+  background: var(--btn-blue);
+  color: #fff;
+}
+
+body :is(
+  .tbh-button,
+  .tbh-nav-order,
+  .tbh-nav-mobile-order,
+  .tbh-fullmenu-back,
+  .tbh-fullmenu-detail-tabs [role="tab"],
+  .checkout-primary,
+  .checkout-secondary,
+  .checkout-link
+):focus-visible {
+  outline: 3px solid var(--btn-blue);
+  outline-offset: 5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --btn-motion: 0;
+  }
+  body :is(
+    .tbh-button,
+    .tbh-nav-order,
+    .tbh-nav-mobile-order,
+    .tbh-fullmenu-back,
+    .tbh-fullmenu-detail-tabs [role="tab"],
+    .checkout-primary,
+    .checkout-secondary,
+    .checkout-link
+  ) {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* TBH BUTTON SIZES START */
+
+/* 1. NAVBAR: compacto e proporcional */
+body .tbh-navbar .tbh-nav-order {
+  min-height: 34px;
+  height: 34px;
+  padding: 5px 13px;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1;
+  --btn-border-width: 1.5px;
+  --btn-shadow: 3px;
+  white-space: nowrap;
+}
+
+body .tbh-navbar .tbh-nav-order svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+/* 2. BOTOES MEDIOS: cards, localizacao e rodape */
+body :is(
+  .tbh-fullmenu-back,
+  .tbh-showcase-all,
+  .tbh-locations-actions .tbh-button,
+  .tbh-footer-order,
+  .btn-add-item
+) {
+  min-height: 38px;
+  padding: 7px 15px;
+  font-size: 14px;
+  line-height: 1.1;
+  --btn-shadow: 4px;
+}
+
+/* 3. SELETORES DE CATEGORIA */
+body .tbh-fullmenu-detail-tabs [role="tab"] {
+  min-height: 42px;
+  padding: 8px 16px;
+  --btn-shadow: 4px;
+}
+
+/* 4. CTA HERO: preservar maior destaque */
+body :is(
+  .campaign-hero__cta,
+  .tbh-hero-stage .tbh-button
+) {
+  min-height: 48px;
+  padding: 12px 24px;
+  box-shadow: 0 7px 0 #171717;
+}
+
+/* Hover proporcional para navbar */
+@media (hover: hover) and (pointer: fine) {
+
+  body .tbh-navbar .tbh-nav-order:active:not(:disabled) {
+    --btn-active-shadow: 0px;
+    --btn-active-offset: 3px;
+  }
+
+  body :is(
+    .tbh-showcase-all,
+    .tbh-locations-actions .tbh-button,
+    .tbh-footer-order,
+    .btn-add-item
+  ):hover:not(:disabled):not([aria-disabled="true"]) {
+    --btn-hover-shadow: 2px;
+    --btn-hover-offset: 2px;
+  }
+}
+
+/* Estados selecionados mantem destaque */
+
+/* Sem animacao para movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  body .tbh-navbar .tbh-nav-order {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* TBH BUTTON SIZES END */

@@ -1,0 +1,73 @@
+.tbh-privacy-preferences {
+  position: fixed;
+  z-index: 90;
+  inset: auto 16px 16px auto;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid #716e67;
+  border-radius: 20px;
+  background: #fff7e3;
+  color: #171717;
+  box-shadow: 0 8px 32px #17171726;
+  font: 500 18px/1.45 'Barlow Condensed', sans-serif;
+}
+.tbh-privacy-preferences h2 { margin: 0 0 8px; font: 400 23px/1.3 Anton, sans-serif; }
+.tbh-privacy-preferences p { margin: 8px 0 16px; }
+.tbh-privacy-preferences a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: #1948b6;
+  text-decoration: underline;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tbh-privacy-preferences a:hover {
+    background: #ffdc32;
+    border-color: #171717;
+    color: #171717;
+    box-shadow: 0 5px 0 #171717;
+    transform: translateY(-2px);
+    text-decoration: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tbh-privacy-preferences a {
+    transition: none;
+  }
+}
+.tbh-privacy-preferences fieldset { min-width: 0; border: 1px solid #716e67; border-radius: 12px; padding: 12px; }
+.tbh-privacy-preferences label { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; }
+.tbh-privacy-preferences input { flex-shrink: 0; width: 22px; height: 22px; accent-color: #1948b6; }
+.tbh-privacy-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.tbh-privacy-actions button, .tbh-map-consent button {
+  min-height: 44px; padding: 10px 16px; border: 1px solid #171717;
+  border-radius: 24px; background: #fff7e3; color: #171717; font: 600 18px/1.2 'Barlow Condensed', sans-serif; cursor: pointer;
+}
+@media (hover: hover) and (pointer: fine) {
+  .tbh-privacy-actions button:not(:disabled):hover {
+    background: #ffdc32;
+    border-color: #171717;
+    color: #171717;
+    box-shadow: 0 5px 0 #171717;
+    transform: translateY(-2px);
+  }
+}
+
+.tbh-privacy-preferences :focus-visible, .tbh-map-consent button:focus-visible { outline: 3px solid #1948b6; outline-offset: 3px; }
+.tbh-map-consent { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; height: 100%; min-height: 180px; padding: 24px; background: #eee9dd; color: #171717; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .tbh-privacy-preferences { scroll-behavior: auto; } }
+body:has(.tbh-privacy-preferences) .tbh-footer { padding-bottom: 224px; }
+@media (max-width: 600px) { body:has(.tbh-privacy-preferences) .tbh-footer { padding-bottom: 344px; } }

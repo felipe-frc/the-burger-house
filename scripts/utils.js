@@ -20,11 +20,14 @@ export function isValidHouseNumber(value) {
   return /^[0-9]+$/.test(value.trim());
 }
 
-export function isStoreOpenNow() {
+const storeHour = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23",
+});
+
+export function isStoreOpenNow(now = new Date()) {
   if (FORCE_STORE_OPEN) return true;
 
-  const now = new Date();
-  const hour = now.getHours();
+  const hour = Number(storeHour.format(now));
 
   return hour >= STORE_OPEN_HOUR && hour < STORE_CLOSE_HOUR;
 }

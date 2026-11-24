@@ -1,0 +1,382 @@
+/* One map above one editorial information strip. Everything is scoped to Locations. */
+#locations.tbh-locations {
+  background: #2864f0; color: #171717;
+  padding-block: var(--tbh-section-space); scroll-margin-top: 96px;
+}
+#locations .tbh-locations-heading,
+#locations .tbh-locations-unit { width: min(calc(100% - 2 * var(--tbh-gutter)), var(--tbh-container)); margin-inline: auto; }
+#locations .tbh-locations-heading { margin-bottom: var(--tbh-space-content); }
+#root #locations .tbh-locations-heading h2 {
+  margin: 0; font-size: var(--tbh-text-section);
+  line-height: var(--tbh-leading-title); color: #ffdc32; text-align: left;
+}
+#locations .tbh-locations-unit { overflow: hidden; border-radius: 24px; background: #f5f3ee; }
+#locations .tbh-locations-map-frame { position: relative; height: 320px; overflow: hidden; background: #f5f3ee; }
+#locations .tbh-location-map-wrapper { position: relative; width: 100%; height: 100%; min-height: 0; }
+#locations .tbh-location-map-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+#locations .tbh-locations-info { min-width: 0; padding: 26px 24px; }
+#locations :is(a, button):focus-visible { outline: 3px solid #2864f0; outline-offset: 4px; }
+#locations .tbh-location-map-disclaimer {
+  position: absolute; z-index: 2; bottom: 30px; left: 12px;
+  padding: 7px 11px; background: #f5f3ee; color: #171717; border-radius: 8px;
+  font: 600 12px var(--tbh-font-description); pointer-events: none;
+}
+@media (min-width: 640px) {
+  #locations .tbh-locations-info { padding: 24px 28px; }
+  #locations .tbh-locations-map-frame { height: 360px; }
+}
+@media (min-width: 1024px) {
+  #locations .tbh-locations-map-frame { height: clamp(380px, 30vw, 440px); }
+}
+
+/* TBH LOCATION PREMIUM PANEL START */
+
+#locations .tbh-loc-approved-layout {
+  position: relative;
+  min-width: 0;
+  padding: clamp(24px, 3vw, 46px);
+  background: #f5f3ee;
+}
+
+#locations .tbh-loc-layout-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 190px;
+  align-items: center;
+  gap: 24px;
+}
+
+#locations .tbh-loc-layout-kicker {
+  display: block;
+  margin-bottom: 9px;
+  color: #2864f0;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: .06em;
+}
+
+#locations .tbh-loc-layout-city-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+#root #locations .tbh-loc-layout-city-row h3 {
+  margin: 0;
+  color: #171717;
+  font-family: "Anton", sans-serif;
+  font-weight: 400;
+  font-size: clamp(32px, 3.2vw, 52px);
+  line-height: 1.15;
+  text-shadow: none;
+}
+
+#locations .tbh-loc-layout-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 3px 9px;
+  border: 2px solid #171717;
+  border-radius: 10px;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+#locations .tbh-loc-layout-hours {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 190px;
+  min-height: 147px;
+  padding: 15px 10px;
+  border: 2px solid #171717;
+  border-radius: 18px;
+  background: #ffdc32;
+  box-shadow: 0 6px 0 #171717;
+  color: #171717;
+  text-align: center;
+}
+
+#locations .tbh-loc-layout-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: #fffdf6;
+  border: 1px solid #171717;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+#locations .tbh-loc-layout-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #858585;
+}
+
+#locations .tbh-loc-layout-status-dot.is-active {
+  background: #178f42;
+}
+
+#locations .tbh-loc-layout-hours-label {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .06em;
+}
+
+#locations .tbh-loc-layout-hours strong {
+  font-family: "Anton", sans-serif;
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+#locations .tbh-loc-layout-divider {
+  height: 1px;
+  margin: 24px 0 20px;
+  background: #d8d5ce;
+}
+
+#locations .tbh-loc-layout-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 185px;
+  align-items: end;
+  gap: 28px;
+  min-height: 175px;
+}
+
+#locations .tbh-loc-layout-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+#locations .tbh-loc-layout-contacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 750px;
+}
+
+#locations .tbh-loc-layout-contact {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 12px 15px;
+  background: #fff;
+  border: 1px solid #dedbd5;
+  border-radius: 15px;
+  min-width: 0;
+}
+
+#locations .tbh-loc-layout-contact > svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  color: #2864f0;
+}
+
+#locations .tbh-loc-layout-contact:first-child > svg {
+  color: #168b45;
+}
+
+#locations .tbh-loc-layout-contact > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+#locations .tbh-loc-layout-contact span {
+  color: #625e59;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .05em;
+}
+
+#locations .tbh-loc-layout-contact strong {
+  color: #171717;
+  font-size: clamp(17px, 1.5vw, 22px);
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+#locations .tbh-loc-layout-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 15px;
+}
+
+#locations .tbh-loc-layout-actions :is(button, a) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px 18px;
+  border: 2px solid #171717;
+  border-radius: 999px;
+  box-shadow: 0 5px 0 #171717;
+  color: #171717;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+#locations .tbh-loc-layout-primary {
+  background: #ffdc32;
+}
+
+#locations .tbh-loc-layout-secondary {
+  background: #f5f3ee;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #locations .tbh-loc-layout-actions :is(button, a):hover {
+    transform: translateY(3px);
+    box-shadow: 0 2px 0 #171717;
+  }
+}
+
+#locations .tbh-loc-layout-actions :is(button, a):focus-visible {
+  outline: 3px solid #2864f0;
+  outline-offset: 5px;
+}
+
+#locations .tbh-loc-layout-mascot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  align-self: stretch;
+  min-width: 0;
+  pointer-events: none;
+}
+
+#locations .tbh-loc-layout-mascot img {
+  display: block;
+  width: min(100%, 185px);
+  height: auto;
+  object-fit: contain;
+  object-position: bottom center;
+}
+
+@media (max-width: 950px) {
+  #locations .tbh-loc-layout-bottom {
+    grid-template-columns: minmax(0, 1fr) 130px;
+    gap: 15px;
+  }
+
+  #locations .tbh-loc-layout-contacts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  #locations .tbh-loc-approved-layout {
+    padding: 24px 18px;
+  }
+
+  #locations .tbh-loc-layout-top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #locations .tbh-loc-layout-bottom {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #locations .tbh-loc-layout-contacts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #locations .tbh-loc-layout-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #locations .tbh-loc-layout-actions :is(button, a) {
+    width: 100%;
+  }
+
+  #locations .tbh-loc-layout-mascot {
+    justify-content: flex-end;
+  }
+
+  #locations .tbh-loc-layout-mascot img {
+    width: 125px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #locations .tbh-loc-layout-actions :is(button, a) {
+    transition: none;
+  }
+}
+
+/* TBH LOCATION PREMIUM PANEL END */
+
+/* TBH LOCATION MAP PIN START */
+#locations .tbh-location-map-pin-image {
+  width: 72px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+#locations .tbh-location-map-pin-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 10px rgba(23, 23, 23, 0.18));
+}
+
+#locations .tbh-location-map-popup strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #171717;
+  font-family: "Anton", sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+
+#locations .tbh-location-map-popup p {
+  margin: 0 0 4px 0;
+  color: #171717;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+#locations .tbh-location-map-popup small {
+  color: #5e5a52;
+  font-family: "Barlow Condensed", sans-serif;
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  #locations .tbh-location-map-pin-image {
+    width: 58px;
+    height: 72px;
+  }
+}
+/* TBH LOCATION MAP PIN END */

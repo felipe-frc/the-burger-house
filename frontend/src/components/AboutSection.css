@@ -1,0 +1,26 @@
+.tbh-about { padding-block: var(--tbh-section-space); background: #F5F3EE; color: var(--tbh-ink);
+  background-color: #F5F3EE; }
+.tbh-about-intro { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; margin-bottom: var(--tbh-space-content); }
+/* Coral headings retain the approved contrast against the porcelain section. */
+.tbh-about-heading {
+  color: #D2311B; }
+.tbh-about-narrative { padding-top: 8px; }
+.tbh-about-narrative p { margin: 0; max-width: 60ch; color: var(--tbh-ink); font-size:clamp(1.05rem,1.35vw,1.18rem); line-height:1.65; }
+.tbh-about-accordion .ag-panel { border: 0; padding: 0; }
+.tbh-about-accordion .ag-panel__overlay { background: linear-gradient(180deg, transparent 55%, #171717a6 100%), #17171714; }
+.tbh-about-accordion .ag-panel:focus-visible { outline: 3px solid var(--tbh-ink); outline-offset: 3px; }
+.tbh-about-accordion .ag-photo-reveal {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.tbh-about-accordion .ag-photo-reveal > img {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(0px - var(--about-photo-overscan, 0px));
+  height: calc(100% + 2 * var(--about-photo-overscan, 0px));
+}
+@media (max-width: 1000px) { .tbh-about-intro { grid-template-columns: minmax(0, 1fr); gap: 24px; } .tbh-about-narrative { padding-top: 0; } }
+@media (max-width: 600px) { .tbh-about-accordion .accordion-gallery { height: 340px; } }

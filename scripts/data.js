@@ -23,7 +23,7 @@ export const MENU_CATEGORIES = [
         description:
           "Queijo coalho grelhado com fio de mel, banana-da-terra frita, bacon crocante e maionese defumada.",
         price: 43.9,
-        image: "./assets/praiano-burguer.webp",
+        image: "./assets/branding/menu-destaques/praiano-card.webp",
         imageAlt:
           "Hambúrguer O Praiano com queijo coalho grelhado, banana-da-terra frita, bacon crocante e maionese defumada.",
         tag: "Mais Pedido",
@@ -41,7 +41,7 @@ export const MENU_CATEGORIES = [
         description:
           "Aioli de alho assado, queijo suíço derretido, bacon e anéis de cebola gigantes crocantes.",
         price: 43.9,
-        image: "./assets/onion-rings-burguer.webp",
+        image: "./assets/branding/menu-destaques/onion-card.webp",
         imageAlt:
           "Hambúrguer O Famoso Onion Ring com queijo suíço, bacon e anéis de cebola crocantes.",
         tag: "Destaque",
@@ -59,7 +59,7 @@ export const MENU_CATEGORIES = [
         description:
           "Filé de frango crocante com cheddar derretido, bacon, alface, tomate e maionese defumada.",
         price: 35.9,
-        image: "./assets/crispy-chicken-burguer.webp",
+        image: "./assets/branding/menu-destaques/frango-card.webp",
         imageAlt:
           "Hambúrguer Crispy Chicken Cheddar com frango crocante, cheddar, bacon, alface, tomate e maionese defumada.",
         translations: {

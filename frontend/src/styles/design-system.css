@@ -1,0 +1,102 @@
+/* Landing UI tokens. Official media and third-party map colors remain untouched. */
+:root {
+  --tbh-blue: #2864f0;
+  --tbh-coral: #e85d4a;
+  --tbh-porcelain: #f5f3ee;
+  --tbh-yellow: #ffdc32;
+  --tbh-ink: #171717;
+  --tbh-coral-hover: #d44a37;
+  --tbh-coral-active: #bf3e2c;
+  --tbh-font-title: 'Anton', sans-serif;
+  --tbh-font-description: 'Barlow Condensed', sans-serif;
+  --tbh-text-hero: clamp(86.4px, 9.984vw, 209.28px);
+  --tbh-text-section: clamp(3rem, 5.5vw, 5.5rem);
+  --tbh-text-subtitle: 1.25rem;
+  --tbh-text-description: 1.125rem;
+  --tbh-text-product: 1.375rem;
+  --tbh-text-price: 1.25rem;
+  --tbh-text-button: 1rem;
+  --tbh-text-small: .875rem;
+  --tbh-leading-title: 1.12;
+  --tbh-leading-body: 1.5;
+  --tbh-title-tracking: -.025em;
+  --tbh-body-tracking: .01em;
+  --tbh-container: 1360px;
+  --tbh-gutter: 40px;
+  --tbh-section-space: clamp(56px, 5.5vw, 88px);
+  --tbh-space-heading: 32px;
+  --tbh-space-content: 40px;
+  --tbh-space-action: 32px;
+  --tbh-radius-control: 12px;
+  --tbh-shadow-dialog: 0 25px 50px -12px rgb(0 0 0 / 25%);
+  --tbh-nav-weight: 700;
+  --tbh-nav-tracking: .035em;
+  --tbh-radius-panel: 24px;
+  --tbh-radius-button: 999px;
+  --tbh-button-height: 48px;
+  --tbh-button-padding: 21px;
+  --tbh-icon-size: 20px;
+  --tbh-ease-out: cubic-bezier(.23, 1, .32, 1);
+  --tbh-duration-feedback: 160ms;
+}
+.tbh-container { width: min(calc(100% - 2 * var(--tbh-gutter)), var(--tbh-container)); margin-inline: auto; }
+#root .tbh-section-title {
+  margin: 0;
+  font-family: var(--tbh-font-title);
+  font-size: var(--tbh-text-section);
+  font-weight: 400;
+  font-style: normal;
+  line-height: var(--tbh-leading-title);
+  letter-spacing: var(--tbh-title-tracking);
+  text-transform: uppercase;
+  text-wrap: balance;
+  text-shadow:
+    0 1px 0 #171717,
+    0 2px 0 #171717,
+    0 3px 0 #171717,
+    0 4px 0 #171717,
+    0 6px 9px rgba(0, 0, 0, 0.10);
+}
+.tbh-description { font: 500 var(--tbh-text-description)/var(--tbh-leading-body) var(--tbh-font-description); letter-spacing: var(--tbh-body-tracking); max-width: 65ch; }
+.tbh-subtitle { font: 600 var(--tbh-text-subtitle)/var(--tbh-leading-body) var(--tbh-font-description); letter-spacing: var(--tbh-body-tracking); }
+.tbh-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: var(--tbh-button-height); padding: 12px var(--tbh-button-padding);
+  border: 1px solid var(--tbh-ink); border-radius: var(--tbh-radius-button);
+  font: 800 var(--tbh-text-button)/1.2 var(--tbh-font-description);
+  letter-spacing: .03em; text-transform: uppercase; text-decoration: none; text-align: center;
+  cursor: pointer; touch-action: manipulation;
+  transition: background-color var(--tbh-duration-feedback) ease, color var(--tbh-duration-feedback) ease;
+}
+.tbh-button--primary { background: var(--tbh-yellow); color: var(--tbh-ink); }
+.tbh-button svg { width: var(--tbh-icon-size); height: var(--tbh-icon-size); flex-shrink: 0; stroke-width: 2; }
+.tbh-button:active { box-shadow: inset 0 0 0 1px currentColor; }
+.tbh-button:disabled, .tbh-button[aria-disabled='true'] { opacity: .55; cursor: not-allowed; }
+:where(.tbh-landing-scroll, .tbh-navbar, [role='dialog']) :is(button, a, input, select, textarea, [tabindex='0']):focus-visible {
+  outline: 3px solid currentColor; outline-offset: 4px;
+}
+.tbh-landing-scroll > [data-landing-panel] { scroll-margin-top: 84px; }
+.tbh-skip-link {
+  position: fixed; z-index: 1500; top: 8px; left: 8px;
+  padding: 10px 16px; border-radius: var(--tbh-radius-button);
+  background: var(--tbh-yellow); color: var(--tbh-ink);
+  font-weight: 700; clip-path: inset(50%);
+}
+.tbh-skip-link:focus { clip-path: none; outline: 2px solid var(--tbh-ink); }
+.tbh-landing-scroll:focus { outline: none; }
+.tbh-catalog-notice { margin: 0 0 12px; font: 600 var(--tbh-text-small)/1.4 var(--tbh-font-description); }
+.tbh-catalog-notice button { min-height: 44px; padding-inline: 8px; text-decoration: underline; }
+.tbh-landing-scroll section[id],
+.tbh-landing-scroll :is(a, button, [tabindex]):focus-visible { scroll-margin-top: 84px; }
+.tbh-landing-scroll :where(input, textarea) { caret-color: var(--tbh-blue); }
+.tbh-landing-scroll ::selection { background: var(--tbh-yellow); color: var(--tbh-ink); }
+.tbh-landing-dialog { z-index: 1100; overflow-y: auto; }
+.tbh-landing-dialog > div { max-height: calc(100dvh - 32px); overflow-y: auto; border-radius: var(--tbh-radius-panel); box-shadow: var(--tbh-shadow-dialog); }
+.tbh-landing-dialog button, .tbh-fullmenu-dialog button { min-height: 44px; }
+.tbh-landing-dialog button[aria-label], .tbh-fullmenu-dialog button[aria-label] { min-width: 44px; }
+@media (hover: hover) and (pointer: fine) { .tbh-button--primary:hover { background: var(--tbh-porcelain); } }
+@media (max-width: 1023px) { :root { --tbh-gutter: 28px; } }
+@media (max-width: 600px) {
+  :root { --tbh-gutter: 20px; --tbh-text-section: clamp(2.5rem, 9vw, 3.25rem); --tbh-space-heading: 24px; --tbh-space-content: 32px; }
+}
+@media (prefers-reduced-motion: reduce) { .tbh-button { transition: none; } }

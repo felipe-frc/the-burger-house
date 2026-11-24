@@ -228,7 +228,7 @@ function addItemToCart(button) {
     translate("cart.addedToast", undefined, {
       name: localizedProduct.name,
     }),
-    "#16a34a",
+    "#ffd340",
   );
 }
 

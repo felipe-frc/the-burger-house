@@ -1,0 +1,26 @@
+/* Shared presentation tokens: existing Burger House palette and official typefaces. */
+:root {
+  --bh-font-title: "Bricolage Grotesque", sans-serif;
+  --bh-font-body: "Gabarito", system-ui, sans-serif;
+  --bh-color-orange: #ff3816;
+  --bh-color-cream: #F5F3EE;
+  --bh-color-ink: #171717;
+  --bh-color-on-bright: #000;
+  --bh-color-blue: #3a6ecf;
+  --bh-space-1: 0.5rem;
+  --bh-space-2: 0.75rem;
+  --bh-space-3: 1rem;
+  --bh-space-4: 1.5rem;
+  --bh-space-5: 2rem;
+  --bh-space-6: 3rem;
+  --bh-space-7: 4rem;
+  --bh-container: 72rem;
+  --bh-page-gutter: clamp(1rem, 3vw, 2rem);
+  --bh-section-space: clamp(2.5rem, 5vw, 4rem);
+  --bh-title-hero: clamp(2.5rem, 4.3vw, 3.9rem);
+  --bh-title-section: clamp(1.875rem, 3vw, 2.75rem);
+  --bh-title-product: clamp(1.5rem, 2.5vw, 2.25rem);
+  --bh-radius-card: 1rem;
+  --bh-radius-control: 0.75rem;
+  --bh-control-height: 2.75rem;
+}

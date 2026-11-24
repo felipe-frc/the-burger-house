@@ -1,0 +1,66 @@
+/* Scoped navigation: original Burger House assets and existing application callbacks. */
+.tbh-navbar { inset: 14px 14px auto; color: #171717; background: #f5f3ee; transition: box-shadow 180ms ease;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border-radius: 0;
+  z-index: 1000; }
+.tbh-navbar.is-scrolled { box-shadow: 0 1px 0 #17171724; }
+.tbh-navbar-inner { height: 65px; width: min(calc(100% - 2 * var(--tbh-gutter)), var(--tbh-container)); margin-inline: auto; padding-block: 3px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; }
+.tbh-nav-desktop { display: flex; align-items: center; gap: clamp(18px, 2.2vw, 44px); }
+.tbh-nav-link, .tbh-nav-order, .tbh-nav-menu-toggle, .tbh-nav-language-trigger { font-family: var(--tbh-font-description); font-weight: var(--tbh-nav-weight); font-size: 17px; line-height: 1.1; text-transform: uppercase; letter-spacing: var(--tbh-nav-tracking); }
+.tbh-navbar button, .tbh-nav-dialog button { cursor: pointer; }
+.tbh-nav-link { color: inherit; text-decoration: none; padding: 12px 0; white-space: nowrap; }
+.tbh-nav-label { display: flex; height: 1.12em; position: relative; }
+.tbh-nav-accessible-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.tbh-nav-letter { display: block; height: 1.12em; overflow: hidden; }
+.tbh-nav-letter-inner { display: block; height: 1.12em; }
+.tbh-nav-letter-inner > span { display: block; height: 1.12em; }
+.tbh-nav-logo { width: clamp(138px, 11vw, 180px); display: grid; place-items: center; }
+.tbh-nav-logo img { display: block; width: 100%; height: 59px; object-fit: contain; }
+.tbh-nav-actions { display: flex; align-items: center; justify-content: flex-end; gap: clamp(10px, 1.5vw, 28px); }
+.tbh-nav-language { position: relative; }
+.tbh-nav-language-trigger { display: flex; align-items: center; gap: 6px; min-height: 44px; background: none; border: 0; padding: 0; }
+.tbh-nav-language-trigger img, .tbh-nav-language-options img { object-fit: cover; border-radius: 1px; }
+.tbh-nav-language-options { position: absolute; top: calc(100% + 9px); right: 0; background: #f5f3ee; border: 1px solid #171717; border-radius: var(--tbh-radius-control); padding: 6px; min-width: 160px; box-shadow: 0 8px 30px #1717171f; }
+.tbh-nav-language-options button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 10px; border-radius: 7px; font-weight: 600; text-align: left; }
+.tbh-nav-language-options button[aria-pressed=true] { background: #ffdc32; }
+.tbh-nav-order { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; background: #ffdc32; border: 1px solid #171717; border-radius: var(--tbh-radius-button); padding: 12px 21px; white-space: nowrap; }
+.tbh-nav-cart { display: flex; align-items: center; gap: 5px; min-height: 44px; min-width: 44px; border: 0; background: none; padding: 5px; }
+.tbh-nav-cart-count { font-family: var(--tbh-font-description); font-weight: 700; font-size: 15px; }
+.tbh-navbar :is(button,a):focus-visible, .tbh-nav-dialog :is(button,a):focus-visible { outline: 3px solid var(--tbh-blue); outline-offset: 5px; border-radius: 4px; }
+.tbh-nav-menu-toggle { display: none; align-items: center; gap: 8px; min-height: 44px; border: 0; background: none; padding: 0; }
+.tbh-nav-dialog { position: fixed; inset: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; margin: 0; border: 0; padding: 0; background: transparent; color: #171717; overflow-y: auto; }
+.tbh-nav-dialog:not([open]) { display: none; }
+.tbh-nav-dialog::backdrop { background: #17171799; }
+.tbh-nav-dialog-sheet { min-height: 100%; background: transparent; padding: 4px; display: flex; flex-direction: column; align-items: stretch; }
+.tbh-nav-dialog-heading { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; height: 65px; padding: 3px; background: #f5f3ee; border-radius: 6px; font: 700 17px var(--tbh-font-description); letter-spacing: .06em; }
+.tbh-nav-close, .tbh-nav-dialog-bag { display: grid; place-items: center; width: 59px; height: 59px; border: 0; border-radius: 4px; background: #e85d4a; }
+.tbh-nav-close { font: 700 12px var(--tbh-font-description); text-decoration: underline; text-underline-offset: 3px; }
+.tbh-nav-dialog-bag { justify-self: end; }
+.tbh-nav-dialog-logo { display: block; width: 137px; height: 59px; object-fit: contain; }
+.tbh-nav-mobile-links { display: flex; flex-direction: column; gap: 5px; padding: 4px 0 0; }
+.tbh-nav-mobile-link { display: flex; align-items: center; gap: 12px; min-height: 61px; padding: 17px 16px; border: 0; border-radius: 5px; background: #f5f3ee; text-decoration: none; color: inherit; font-family: var(--tbh-font-description); font-size: clamp(23px, 4vw, 32px); line-height: 1.12; text-transform: uppercase; }
+.tbh-nav-mobile-link.is-menu { background: #171717; color: #f5f3ee; }
+/* Mobile navigation display typography. */
+#root .tbh-nav-dialog .tbh-nav-mobile-link { font-family: var(--tbh-font-description); letter-spacing: 0; }
+.tbh-nav-mobile-link > svg { width: .55em; height: .55em; margin-left: auto; }
+.tbh-nav-mobile-index { font: 600 13px var(--tbh-font-description); align-self: flex-start; padding-top: 5px; }
+.tbh-nav-careers { font-family: var(--tbh-font-description); }
+.tbh-nav-mobile-order { margin-top: 5px; text-align: left; }
+.tbh-nav-dialog-bottom { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 5px; padding: 4px 12px; background: #f5f3ee; border-radius: 5px; font: 700 14px var(--tbh-font-description); letter-spacing: .03em; }
+.tbh-nav-dialog-bottom > div { display: flex; gap: 4px; }
+.tbh-nav-dialog-bottom button { width: 44px; height: 44px; border-radius: 50%; border: 1px solid transparent; }
+.tbh-nav-dialog-bottom button[aria-pressed=true] { border-color: #171717; }
+@media (max-width: 1100px) { .tbh-nav-desktop { gap: 16px; }.tbh-nav-link { font-size: 15px; }.tbh-nav-order { padding-inline: 16px; font-size: 15px; }.tbh-navbar-inner { gap: 16px; }.tbh-nav-actions { gap: 12px; } }
+@media (max-width: 1023px) {.tbh-navbar-inner { height: 65px; grid-template-columns: 1fr auto 1fr; gap: 12px; }.tbh-nav-desktop, .tbh-nav-order { display: none; }.tbh-nav-menu-toggle { display: flex; justify-content: center; background: #e85d4a; border-radius: 4px; width: 59px; height: 59px; }.tbh-nav-menu-toggle span { display: none; }.tbh-nav-logo { width: 145px; }.tbh-nav-logo img { height: 59px; }.tbh-nav-actions { gap: 12px; }.tbh-nav-language-trigger img, .tbh-nav-language-trigger svg { display: none; } }
+@media (max-width: 480px) { .tbh-navbar-inner { gap: 8px; }.tbh-nav-logo { width: 137px; }.tbh-nav-actions { gap: 4px; }.tbh-nav-language-trigger { font-size: 14px; min-width: 32px; justify-content: center; }.tbh-nav-cart { gap: 3px; padding-inline: 5px; }.tbh-nav-cart-count { font-size: 13px; } }
+@media (max-height: 600px) { .tbh-nav-mobile-links { padding-block: 15px; }.tbh-nav-mobile-link { font-size: 30px; padding-block: 10px; }.tbh-nav-dialog-bottom { margin-top: 16px; } }
+@media (prefers-reduced-motion: reduce) { .tbh-navbar { transition: none; } }
+
+/* TBH NAVBAR EDGE TO EDGE START */
+/* TBH NAVBAR EDGE TO EDGE END */

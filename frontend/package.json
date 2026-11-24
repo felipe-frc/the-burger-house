@@ -1,0 +1,32 @@
+{
+  "name": "the-burger-house-storefront",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port=3001 --host=127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "test": "node --import tsx --test src/utils/menu.test.ts src/utils/locationMap.test.ts src/components/burger-menu/ingredients.test.ts src/checkout/cartStorage.test.ts src/data/nutrition.test.ts src/privacy/consent.test.ts src/privacy/analytics.test.ts"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
+    "lucide-react": "^0.546.0",
+    "maplibre-gl": "6.16.0",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "vite": "^8.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "esbuild": "^0.28.2",
+    "gsap": "^3.15.0",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2"
+  }
+}

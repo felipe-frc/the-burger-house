@@ -1,37 +1,79 @@
+@import url("/styles/brand-tokens.css");
+
 :root {
   color-scheme: light;
-  font-family: system-ui, sans-serif;
-  color: #27272a;
-  background: #faf7f2;
+  font-family: var(--bh-font-body);
+  color: var(--bh-color-ink);
+  background: var(--bh-color-cream);
+}
+* {
+  box-sizing: border-box;
 }
 body {
   margin: 0;
 }
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 10;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  background: #ff3816;
+  color: #171717;
+  transform: translateY(calc(-100% - 1.5rem));
+}
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
 header,
 main,
 footer {
-  max-width: 48rem;
+  max-width: 46rem;
   margin: auto;
-  padding: 1.5rem;
+  padding: clamp(1rem, 3vw, 1.75rem);
 }
 main {
-  background: white;
+  background: #F5F3EE;
   border-radius: 1rem;
   line-height: 1.7;
 }
 h1 {
-  font-size: clamp(1.8rem, 6vw, 2.6rem);
+  font-family: var(--bh-font-title);
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
   line-height: 1.2;
 }
 h2 {
+  font-family: var(--bh-font-title);
   font-size: 1.25rem;
   margin-top: 2rem;
 }
+header {
+  border-bottom: 2px solid var(--bh-color-ink);
+  font-weight: 700;
+}
+footer {
+  border-top: 1px solid var(--bh-color-ink);
+  margin-top: 1rem;
+}
+header a,
+footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--bh-control-height);
+}
+p {
+  max-width: 68ch;
+}
+::selection {
+  background: var(--bh-color-blue);
+  color: var(--bh-color-cream);
+}
 a {
-  color: #9a3412;
+  color: #3a6ecf;
   text-underline-offset: 0.2em;
 }
 a:focus-visible {
-  outline: 3px solid #9a3412;
+  outline: 3px solid #ff3816;
   outline-offset: 4px;
 }
