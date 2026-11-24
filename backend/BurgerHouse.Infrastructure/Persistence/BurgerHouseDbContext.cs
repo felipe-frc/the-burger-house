@@ -13,6 +13,9 @@ public class BurgerHouseDbContext : DbContext
     public BurgerHouseDbContext(
         DbContextOptions<BurgerHouseDbContext> options,
         IPersonalDataProtector personalDataProtector)
+        : this((DbContextOptions)options, personalDataProtector) { }
+
+    protected BurgerHouseDbContext(DbContextOptions options, IPersonalDataProtector personalDataProtector)
         : base(options)
     {
         PersonalDataProtector = personalDataProtector ?? throw new ArgumentNullException(nameof(personalDataProtector));
@@ -44,6 +47,77 @@ public class BurgerHouseDbContext : DbContext
         ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<AddonOption>(entity =>
+        {
+            entity.ToTable("AddonOptions");
+            entity.HasKey(x => x.Code);
+            entity.Property(x => x.Code).HasMaxLength(100);
+            entity.Property(x => x.Name).HasMaxLength(150);
+            entity.Property(x => x.Price).HasPrecision(10, 2);
+        });
+        modelBuilder.Entity<Coupon>(entity =>
+        {
+            entity.ToTable("Coupons");
+            entity.HasKey(x => x.Code);
+            entity.Property(x => x.Code).HasMaxLength(40);
+            entity.Property(x => x.Percentage).HasPrecision(5, 2);
+            entity.Property(x => x.FixedAmount).HasPrecision(10, 2);
+            entity.Property(x => x.MinimumSubtotal).HasPrecision(10, 2);
+        });
+        modelBuilder.Entity<Order>().Property(x => x.Discount).HasPrecision(10, 2).HasDefaultValue(0m);
+        modelBuilder.Entity<Order>().Property(x => x.CouponCode).HasMaxLength(40);
+        modelBuilder.Entity<OrderItem>().Property(x => x.DiscountAmount).HasPrecision(10, 2).HasDefaultValue(0m);
+        modelBuilder.Entity<OwnerNotificationState>(entity =>
+        {
+            entity.ToTable("OwnerNotificationStates");
+            entity.HasKey(x => new { x.OwnerId, x.OrderId });
+            entity.HasOne<AdminUser>().WithMany().HasForeignKey(x => x.OwnerId);
+            entity.HasOne<Order>().WithMany().HasForeignKey(x => x.OrderId);
+        });
+        modelBuilder.ApplyConfiguration(new StockConfiguration());
+        modelBuilder.ApplyConfiguration(new StockMovementConfiguration());
+        modelBuilder.ApplyConfiguration(new BurgerHouse.Infrastructure.Admin.AgendaEventConfiguration());
+        modelBuilder.Entity<TeamMember>(entity =>
+        {
+            entity.ToTable("TeamMembers");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+            entity.Property(x => x.Name).HasConversion(PersonalDataConverter("TeamMember.Name"));
+            entity.Property(x => x.Email).HasConversion(PersonalDataConverter("TeamMember.Email"));
+            entity.Property(x => x.Role).HasMaxLength(80);
+            entity.Property(x => x.Department).HasMaxLength(80);
+            entity.Property(x => x.Shift).HasMaxLength(120);
+        });
+        modelBuilder.Entity<TeamWorkDay>(entity =>
+        {
+            entity.ToTable("TeamWorkDays");
+            entity.HasKey(x => new { x.TeamMemberId, x.Date });
+            entity.HasOne<TeamMember>().WithMany().HasForeignKey(x => x.TeamMemberId).OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.Revision).IsConcurrencyToken();
+        });
+        modelBuilder.Entity<TeamJournalEntry>(entity =>
+        {
+            entity.ToTable("TeamJournalEntries");
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => new { x.TeamMemberId, x.Date, x.Kind });
+            entity.HasIndex(x => x.ReplacesId).IsUnique();
+            entity.HasOne<TeamMember>().WithMany().HasForeignKey(x => x.TeamMemberId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<AdminUser>().WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<TeamJournalEntry>().WithMany().HasForeignKey(x => x.ReplacesId).OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.Note).HasConversion((ValueConverter)PersonalDataConverter("TeamJournalEntry.Note"));
+            entity.Property(x => x.Reference).HasConversion((ValueConverter)PersonalDataConverter("TeamJournalEntry.Reference"));
+            entity.Property(x => x.Amount).HasPrecision(12, 2);
+            entity.Property(x => x.OvertimeHourlyRate).HasPrecision(12, 2);
+        });
+        modelBuilder.Entity<DeliveryTracking>(entity =>
+        {
+            entity.ToTable("DeliveryTracking");
+            entity.HasKey(x => x.OrderId);
+            entity.HasIndex(x => x.ExpiresAtUtc);
+            entity.HasOne<Order>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<TeamMember>().WithMany().HasForeignKey(x => x.CourierId).OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.TokenHash).HasMaxLength(64);
+        });
         modelBuilder.Entity<PaymentRefund>(entity =>
         {
             entity.ToTable("PaymentRefunds", table =>
@@ -156,6 +230,7 @@ public class BurgerHouseDbContext : DbContext
             entity.Property(product => product.IsActive)
                 .IsRequired();
 
+            if (Database.IsNpgsql()) return; // PostgreSQL imports the establishment’s actual catalog.
             entity.HasData(
                 new
                 {
@@ -343,6 +418,8 @@ public class BurgerHouseDbContext : DbContext
 
             entity.Property(item => item.UnitPrice)
                 .HasPrecision(10, 2);
+
+            entity.Property(item => item.SaleCategory).HasMaxLength(10);
 
             entity.Property(item => item.Observation)
                 .HasColumnType("TEXT").HasConversion((ValueConverter)PersonalDataConverter("OrderItems.Observation"));

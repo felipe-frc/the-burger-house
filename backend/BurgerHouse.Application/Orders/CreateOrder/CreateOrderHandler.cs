@@ -37,6 +37,13 @@ public class CreateOrderHandler
             );
         }
 
+        if (request.Items.Count > 99)
+        {
+            throw new ArgumentException(
+                "The order cannot contain more than 99 items."
+            );
+        }
+
         var normalizedOrderType =
             (request.OrderType ?? string.Empty)
                 .Trim()
@@ -74,13 +81,13 @@ public class CreateOrderHandler
                 request.Observation
             );
 
+        var products = (await _productRepository.GetByCodesAsync(
+            request.Items.Select(item => item.ProductCode).ToArray(), cancellationToken))
+            .ToDictionary(product => product.Code, StringComparer.Ordinal);
+
         foreach (var requestedItem in request.Items)
         {
-            var product =
-                await _productRepository.GetByCodeAsync(
-                    requestedItem.ProductCode,
-                    cancellationToken
-                );
+            products.TryGetValue(requestedItem.ProductCode?.Trim() ?? string.Empty, out var product);
 
             if (product is null)
             {
@@ -95,7 +102,8 @@ public class CreateOrderHandler
                     requestedItem.Quantity,
                     product.Price,
                     requestedItem.Observation,
-                    product.CostPrice
+                    product.CostPrice,
+                    product.Category
                 );
 
             order.AddItem(

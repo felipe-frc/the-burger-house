@@ -10,6 +10,26 @@ namespace BurgerHouse.Infrastructure.Tests.Payments.PagBank;
 public class PagBankWebhookSignatureValidatorTests
 {
     [Fact]
+    public async Task InvalidSignatureBurstDoesNotAmplifyPublicKeyRequests()
+    {
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var other = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var calls = 0;
+        using var http = new HttpClient(new Stub(_ => {
+            calls++;
+            return Task.FromResult(KeyResponse(key));
+        }));
+        var validator = Create(http);
+        var body = Encoding.UTF8.GetBytes("{\"id\":\"synthetic\"}");
+        var bad = Sign(other, body);
+        for (var i = 0; i < 20; i++)
+            Assert.False(await validator.IsValidAsync(body, [bad]));
+        Assert.Equal(2, calls);
+        Assert.True(await validator.IsValidAsync(body, [Sign(key, body)]));
+        Assert.Equal(2, calls);
+    }
+
+    [Fact]
     public async Task ValidatesRawPayloadWithOfficialPublicKeyAndCachesIt()
     {
         using var signer =
@@ -115,7 +135,7 @@ public class PagBankWebhookSignatureValidatorTests
         );
 
         Assert.Equal(
-            "https://sandbox.api.pagseguro.com/public-keys?type=webhook",
+            "https://sandbox.api.pagseguro.com/public-keys/webhook",
             captured!
                 .RequestUri!
                 .ToString()
@@ -1242,7 +1262,7 @@ public class PagBankWebhookSignatureValidatorTests
         Assert.Equal(
             expected
                 ? 1
-                : 3,
+                : 2,
             calls
         );
     }

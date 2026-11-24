@@ -10,6 +10,7 @@ public sealed class PendingPaymentExpirationWorker(
     protected override async Task ExecuteAsync(
         CancellationToken stoppingToken)
     {
+        var cursor = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -23,10 +24,11 @@ public sealed class PendingPaymentExpirationWorker(
                 await using var scope =
                     scopeFactory.CreateAsyncScope();
 
-                var expired =
+                var (expired, nextCursor) =
                     await scope.ServiceProvider
                         .GetRequiredService<PendingPaymentExpirationBatch>()
-                        .RunAsync(stoppingToken);
+                        .RunAsync(cursor, stoppingToken);
+                cursor = nextCursor;
 
                 if (expired > 0)
                 {

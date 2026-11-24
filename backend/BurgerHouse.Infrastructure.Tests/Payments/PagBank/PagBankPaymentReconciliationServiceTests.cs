@@ -154,6 +154,7 @@ public class PagBankPaymentReconciliationServiceTests
     [InlineData("IN_ANALYSIS", "CREDIT_CARD", PaymentStatus.Pending)]
     [InlineData("WAITING", "BOLETO", PaymentStatus.Pending)]
     [InlineData("DECLINED", "PIX", PaymentStatus.Rejected)]
+    [InlineData("DECLINED", "CREDIT_CARD", PaymentStatus.Rejected)]
     [InlineData("CANCELED", "PIX", PaymentStatus.Cancelled)]
     public async Task MapsVerifiedChargeStatus(
         string providerStatus,
@@ -170,6 +171,12 @@ public class PagBankPaymentReconciliationServiceTests
 
         Assert.Equal(expectedStatus, (await fixture.Payment()).Status);
         Assert.Equal(OrderStatus.PendingPayment, await fixture.GetOrderStatus());
+        await using var db = fixture.Open();
+        var now = DateTime.UtcNow;
+        var summary = await new BurgerHouse.Infrastructure.Admin.AdminService(db)
+            .SummaryAsync(new(now.AddMinutes(-5), now.AddMinutes(5)), default);
+        Assert.Equal(0, summary.PaidOrders);
+        Assert.Equal(0m, summary.GrossRevenue);
     }
 
     [Fact]
@@ -362,7 +369,7 @@ public class PagBankPaymentReconciliationServiceTests
         if (mismatch == "local-order-total")
         {
             await using var db = fixture.Open();
-            await db.Database.ExecuteSqlRawAsync("UPDATE OrderItems SET UnitPrice = 1");
+            await db.Database.ExecuteSqlRawAsync("""UPDATE "OrderItems" SET "UnitPrice" = 1""");
         }
         await fixture.Reconcile();
         await fixture.AssertPending();
@@ -490,6 +497,13 @@ public class PagBankPaymentReconciliationServiceTests
         await fixture.Reconcile();
 
         await fixture.AssertPending();
+        fixture.Timeout = false;
+        await fixture.Reconcile();
+        await fixture.Reconcile();
+        await using var db = fixture.Open();
+        var recovered = Assert.Single(await db.Payments.ToListAsync());
+        Assert.Equal(PaymentStatus.Approved, recovered.Status);
+        Assert.Equal(OrderStatus.Received, (await db.Orders.SingleAsync()).Status);
     }
 
     [Fact]
@@ -520,6 +534,75 @@ public class PagBankPaymentReconciliationServiceTests
                 .AsNoTracking()
                 .ToListAsync()
         );    }
+
+    [Fact]
+    public async Task FifteenConcurrentApprovalsReachOwnerWithoutDuplicatePayments()
+    {
+        using var fixture = new Fixture();
+        const int size = 15;
+        var ids = new List<int> { fixture.PaymentId };
+        await using (var seed = fixture.Open())
+        {
+            for (var i = 2; i <= size; i++)
+            {
+                var order = new Order(0, "pickup", "Cliente Teste", "11999990000", "cliente@teste.com", "52998224725");
+                order.AddItem(new OrderItem(1, 1, 43.90m));
+                seed.Orders.Add(order);
+                await seed.SaveChangesAsync();
+                var payment = new Payment(order.Id, order.Total, Guid.NewGuid().ToString("D"), PaymentMethod.Unknown);
+                payment.SetExternalCheckoutId($"CHEC_{i}");
+                payment.SetExternalPaymentId($"CHAR_{i}");
+                seed.Payments.Add(payment);
+                await seed.SaveChangesAsync();
+                ids.Add(payment.Id);
+            }
+        }
+
+        var arrived = 0;
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async Task Approve(int id, int chargeIndex)
+        {
+            await using var db = fixture.Open();
+            using var http = new HttpClient(new Fixture.Stub(async request =>
+            {
+                Assert.Equal($"/charges/CHAR_{chargeIndex}", request.RequestUri!.AbsolutePath);
+                if (Interlocked.Increment(ref arrived) == size) release.TrySetResult();
+                await release.Task.WaitAsync(TimeSpan.FromSeconds(15));
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(new
+                    {
+                        id = $"CHAR_{chargeIndex}", reference_id = $"payment:{id}", status = "PAID",
+                        amount = new { value = 4390, currency = "BRL", summary = new { total = 4390, refunded = 0 } },
+                        payment_method = new { type = "PIX" }
+                    }))
+                };
+            }));
+            var lookup = new PagBankPaymentLookup(http, Options.Create(new PagBankOptions
+            {
+                BaseUrl = "https://sandbox.api.pagseguro.com",
+                Token = "local-test-token"
+            }));
+            var synchronizer = new SynchronizeCheckoutPaymentHandler(
+                new PaymentRepository(db), new OrderRepository(db), new EfAuditLogWriter(db));
+            await new PagBankPaymentReconciliationService(lookup, synchronizer, db,
+                NullLogger<PagBankPaymentReconciliationService>.Instance).ReconcileAsync(id);
+        }
+
+        var approvals = ids.Select((id, index) => Approve(id, index + 1)).ToArray();
+        await using var reader = fixture.Open();
+        var owner = new BurgerHouse.Infrastructure.Admin.AdminService(reader);
+        var filter = new BurgerHouse.Application.Admin.OrderFilter(Status: "Received");
+        Assert.InRange((await owner.OrdersAsync(filter, default)).Total, 0, size);
+        await Task.WhenAll(approvals);
+        await Approve(ids[0], 1);
+        var final = await owner.OrdersAsync(filter, default);
+        Assert.Equal(size, final.Total);
+        Assert.All(final.Items, order => Assert.Equal("Approved", order.PaymentStatus));
+        Assert.Equal(size, await reader.Payments.CountAsync());
+        Assert.Equal(658.50m, await reader.Payments.SumAsync(payment => payment.Amount));
+        Assert.Equal(size, await reader.AdminAuditLogs.CountAsync(log => log.Action == "PaymentSynchronized"));
+    }
 
     [Fact]
     public async Task ConcurrentReconciliationsLeaveOneConsistentResult()
@@ -562,6 +645,7 @@ public class PagBankPaymentReconciliationServiceTests
 
     private sealed class Fixture : IDisposable
     {
+        private readonly string? postgres = PostgresLab.Create();
         private readonly string _path = Path.Combine(
             Path.GetTempPath(),
             $"burger-pagbank-charge-reconciliation-{Guid.NewGuid()}.db"
@@ -594,7 +678,12 @@ public class PagBankPaymentReconciliationServiceTests
         public Fixture(bool setExternalPaymentId = true)
         {
             using var db = Open();
-            db.Database.EnsureCreated();
+            if (postgres == null) db.Database.EnsureCreated();
+            else
+            {
+                db.Products.Add(new Product("fixture", "Item de teste", 43.90m));
+                db.SaveChanges();
+            }
             var order = new Order(
     0,
     "pickup",
@@ -621,7 +710,7 @@ public class PagBankPaymentReconciliationServiceTests
             ChargeReference = $"payment:{PaymentId}";
         }
 
-        public BurgerHouseDbContext Open() => new(
+        public BurgerHouseDbContext Open() => postgres != null ? PostgresLab.Open(postgres) : new BurgerHouseDbContext(
             new DbContextOptionsBuilder<BurgerHouseDbContext>()
                 .UseSqlite($"Data Source={_path};Pooling=False;Default Timeout=10")
                 .Options, TestPersonalData.Protector
@@ -759,6 +848,15 @@ public class PagBankPaymentReconciliationServiceTests
         public async Task AddFailingOrderTrigger()
         {
             await using var db = Open();
+            if (postgres != null)
+            {
+                await db.Database.ExecuteSqlRawAsync("""
+                    CREATE FUNCTION reject_fixture_update() RETURNS trigger LANGUAGE plpgsql AS
+                    $$ BEGIN RAISE EXCEPTION 'simulated write failure'; END $$;
+                    CREATE TRIGGER fail_order BEFORE UPDATE ON "Orders" FOR EACH ROW EXECUTE FUNCTION reject_fixture_update();
+                    """);
+                return;
+            }
             await db.Database.ExecuteSqlRawAsync(
                 "CREATE TRIGGER fail_order BEFORE UPDATE ON Orders " +
                 "BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;"
@@ -767,7 +865,7 @@ public class PagBankPaymentReconciliationServiceTests
 
         public void Dispose() => File.Delete(_path);
 
-        private sealed class Stub(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler
+        public sealed class Stub(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(
                 HttpRequestMessage request,

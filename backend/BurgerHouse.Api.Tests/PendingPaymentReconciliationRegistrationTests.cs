@@ -7,16 +7,17 @@ using Microsoft.Extensions.Logging;
 
 namespace BurgerHouse.Api.Tests;
 
-public sealed class DevelopmentPaymentReconciliationTests
+public sealed class PendingPaymentReconciliationRegistrationTests
 {
     [Theory]
-    [InlineData("Development", true)]
-    [InlineData("Production", false)]
-    public async Task AutomaticReconciliationIsRegisteredOnlyInDevelopment(string environment, bool enabled)
+    [InlineData("Development")]
+    [InlineData("IntegrationTest")]
+    public async Task AutomaticReconciliationRunsAlongsideExpiration(string environment)
     {
         var database = Path.Combine(Path.GetTempPath(), $"burger-reconciliation-registration-{Guid.NewGuid()}.db");
         try
         {
+            TestDatabase.Prepare(database);
             await using var app = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
             {
                 builder.UseEnvironment(environment);
@@ -27,10 +28,11 @@ public sealed class DevelopmentPaymentReconciliationTests
                 builder.UseSetting("PagBank:NotificationUrl", "https://example.invalid/webhook");
                 builder.ConfigureLogging(logging => logging.ClearProviders());
             });
-            Assert.Equal(enabled, app.Services.GetServices<IHostedService>()
-                .Any(service => service is DevelopmentPaymentReconciliationWorker));
+            var workers = app.Services.GetServices<IHostedService>();
+            Assert.Single(workers.OfType<PendingPaymentReconciliationWorker>());
+            Assert.Single(workers.OfType<PendingPaymentExpirationWorker>());
             using var scope = app.Services.CreateScope();
-            Assert.Equal(enabled, scope.ServiceProvider.GetService<PendingPaymentReconciliationBatch>() != null);
+            Assert.NotNull(scope.ServiceProvider.GetService<PendingPaymentReconciliationBatch>());
         }
         finally
         {

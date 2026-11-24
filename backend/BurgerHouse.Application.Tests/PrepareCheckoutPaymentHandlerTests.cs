@@ -62,6 +62,17 @@ public class PrepareCheckoutPaymentHandlerTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => new PrepareCheckoutPaymentHandler(store, store).HandleAsync(1));
     }
 
+    [Fact]
+    public async Task RejectsCancelledOrderWithoutCreatingPayment()
+    {
+        var store = new Store();
+        store.Order.CancelPendingPayment();
+
+        await Assert.ThrowsAsync<CancelledCheckoutOrderException>(() => new PrepareCheckoutPaymentHandler(store, store).HandleAsync(1));
+        Assert.Null(store.Payment);
+        Assert.Equal(0, store.Saves);
+    }
+
     [Theory]
     [InlineData(nameof(Order.CustomerName))]
     [InlineData(nameof(Order.CustomerEmail))]

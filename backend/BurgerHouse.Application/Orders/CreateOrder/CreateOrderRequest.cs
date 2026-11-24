@@ -31,6 +31,7 @@ public class CreateOrderRequest
     public string? Complement { get; init; }
 
     public string? Observation { get; init; }
+    public string? CouponCode { get; init; }
 
     public List<CreateOrderItemRequest> Items { get; init; } = [];
 }
@@ -42,4 +43,7 @@ public class CreateOrderItemRequest
     public int Quantity { get; init; }
 
     public string? Observation { get; init; }
+    public List<RequestedExtra> Extras { get; init; } = [];
 }
+
+public sealed record RequestedExtra(string Code, int Quantity);

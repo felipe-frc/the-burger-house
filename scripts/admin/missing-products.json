@@ -1,0 +1,112 @@
+[
+  {
+    "name": "The Classic",
+    "description": "Carne smash, cheddar, cebola, picles e molho da casa no pão brioche.",
+    "englishName": "The Classic",
+    "englishDescription": "Smash patty, cheddar, onion, pickles and house sauce on a brioche bun.",
+    "price": 34.9,
+    "costPrice": null,
+    "isActive": true,
+    "category": "menu",
+    "displayOrder": 40
+  },
+  {
+    "name": "Double Smash",
+    "description": "Dois smash burgers, cheddar duplo, picles e cebola caramelizada no pão brioche.",
+    "englishName": "Double Smash",
+    "englishDescription": "Two smash patties, double cheddar, pickles and caramelized onion on a brioche bun.",
+    "price": 42.9,
+    "costPrice": null,
+    "isActive": true,
+    "category": "menu",
+    "displayOrder": 50
+  },
+  {
+    "name": "Smokehouse BBQ",
+    "description": "Carne smash, cheddar, bacon crocante, cebola e barbecue defumado no pão brioche.",
+    "englishName": "Smokehouse BBQ",
+    "englishDescription": "Smash patty, cheddar, crispy bacon, onion and smoky barbecue sauce on a brioche bun.",
+    "price": 43.9,
+    "costPrice": null,
+    "isActive": true,
+    "category": "menu",
+    "displayOrder": 60
+  },
+  {
+    "name": "Classic Fries",
+    "description": "Batatas sequinhas com sal da casa e molho especial à parte.",
+    "englishName": "Classic Fries",
+    "englishDescription": "Crispy fries with house salt and special sauce on the side.",
+    "price": 17.9,
+    "costPrice": null,
+    "isActive": true,
+    "category": "sides",
+    "displayOrder": 10
+  },
+  {
+    "name": "Chicken Tenders",
+    "description": "Tiras de frango empanadas, crocantes por fora e suculentas por dentro.",
+    "englishName": "Chicken Tenders",
+    "englishDescription": "Breaded chicken strips, crunchy outside and juicy inside.",
+    "price": 26.9,
+    "costPrice": null,
+    "isActive": true,
+    "category": "sides",
+    "displayOrder": 30
+  },
+  {
+    "name": "Strawberry Soda",
+    "description": "Soda artesanal de morango, gelo e o toque refrescante da casa.",
+    "englishName": "Strawberry Soda",
+    "englishDescription": "House strawberry soda with ice and a refreshing finish.",
+    "price": 12.9,
+    "costPrice": null,
+    "isActive": true,
+    "category": "drinks",
+    "displayOrder": 10
+  },
+  {
+    "name": "Coca-Cola Zero",
+    "description": "Lata de 350 ml sem açúcar, servida bem gelada.",
+    "englishName": "Coca-Cola Zero",
+    "englishDescription": "A chilled, sugar-free 350 ml can.",
+    "price": 5.9,
+    "costPrice": null,
+    "isActive": true,
+    "category": "drinks",
+    "displayOrder": 30
+  },
+  {
+    "name": "Água Mineral",
+    "description": "Água mineral sem gás, garrafa de 500 ml.",
+    "englishName": "Mineral Water",
+    "englishDescription": "Still mineral water, 500 ml bottle.",
+    "price": 4.9,
+    "costPrice": null,
+    "isActive": true,
+    "category": "drinks",
+    "displayOrder": 40
+  },
+  {
+    "name": "Água com Gás",
+    "description": "Água mineral com gás, garrafa de 500 ml.",
+    "englishName": "Sparkling Water",
+    "englishDescription": "Sparkling mineral water, 500 ml bottle.",
+    "price": 5.9,
+    "costPrice": null,
+    "isActive": true,
+    "category": "drinks",
+    "displayOrder": 50
+  },
+  {
+    "name": "Suco de Laranja",
+    "description": "Suco de laranja refrescante servido bem gelado.",
+    "englishName": "Orange Juice",
+    "englishDescription": "Refreshing orange juice served chilled.",
+    "price": 11.9,
+    "costPrice": null,
+    "isActive": true,
+    "category": "drinks",
+    "displayOrder": 60
+  }
+]

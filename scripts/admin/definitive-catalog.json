@@ -1,0 +1,11 @@
+{
+  "source": "src/features/catalog/catalog.ts",
+  "reviewedOn": "2026-10-28",
+  "keepCodes": [
+    "burger-praiano", "burger-onion-rings", "burger-crispy-chicken-cheddar",
+    "the-classic-4ba04d7ead65", "double-smash-4276b8888e1d", "smokehouse-bbq-75946698bf87",
+    "side-fritas-cheddar", "classic-fries-6c8e36dbe411", "chicken-tenders-43b675323c17",
+    "drink-coca-lata", "strawberry-soda-9f3a2214efb0", "coca-cola-zero-66e83e41b092",
+    "agua-mineral-56179d5f0024", "agua-com-gas-f986b47adcde", "suco-de-laranja-bd1339ac051d"
+  ]
+}

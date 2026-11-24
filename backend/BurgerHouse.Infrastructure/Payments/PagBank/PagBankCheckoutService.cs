@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using BurgerHouse.Application.Abstractions.Payments;
 using BurgerHouse.Domain.Entities;
 using BurgerHouse.Domain.Enums;
@@ -20,6 +21,7 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
     private readonly HttpClient _httpClient;
     private readonly PagBankOptions _options;
     private readonly Uri _baseUri;
+    private readonly bool _localHomologationCheckout;
     private readonly IHostEnvironment? _environment;
     private readonly ILogger<PagBankCheckoutService>? _logger;
 
@@ -62,15 +64,16 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
             throw new InvalidOperationException("PagBank token has an invalid format.");
         }
 
-        ValidatePublicUrl(
-            _options.RedirectUrl,
-            "redirect"
-        );
-
-        ValidatePublicUrl(
-            _options.NotificationUrl,
-            "notification"
-        );
+        _localHomologationCheckout = _environment?.IsEnvironment("Homologation") == true &&
+            _options.BaseUrl == PagBankOptions.SandboxOrigin &&
+            (_options.RedirectUrl == PagBankOptions.LocalHomologationReturnUrl ||
+             _options.RedirectUrl == PagBankOptions.LocalPortfolioReturnUrl) &&
+            string.IsNullOrWhiteSpace(_options.NotificationUrl);
+        if (!_localHomologationCheckout)
+        {
+            ValidatePublicUrl(_options.RedirectUrl, "redirect");
+            ValidatePublicUrl(_options.NotificationUrl, "notification");
+        }
     }
 
     public async Task<HostedCheckoutSession> GetOrCreateAsync(
@@ -163,10 +166,11 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
                     DateTimeOffset.UtcNow
                         .AddMinutes(_options.CheckoutExpirationMinutes)
                         .ToString("O", CultureInfo.InvariantCulture),
-                    _options.RedirectUrl,
-                    _options.RedirectUrl,
-                    [_options.NotificationUrl],
-                    [_options.NotificationUrl]
+                    // The sandbox edge rejects the loopback URL. The local test returns via browser history.
+                    _localHomologationCheckout ? null : _options.RedirectUrl,
+                    _localHomologationCheckout ? null : _options.RedirectUrl,
+                    _localHomologationCheckout ? null : [_options.NotificationUrl],
+                    _localHomologationCheckout ? null : [_options.NotificationUrl]
                 );
 
             using var request =
@@ -225,7 +229,8 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
         if (payLinks.Length != 1 ||
             !IsCheckoutUrl(
                 payLinks[0].Href
-            ))
+            ) ||
+            (_localHomologationCheckout && new Uri(payLinks[0].Href!).Host != "pagamento.sandbox.pagbank.com.br"))
         {
             throw new InvalidOperationException(
                 "PagBank returned no valid PAY link."
@@ -307,18 +312,27 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
 
         if (!response.IsSuccessStatusCode)
         {
-            try
+            if (_localHomologationCheckout)
             {
-                var body = await response.Content.ReadAsStringAsync(cancellationToken);
-                if (_environment?.IsDevelopment() == true)
-                    LogProviderError(response.StatusCode, response.Content.Headers.ContentType?.MediaType, body);
+                var ray = response.Headers.TryGetValues("CF-Ray", out var values)
+                    ? values.FirstOrDefault()
+                    : null;
+                _logger?.LogWarning("PagBank Sandbox {Method} checkout returned HTTP {StatusCode}; content-type={ContentType}; cf-ray={Ray}.",
+                    request.Method, (int)response.StatusCode, SafeContentType(response.Content.Headers.ContentType?.MediaType),
+                    ray is not null && Regex.IsMatch(ray, @"\A[0-9a-fA-F]{16}-[A-Z]{3}\z") ? ray : "[unavailable]");
             }
-            catch (Exception exception) when (exception is HttpRequestException or IOException or OperationCanceledException)
+            else if (_environment?.IsDevelopment() == true)
             {
-                // Diagnostic reads must not replace the existing HTTP failure.
-                if (_environment?.IsDevelopment() == true)
+                try
+                {
+                    var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                    LogProviderError(response.StatusCode, response.Content.Headers.ContentType?.MediaType, body);
+                }
+                catch (Exception exception) when (exception is HttpRequestException or IOException or OperationCanceledException)
+                {
                     _logger?.LogWarning("PagBank checkout HTTP {StatusCode}; content-type={ContentType}; error body could not be read.",
                         (int)response.StatusCode, SafeContentType(response.Content.Headers.ContentType?.MediaType));
+                }
             }
 
             throw new HttpRequestException(
@@ -566,16 +580,20 @@ public sealed class PagBankCheckoutService : IHostedCheckoutGateway
         string ExpirationDate,
 
         [property: JsonPropertyName("redirect_url")]
-        string RedirectUrl,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string? RedirectUrl,
 
         [property: JsonPropertyName("return_url")]
-        string ReturnUrl,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string? ReturnUrl,
 
         [property: JsonPropertyName("notification_urls")]
-        string[] NotificationUrls,
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string[]? NotificationUrls,
 
         [property: JsonPropertyName("payment_notification_urls")]
-        string[] PaymentNotificationUrls
+        [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string[]? PaymentNotificationUrls
     );
 
     private sealed record PagBankCheckoutCustomer(

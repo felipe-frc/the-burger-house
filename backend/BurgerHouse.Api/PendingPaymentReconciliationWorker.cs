@@ -2,9 +2,9 @@ using BurgerHouse.Infrastructure.Payments.PagBank;
 
 namespace BurgerHouse.Api;
 
-public sealed class DevelopmentPaymentReconciliationWorker(
+public sealed class PendingPaymentReconciliationWorker(
     IServiceScopeFactory scopeFactory,
-    ILogger<DevelopmentPaymentReconciliationWorker> logger) : BackgroundService
+    ILogger<PendingPaymentReconciliationWorker> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -26,7 +26,7 @@ public sealed class DevelopmentPaymentReconciliationWorker(
             catch (Exception exception)
             {
                 // Exception messages may contain provider responses or personal data.
-                logger.LogWarning("Development pending payment reconciliation failed. Failure: {Failure}.",
+                logger.LogWarning("Pending payment reconciliation failed. Failure: {Failure}.",
                     exception.GetType().Name);
             }
         }

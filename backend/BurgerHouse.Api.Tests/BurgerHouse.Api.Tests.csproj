@@ -17,11 +17,13 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="..\TestSupport\PostgresLab.cs" Link="PostgresLab.cs" />
     <Compile Include="..\TestSupport\TestPersonalData.cs" Link="TestPersonalData.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\BurgerHouse.Api\BurgerHouse.Api.csproj" />
+    <ProjectReference Include="..\tools\OwnerRecoveryHost\OwnerRecoveryHost.csproj" />
   </ItemGroup>
 
 </Project>

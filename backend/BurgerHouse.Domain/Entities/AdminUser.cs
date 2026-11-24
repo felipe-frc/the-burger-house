@@ -8,11 +8,16 @@ public sealed class AdminUser
     public string PasswordHash { get; private set; } = "";
     public AdminUser(string email, string passwordHash)
     {
-        Email = email.Trim().ToUpperInvariant();
-        if (Email.Length > 254 || !System.Net.Mail.MailAddress.TryCreate(Email, out var address) || address.Address != Email)
-            throw new ArgumentException("Invalid email.");
+        ChangeEmail(email);
         if (string.IsNullOrWhiteSpace(passwordHash)) throw new ArgumentException("Hash required.");
         PasswordHash = passwordHash;
+    }
+    public void ChangeEmail(string email)
+    {
+        var normalized = email.Trim().ToUpperInvariant();
+        if (normalized.Length > 254 || !System.Net.Mail.MailAddress.TryCreate(normalized, out var address) || address.Address != normalized)
+            throw new ArgumentException("Invalid email.");
+        Email = normalized;
     }
     public void ReplaceHash(string hash) => PasswordHash = hash;
 }

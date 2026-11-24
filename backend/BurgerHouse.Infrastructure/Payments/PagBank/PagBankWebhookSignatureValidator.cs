@@ -25,6 +25,7 @@ public sealed class PagBankWebhookSignatureValidator
 
     private byte[]? _cachedPublicKey;
     private DateTime _cacheExpiresAt;
+    private DateTime _nextForcedRefreshAt;
 
     public PagBankWebhookSignatureValidator(
         IHttpClientFactory httpClientFactory,
@@ -318,8 +319,13 @@ public sealed class PagBankWebhookSignatureValidator
         try
         {
             // All cache reads, invalidations and publications share the same lock.
+            // A forged signature must not amplify into one provider request per webhook.
+            // Permit one immediate rotation refresh, then reuse the key for 30 seconds.
+            if (forceRefresh && _cachedPublicKey is not null && DateTime.UtcNow < _nextForcedRefreshAt)
+                return _cachedPublicKey;
             if (forceRefresh)
             {
+                _nextForcedRefreshAt = DateTime.UtcNow.AddSeconds(30);
                 _cachedPublicKey =
                     null;
             }
@@ -336,7 +342,7 @@ public sealed class PagBankWebhookSignatureValidator
                     HttpMethod.Get,
                     new Uri(
                         _baseUri,
-                        "public-keys?type=webhook"
+                        "public-keys/webhook"
                     )
                 );
 

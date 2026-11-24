@@ -219,7 +219,7 @@ public sealed class PagBankPaymentLookup
         );
     }
 
-    public async Task<string?> GetCheckoutStatusAsync(
+    public async Task<bool> IsExpiredCheckoutWithoutOrdersAsync(
         string checkoutId,
         int paymentId,
         CancellationToken cancellationToken = default)
@@ -236,13 +236,13 @@ public sealed class PagBankPaymentLookup
 
         var checkout =
             await GetResourceAsync<CheckoutResponse>(
-                $"checkouts/{Uri.EscapeDataString(checkoutId)}",
+                $"checkouts/{Uri.EscapeDataString(checkoutId)}?offset=0&limit=100",
                 cancellationToken
             );
 
         if (checkout is null)
         {
-            return null;
+            return false;
         }
 
         if (!string.Equals(
@@ -266,7 +266,9 @@ public sealed class PagBankPaymentLookup
             );
         }
 
-        return checkout.Status.Trim();
+        // The provider can omit orders when the expanded collection is empty.
+        return string.Equals(checkout.Status.Trim(), "EXPIRED", StringComparison.OrdinalIgnoreCase) &&
+            checkout.Orders is null or { Length: 0 };
     }
 
     public async Task<PagBankChargeDiscovery> DiscoverChargeAsync(

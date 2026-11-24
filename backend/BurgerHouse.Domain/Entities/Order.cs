@@ -10,7 +10,16 @@ public class Order
     public int Id { get; private set; }
     public decimal DeliveryFee { get; private set; }
     public decimal Subtotal => _items.Sum(item => item.Total);
-    public decimal Total => Subtotal + DeliveryFee;
+    public decimal Discount { get; private set; }
+    public string? CouponCode { get; private set; }
+    public decimal Total => Subtotal - Discount + DeliveryFee;
+    public void ApplyDiscount(string code, decimal amount)
+    {
+        if (string.IsNullOrWhiteSpace(code) || amount < 0 || amount > Subtotal)
+            throw new ArgumentException("Invalid order discount.");
+        CouponCode = code;
+        Discount = amount;
+    }
     public OrderStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
@@ -39,6 +48,29 @@ public class Order
     public string? Observation { get; private set; }
 
     public IReadOnlyCollection<OrderItem> Items => _items.AsReadOnly();
+
+    public void CorrectPrivacyContact(string name, string phone, string email)
+    {
+        if (Status is not (OrderStatus.Completed or OrderStatus.Cancelled))
+            throw new InvalidOperationException("Only terminal orders allow privacy contact changes.");
+        var safeName = Required(name, 120, nameof(CustomerName));
+        var safePhone = Required(phone, 25, nameof(CustomerPhone));
+        var safeEmail = NormalizeEmail(email);
+        if (safeName.Any(char.IsControl) || safePhone.Count(char.IsAsciiDigit) is < 10 or > 15 ||
+            safePhone.Any(x => !char.IsAsciiDigit(x) && !" +-()".Contains(x))) throw new ArgumentException("Invalid contact.");
+        CustomerName = safeName; CustomerPhone = safePhone; CustomerEmail = safeEmail;
+    }
+
+    // Minimizes local fulfillment identifiers; financial/provider records remain linkable.
+    // This is not a claim of irreversible anonymization or deletion of external copies.
+    public void MinimizePrivacyContact()
+    {
+        if (Status is not (OrderStatus.Completed or OrderStatus.Cancelled))
+            throw new InvalidOperationException("Only terminal orders allow contact minimization.");
+        CustomerName = "Titular minimizado"; CustomerPhone = ""; CustomerEmail = null; CustomerTaxId = null;
+        ZipCode = null; Street = null; HouseNumber = null; Neighborhood = null; City = null; Complement = null; Observation = null;
+        foreach (var item in _items) item.MinimizePrivacyNotes();
+    }
 
     private Order()
     {

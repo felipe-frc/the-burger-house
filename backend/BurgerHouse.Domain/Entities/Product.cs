@@ -37,9 +37,11 @@ public class Product
         ImageUrl = imageUrl;
     }
 
+    public static bool IsValidCategory(string? category) => category is "menu" or "sides" or "drinks";
+
     public void UpdateClassification(string category, int displayOrder)
     {
-        if (category is not ("menu" or "sides" or "drinks"))
+        if (!IsValidCategory(category))
             throw new ArgumentException("Invalid product category.", nameof(category));
         if (displayOrder is < 0 or > 999999)
             throw new ArgumentOutOfRangeException(nameof(displayOrder), "Invalid product display order.");

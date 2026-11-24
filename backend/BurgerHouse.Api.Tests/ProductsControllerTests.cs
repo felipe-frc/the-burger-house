@@ -7,8 +7,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 namespace BurgerHouse.Api.Tests;
 
 public sealed class ProductsControllerTests
-    : IClassFixture<WebApplicationFactory<Program>>
+    : IClassFixture<WebApplicationFactory<Program>>, IDisposable
 {
+    private readonly string database = Path.Combine(Path.GetTempPath(), $"burger-catalog-{Guid.NewGuid():N}.db");
     private readonly WebApplicationFactory<Program> factory;
 
     public ProductsControllerTests(
@@ -16,8 +17,16 @@ public sealed class ProductsControllerTests
     {
         this.factory = factory.WithWebHostBuilder(builder =>
         {
+            builder.UseEnvironment("Development");
+            builder.UseSetting("ConnectionStrings:DefaultConnection", $"Data Source={database};Pooling=False");
             builder.UseSetting("Privacy:EncryptionKey", TestPersonalData.Key);
         });
+    }
+
+    public void Dispose()
+    {
+        factory.Dispose();
+        foreach (var suffix in new[] { "", "-shm", "-wal" }) File.Delete(database + suffix);
     }
 
     [Fact]

@@ -737,11 +737,50 @@ public class PagBankCheckoutServiceTests
         Assert.Equal(0, calls);
     }
 
+    [Theory]
+    [InlineData("pagamento.sandbox.pagbank.com.br", true)]
+    [InlineData("pagamento.pagbank.com.br", false)]
+    public async Task LocalHomologationOmitsCallbackUrlsAndRequiresSandboxPayLink(string host, bool accepted)
+    {
+        using var http = new HttpClient(new Stub(async request =>
+        {
+            Assert.Equal("https://sandbox.api.pagseguro.com/checkouts", request.RequestUri!.AbsoluteUri);
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            Assert.False(body.RootElement.TryGetProperty("notification_urls", out _));
+            Assert.False(body.RootElement.TryGetProperty("payment_notification_urls", out _));
+            Assert.False(body.RootElement.TryGetProperty("redirect_url", out _));
+            Assert.False(body.RootElement.TryGetProperty("return_url", out _));
+            return Json(HttpStatusCode.Created, $$"""
+                {"id":"CHEC_local","reference_id":"payment:17","status":"ACTIVE","links":[{"rel":"PAY","href":"https://{{host}}/checkout/local"}]}
+                """);
+        }));
+        var service = Service(http, new TestEnvironment { EnvironmentName = "Homologation" },
+            redirect: PagBankOptions.LocalHomologationReturnUrl, notification: " ");
+
+        if (accepted)
+            Assert.Equal($"https://{host}/checkout/local", (await service.GetOrCreateAsync(NewPayment(), Customer)).CheckoutUrl);
+        else
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetOrCreateAsync(NewPayment(), Customer));
+    }
+
+    [Theory]
+    [InlineData("Production", "https://localhost:4174/menu", "https://api.example/webhook")]
+    [InlineData("Production", "https://shop.example/return", "")]
+    [InlineData("Development", "https://localhost:4174/menu", "")]
+    public void OtherEnvironmentsStillRequirePublicCheckoutUrls(string environment, string redirect, string notification)
+    {
+        using var http = new HttpClient(new Stub(_ => throw new InvalidOperationException("Unexpected network request.")));
+        Assert.Throws<InvalidOperationException>(() => Service(http, new TestEnvironment { EnvironmentName = environment },
+            redirect: redirect, notification: notification));
+    }
+
     private static PagBankCheckoutService Service(
         HttpClient http,
         IHostEnvironment? environment = null,
         ILogger<PagBankCheckoutService>? logger = null,
-        string token = "local-test-token")
+        string token = "local-test-token",
+        string redirect = "https://shop.example/return",
+        string notification = "https://api.example/api/webhooks/pagbank")
     {
         return new PagBankCheckoutService(
             http,
@@ -755,10 +794,10 @@ public class PagBankCheckoutServiceTests
                         token,
 
                     RedirectUrl =
-                        "https://shop.example/return",
+                        redirect,
 
                     NotificationUrl =
-                        "https://api.example/api/webhooks/pagbank"
+                        notification
                 }
             ),
             environment,
