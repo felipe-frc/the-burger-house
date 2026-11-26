@@ -23,6 +23,7 @@ export async function verifyHostedPreview(origin, fetcher = fetch) {
     nonceDistinct: false,
   };
   const nonces = [];
+  const checkedScripts = new Set();
   const paths = [
     "/",
     "/menu",
@@ -37,7 +38,8 @@ export async function verifyHostedPreview(origin, fetcher = fetch) {
     "/privacy.html",
   ];
   for (const path of paths) {
-    if (path === "/styles/privacy.css" && report.entryMode === "static") continue;
+    if (report.entryMode === "static" &&
+        ["/styles/privacy.css", "/scripts/utils.js", "/scripts/config.js"].includes(path)) continue;
     const response = await fetcher(`${target.origin}${path}`, {
       method: "GET",
       redirect: "manual",
@@ -129,7 +131,8 @@ export async function verifyHostedPreview(origin, fetcher = fetch) {
       check.noStore = /no-store/i.test(response.headers.get("cache-control") ?? "");
       const staticPage = /\bid="root"/.test(html) &&
         scripts.some(([, attrs]) => /(?:^|\s)type="module"/.test(attrs)) &&
-        scripts.every(([, attrs]) => /(?:^|\s)src="\/assets\/[\w.-]+\.js"/.test(attrs));
+        scripts.every(([, attrs]) => /(?:^|\s)src="\/assets\/[\w.-]+\.js"/.test(attrs) ||
+          (/(?:^|\s)id="tbh-font-guard-script"/.test(attrs) && /(?:^|\s)src="\/font-guard\.js"/.test(attrs)));
       const mode = staticPage ? "static" : "ssr";
       const consistentMode = !report.entryMode || report.entryMode === mode;
       report.entryMode = mode;
@@ -143,6 +146,20 @@ export async function verifyHostedPreview(origin, fetcher = fetch) {
         check.scriptPolicyStrict &&
         (staticPage || (check.nonceScriptsValid && check.noStore));
       if (nonce) nonces.push(nonce);
+      if (staticPage) {
+        // Vite entry and the existing font guard replace legacy SSR scripts.
+        // Check their actual responses; recognizing the markup alone is insufficient.
+        for (const [, attrs] of scripts) {
+          const asset = /(?:^|\s)src="([^"]+)"/.exec(attrs)[1];
+          if (checkedScripts.has(asset)) continue;
+          checkedScripts.add(asset);
+          const response = await fetcher(`${target.origin}${asset}`, {
+            method: "GET", redirect: "manual", cache: "no-store", signal: AbortSignal.timeout(15000),
+          });
+          report.checks.push({ method: "GET", path: asset, status: response.status,
+            passed: response.status === 200 && /javascript/.test(response.headers.get("content-type") ?? "") });
+        }
+      }
       if (!check.applicationPage) {
         report.status = "blocked-login-page";
         return report;

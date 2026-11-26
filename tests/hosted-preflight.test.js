@@ -100,4 +100,31 @@ describe("read-only hosted validation", () => {
       }
     }
   });
+  it("validates the production font guard and rejects missing or unexpected scripts", async () => {
+    for (const scenario of ["valid", "missing-guard", "unexpected-script"]) {
+      const fetcher = vi.fn(async url => {
+        const path = new URL(url).pathname;
+        if (path === "/admin/") return ownerEntry();
+        if (path === "/api/admin/auth/me") return new Response(null, { status: 401 });
+        if (path === "/api/products") return Response.json([{ code: "synthetic", price: 1 }]);
+        if (path === "/api/admin/auth/login") return Response.json({ csrfToken: "fixture" }, {
+          headers: { "set-cookie": "BurgerHouse.Csrf=fixture; Path=/api/admin; Secure; HttpOnly; SameSite=Strict" },
+        });
+        if (path === "/" || path === "/menu") return new Response(
+          '<div id="root"></div><script id="tbh-font-guard-script" src="/font-guard.js"></script>' +
+          '<script type="module" src="/assets/main-fixture.js"></script>' +
+          (scenario === "unexpected-script" ? '<script src="/unknown.js"></script>' : ''),
+          { headers: { "content-type": "text/html", "content-security-policy": "script-src 'self'" } });
+        if (scenario === "missing-guard" && path === "/font-guard.js") return new Response(null, { status: 404 });
+        return new Response(null, { headers: { "content-type": path.endsWith('.js') ? "text/javascript" : path.endsWith('.css') ? "text/css" : "text/html" } });
+      });
+      const report = await verifyHostedPreview("https://preview.example", fetcher);
+      expect(report.status).toBe(scenario === "valid" ? "passed-read-only-checks" : "failed-checks");
+      if (scenario !== "unexpected-script") {
+        expect(report.entryMode).toBe("static");
+        expect(fetcher.mock.calls.some(([url]) => /\/scripts\/(utils|config)\.js$/.test(url))).toBe(false);
+        expect(report.checks.find(check => check.path === "/font-guard.js").passed).toBe(scenario === "valid");
+      }
+    }
+  });
 });
