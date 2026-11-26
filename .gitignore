@@ -217,4 +217,10 @@ override.tf.json
 Desktop.ini
 ehthumbs.db
 
+# Private Azure PostgreSQL recovery tooling and runbook (non-publicable)
+/docs/postgres-azure-auth-private.md
+/scripts/admin/repair-azure-postgres-private.py
+/scripts/admin/repair-azure-postgres-windows.py
+/tests/repair-azure-postgres-private.test.py
+
 # === TBH 2.0 SECURITY HARDENING END ===
