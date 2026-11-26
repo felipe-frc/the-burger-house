@@ -124,6 +124,7 @@ body {
   container: owner-content / inline-size;
 }
 .owner-main { min-width: 0; }
+.owner-main:focus { outline: none; }
 .owner-main-status, .owner-main-meta {
   display: flex;
   flex-wrap: wrap;
@@ -217,7 +218,7 @@ body {
 .dark .owner-status[data-tone="slate"] { background: #344051; color: #e1e8f3; }
 .dark .owner-status[data-tone="red"] { background: #4c2227; color: #fca5a5; }
 
-:focus-visible {
+:focus-visible:not(.owner-main) {
   outline: 2px solid var(--owner-focus);
   outline-offset: 2px;
 }
