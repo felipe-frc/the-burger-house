@@ -40,3 +40,10 @@ Configure `Privacy__EncryptionKey`, key ring de Data Protection persistente e co
 ## Portfólio e operação comercial
 
 Manter o repositório comercial privado e preparar uma apresentação pública separada com documentação e mídias sanitizadas e direitos de uso confirmados. Revisar também o histórico Git, arquivos preparados, diretórios locais Vercel, certificados, logs, artefatos e imagens. A licença comercial e a permissão de redistribuir ativos devem ser definidas pelo titular. Homologar a recuperação por estabelecimento, com RPO/RTO acordados e restauração autorizada em destino separado.
+
+## Estado operacional pós-migração
+
+- **PostgreSQL implantado e reconciliado:** a migração SQLite → PostgreSQL 18 foi executada e reconciliada com preservação dos registros históricos, migrations verificadas e conexão exigindo TLS `VerifyFull`.
+- **Arquitetura publicada e estabilizada:** API no Azure App Service e vitrine React + painel Owner publicados na Vercel, com CORS restrito à origem HTTPS publicada, redirecionamento PagBank ajustado e webhooks Sandbox sem assinatura desativados.
+- **Validações concluídas:** painel Owner publicado inspecionado em modo somente leitura em todos os módulos administrativos; teste externo contra o PagBank Sandbox executado em PostgreSQL isolado comprovando criação de checkout hospedado, persistência e reutilização idempotente.
+- **Limitações e etapas futuras:** nenhum pagamento financeiro real foi executado e nenhum callback externo real de pagamento foi comprovado nesse teste (webhooks assinados permanecem cobertos pelos testes internos). O runtime `.NET 9` encontra-se fora de suporte, permanecendo a atualização para `.NET 10 LTS` como intervenção futura independente, assim como eventual liberação comercial para pagamentos reais.

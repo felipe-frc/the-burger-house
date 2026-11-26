@@ -4,7 +4,7 @@
 
 Plataforma **full-stack de pedidos e gestão operacional para hamburgueria**, desenvolvida com **React 19, TypeScript, Vite 8, Tailwind CSS v4, ASP.NET Core 9, Entity Framework Core e PostgreSQL 18**, reunindo vitrine digital, cardápio interativo com informações nutricionais, sacola persistente com sincronização entre abas, checkout integrado ao **PagBank Hosted Checkout (Sandbox)**, webhooks assinados em ECDSA, reconciliação financeira, painel administrativo **Owner React** completo e controles de privacidade e criptografia AES-256-GCM.
 
-> **Status desta ramificação:** preparação da nova arquitetura (**The Burger House 2.0**) na branch local `feat/burger-house-2.0`, ainda **não publicada** no GitHub nem implantada em produção. Os links abaixo apontam para o repositório e seu histórico existente; o deploy antigo em produção não representa esta implementação.
+> **Status operacional:** a arquitetura 2.0 foi publicada na release [`v5.0.0`](https://github.com/felipe-frc/the-burger-house/releases/tag/v5.0.0), com API ASP.NET Core e PostgreSQL 18 implantados no Azure e vitrine React + painel Owner publicados na Vercel em ambiente demonstrativo com PagBank Sandbox. A liberação comercial para recebimento de pagamentos reais constitui uma etapa independente.
 
 📂 [Repositório](https://github.com/felipe-frc/the-burger-house) • 🧪 [GitHub Actions](https://github.com/felipe-frc/the-burger-house/actions) • 📦 [Releases anteriores](https://github.com/felipe-frc/the-burger-house/releases)
 
@@ -299,10 +299,21 @@ Os números abaixo foram executados após todas as correções locais da versão
 
 A vitrine construída (`frontend/dist`) foi validada em navegador real (Chrome via Playwright) em **12 resoluções** (`320×568`, `360×640`, `375×667`, `390×844`, `414×896`, `430×932`, `768×1024`, `820×1180`, `1024×768`, `1280×800`, `1440×900` e `1920×1080`), além da matriz estrutural do Owner React, confirmando **0 pixels de overflow horizontal**, zero imagens quebradas e botões acessíveis sem truncamento.
 
-### Limitações conhecidas de validação
+### ☁️ Validação operacional pós-v5.0.0
 
-- Jornadas externas reais contra o PagBank Sandbox (`ExternalSandboxCheckoutTests`) dependem de credencial privada e rede externa, ficando isoladas por opt-in nas execuções automatizadas offline/controladas.
-- Validações visuais e de fluxo em smartphone físico via ADB não foram executadas por ausência de aparelho Android e utilitário `adb` conectados ao host durante a bateria (procedimento completo preparado na seção **Como Executar** abaixo).
+Após a publicação da `v5.0.0`, foram concluídas a implantação e a estabilização operacional da aplicação publicada:
+
+- **PostgreSQL em produção (Azure):** migração de dados SQLite → PostgreSQL 18 efetivamente implantada e reconciliada com preservação de registros históricos, integridade referencial/financeira verificada, recuperação operacional de autenticação e conexão obrigatória com `SSL Mode=VerifyFull`.
+- **Aplicação publicada (Azure + Vercel):** API em Azure App Service (`GET /health/ready` → `204`) integrada à vitrine React e ao painel Owner publicados na Vercel, com CORS restrito à origem HTTPS publicada, redirecionamento de retorno PagBank ajustado e bypass de webhooks Sandbox sem assinatura desativado.
+- **Homologação do painel Owner publicado:** todos os módulos administrativos publicados foram inspecionados em modo estritamente somente leitura, sem erros de API ou runtime.
+- **PagBank Sandbox externo (PostgreSQL isolado):** execução controlada de `ExternalSandboxCheckoutTests` contra o PagBank Sandbox real em banco PostgreSQL isolado validou criação de checkout hospedado, persistência e reutilização idempotente, sem tocar no banco de produção e sem executar pagamento financeiro real.
+- **Correções pós-publicação:** ajuste do verificador de deploy hospedado (`scripts/verify-hosted-preview.mjs` + testes em `tests/hosted-preflight.test.js`) para o bundle Vite com `font-guard.js`, e correção do contorno visual de foco indesejado em `main.owner-main` (`owner-ui/src/index.css`) preservando foco programático, navegação por teclado e modos claro e escuro.
+
+### Limitações conhecidas de validação e atividades futuras
+
+- **Pagamentos e webhooks:** nenhum pagamento financeiro real foi executado e nenhum callback externo real de pagamento foi comprovado no teste externo de Sandbox; a validação criptográfica de webhooks assinados em ECDSA permanece coberta pelos testes automatizados internos, e a liberação comercial para recebimento de pagamentos reais constitui uma etapa independente.
+- **Ciclo de vida do runtime:** o **.NET 9** encontra-se fora de suporte; a atualização para **.NET 10 LTS** permanece planejada como intervenção futura independente.
+- **Teste físico Android:** validações visuais e de fluxo em smartphone físico via ADB não foram executadas por ausência de aparelho conectado durante a bateria (procedimento completo documentado na seção **Como Executar**).
 
 ---
 
@@ -477,11 +488,12 @@ Por segurança, `https://127.0.0.1:55485` e o PostgreSQL (`55482`) escutam apena
 
 ## 🧾 Histórico de versões e evolução
 
-A **reformulação full-stack atual (The Burger House 2.0)** em preparação representa o salto arquitetural de JavaScript Vanilla + SQLite para React 19 + TypeScript + Owner React + PostgreSQL 18. Nenhuma nova tag SemVer foi criada para esta entrega; o histórico anterior de tags publicadas no repositório permanece preservado como referência evolutiva:
+A **reformulação full-stack (The Burger House 2.0)** foi publicada na tag `v5.0.0`, consolidando a evolução de JavaScript Vanilla + SQLite para React 19 + TypeScript + Owner React + PostgreSQL 18. O histórico de tags publicadas no repositório permanece preservado como referência evolutiva:
 
 | Versão | Categoria | Destaque histórico |
 | :--- | :--- | :--- |
-| [**v4.0.0**](https://github.com/felipe-frc/the-burger-house/releases/tag/v4.0.0) | 🚀 Última tag publicada | Administração inicial, financeiro, privacidade, criptografia e resiliência de pagamentos (geração anterior) |
+| [**v5.0.0**](https://github.com/felipe-frc/the-burger-house/releases/tag/v5.0.0) | 🚀 Última tag publicada | Nova arquitetura full-stack (React 19, TypeScript, painel Owner, ASP.NET Core 9, PostgreSQL 18 e PagBank Sandbox) |
+| [v4.0.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v4.0.0) | 🚀 Major | Administração inicial, financeiro, privacidade, criptografia e resiliência de pagamentos (geração anterior) |
 | [v3.0.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v3.0.0) | 🚀 Major | Evolução full-stack, backend ASP.NET Core, persistência, PagBank e Azure |
 | [v2.7.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.7.0) | 🛡️ Hardening | Testes, E2E desktop/mobile, acessibilidade, Lighthouse, SEO e segurança |
 | [v2.6.0](https://github.com/felipe-frc/the-burger-house/releases/tag/v2.6.0) | 🧪 Testes | Introdução dos testes E2E com Playwright |
@@ -497,6 +509,7 @@ A **reformulação full-stack atual (The Burger House 2.0)** em preparação rep
 
 ## 🔮 Melhorias futuras
 
+- 🔄 Atualização do runtime do backend de **.NET 9** (fora de suporte) para **.NET 10 LTS**
 - 🚚 Cálculo de taxa de entrega dinâmico por região ou faixa de CEP
 - 🔑 Gerenciamento de chaves (`Privacy__EncryptionKey` e ASP.NET Data Protection keyring) com **Azure Key Vault** em ambiente Linux/produção
 - 🔄 Estratégia formal de rotação de chaves e reproteção de registros históricos
